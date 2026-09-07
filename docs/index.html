@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ko" data-page="cover">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>도메인 주도 설계 첫걸음 — 한빛몰로 배우는 DDD</title>
+<link rel="stylesheet" href="assets/book.css">
+</head>
+<body>
+
+<div class="cover">
+
+  <p class="kicker">아키텍처를 처음 공부하는 개발자를 위한 교재</p>
+  <h1 class="title">도메인 주도 설계<br>첫걸음</h1>
+  <p class="sub">가상의 온라인 쇼핑몰 <b>한빛몰</b>을 처음부터 끝까지 파고들며,<br>
+  Python 코드로 DDD를 익히는 15장짜리 교재.</p>
+
+  <p><a class="resume" id="resume" href="ch00.html">처음부터 읽기</a></p>
+
+  <hr>
+
+  <h2>이 교재는 이렇게 생겼습니다</h2>
+
+  <p>한 장(chapter)은 <b>여러 개의 화면</b>으로 나뉩니다. 화면은 <b>← → 방향키</b>나 아래쪽
+  버튼으로 넘깁니다. 어디까지 읽었는지는 이 브라우저에 저장되므로, 다음에 다시 열면
+  <b>이어서 읽기</b>가 나타납니다.</p>
+
+  <div class="box note">
+    <p class="box-t">읽는 방법</p>
+    <ul>
+      <li><b>접힌 상자</b>는 눌러서 펼치는 부분입니다. <b>더 깊이</b>는 처음 읽을 때 건너뛰어도
+      되고, <b>모범답안</b>은 스스로 해본 다음에 열어보세요.</li>
+      <li><b>퀴즈</b>는 반드시 풀어보세요. 해설에 본문에 없는 이야기가 들어 있습니다.</li>
+      <li>점선 밑줄이 그어진 <span class="term" data-term="sku">SKU</span> 같은 낱말은
+      마우스를 올리면 뜻이 나옵니다.</li>
+      <li><b>Before / After</b> 탭이 있는 코드는 탭을 눌러 나쁜 코드와 고친 코드를 같은 자리에서
+      비교해 보세요.</li>
+    </ul>
+  </div>
+
+  <h2>학습 트랙 — 하나 골라서 시작하세요</h2>
+
+  <p>전체 분량은 <b>169화면 / 약 30시간</b>입니다. 읽기만 하는 시간이 아니라
+  퀴즈와 "직접 해보기" 과제까지 포함한 시간입니다.</p>
+
+  <div class="track-grid">
+    <div class="track">
+      <h4>여유</h4>
+      <div class="big">9주</div>
+      <p>하루 30분, 매일<br>주 3.5시간</p>
+    </div>
+    <div class="track pick">
+      <h4>표준 (추천)</h4>
+      <div class="big">6주</div>
+      <p>평일 하루 1시간<br>주 5시간</p>
+    </div>
+    <div class="track">
+      <h4>주말 집중</h4>
+      <div class="big">5주</div>
+      <p>토·일 각 3시간<br>주 6시간</p>
+    </div>
+    <div class="track">
+      <h4>단기 몰입</h4>
+      <div class="big">3주</div>
+      <p>하루 2~3시간<br>주 12시간</p>
+    </div>
+  </div>
+
+  <div class="box warn">
+    <p class="box-t">어떤 트랙이든</p>
+    <p><b>3장(애그리게이트)·7장(도메인 이벤트)·9장(바운디드 컨텍스트)</b>에서는 속도를 늦추세요.
+    이 세 장이 DDD의 허리이고, 나머지 장은 대부분 이 셋의 응용입니다.</p>
+  </div>
+
+  <h2>목차</h2>
+  <ul class="toc-list" id="toc-list"></ul>
+
+  <div class="box" style="margin-top:2rem">
+    <p class="box-t">이 교재를 다 읽으면</p>
+    <ol>
+      <li>트랜잭션 스크립트로 짠 코드의 문제를 지적하고 도메인 모델로 옮길 수 있습니다.</li>
+      <li>요구사항에서 Entity / Value Object를 구분하고, 애그리게이트 경계를 <b>근거와 함께</b>
+      그을 수 있습니다.</li>
+      <li>도메인 이벤트로 결합을 낮추고, 그 대가(결과적 일관성)를 설명할 수 있습니다.</li>
+      <li>시스템을 바운디드 컨텍스트로 쪼개고 컨텍스트 맵을 그릴 수 있습니다.</li>
+      <li><b>DDD를 쓰지 말아야 할 상황을 판단할 수 있습니다.</b></li>
+    </ol>
+  </div>
+
+</div>
+
+<script src="assets/book.js"></script>
+</body>
+</html>

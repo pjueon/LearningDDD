@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="ko" data-chapter="ch01">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1장 · 왜 DDD인가: 잘 돌아가는 나쁜 코드 — 도메인 주도 설계 첫걸음</title>
+<link rel="stylesheet" href="assets/book.css">
+</head>
+<body>
+
+<main id="book"><div class="inner">
+
+<!-- ─────────────────────────────────────────── 화면 1 -->
+<section class="screen" data-title="이 장에서 할 일">
+  <p class="kicker">1장 · 화면 1</p>
+  <h1>왜 DDD인가<br>잘 돌아가는 나쁜 코드</h1>
+
+  <p class="lead">DDD를 배우는 가장 빠른 길은 DDD가 없는 코드에서 <b>직접 아파보는</b> 것입니다.
+  이 장에서는 패턴을 하나도 배우지 않습니다. 대신 한빛몰의 초기 코드를 읽고, 요구사항 세 개를
+  차례로 끼워 넣으면서 그 코드가 어떻게 썩는지 관찰합니다.</p>
+
+  <div class="box note">
+    <p class="box-t">이 장의 진행</p>
+    <ol>
+      <li>한빛몰의 "주문하기" 요구사항을 읽습니다.</li>
+      <li>그 요구사항을 가장 자연스러운 방식으로 구현한 코드를 봅니다. <b>이 코드는 잘 돌아갑니다.</b></li>
+      <li>현실적인 요구사항 변경 세 개를 순서대로 반영합니다.</li>
+      <li>6개월 뒤의 코드를 놓고 <b>정확히 무엇이 아픈지</b> 진단합니다.</li>
+      <li>이 상태에 붙은 이름(트랜잭션 스크립트, 빈혈 도메인 모델)을 배웁니다.</li>
+      <li>그리고 <b>이 방식이 정답인 경우</b>도 확인합니다.</li>
+    </ol>
+  </div>
+
+  <div class="box warn">
+    <p class="box-t">중요한 태도</p>
+    <p>앞으로 볼 코드를 비웃지 마세요. 이 코드는 <b>실력 없는 사람이 쓴 코드가 아닙니다.</b>
+    요구사항을 가장 짧은 경로로 정확히 구현한, 성실한 코드입니다. 문제는 코드 실력이 아니라
+    <b>코드가 자라는 방향</b>에 있습니다. 그 방향을 볼 수 있게 되는 것이 이 장의 목표입니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 2 -->
+<section class="screen" data-title="요구사항: 주문하기">
+  <p class="kicker">1장 · 화면 2</p>
+  <h2>요구사항: "주문하기"</h2>
+
+  <p>주문팀 은수가 개발팀에 넘긴 첫 요구사항입니다. 한빛몰 서비스 오픈을 앞둔 시점입니다.</p>
+
+  <blockquote>
+    <p><b>주문하기</b></p>
+    <p>고객이 상품과 수량을 골라 주문하면, 재고를 확인하고 결제를 진행한 뒤 주문을 확정한다.</p>
+    <ol>
+      <li>주문에는 상품이 하나 이상 담겨야 한다.</li>
+      <li>판매 중지된 상품은 주문할 수 없다.</li>
+      <li>재고가 부족하면 주문을 받지 않는다.</li>
+      <li>재고는 <b>유통기한이 이른 것부터</b> 잡는다.</li>
+      <li>주문 금액은 (상품 가격 × 수량)의 합이고, <b>3만 원 미만이면 배송비 3,000원</b>을 더한다.</li>
+      <li>결제가 실패하면 주문 전체를 취소한다. 재고도 원상복구해야 한다.</li>
+      <li>주문이 확정되면 고객에게 확인 메일을 보내고, 창고 슬랙 채널에 알린다.</li>
+      <li>주문 시점의 <b>상품명과 가격을 그대로 보관</b>한다. 나중에 상품 가격이 바뀌어도
+      과거 주문 금액은 변하지 않아야 한다.</li>
+    </ol>
+  </blockquote>
+
+  <p>요구사항 여덟 개. 애매한 것도 없고, 이상한 것도 없습니다. 읽으면 바로 코드가 떠오릅니다.
+  실제로 개발팀은 이걸 이틀 만에 만들어 배포했습니다.</p>
+
+  <div class="box note">
+    <p class="box-t">잠깐 — 8번 요구사항이 눈에 걸렸다면</p>
+    <p>"주문 시점의 상품명과 가격을 보관한다"는 조항은 데이터베이스 정규화를 배운 사람에게는
+    거슬립니다. 상품 테이블을 참조하면 되는데 왜 값을 복사할까요? 이 조항이 이 교재에서
+    가장 여러 번 다시 등장하는 요구사항입니다. 6장에서 정면으로 다룹니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 3 -->
+<section class="screen" data-title="그래서 이렇게 짰다">
+  <p class="kicker">1장 · 화면 3</p>
+  <h2>그래서 이렇게 짰다</h2>
+
+  <p>요구사항 여덟 개를 위에서부터 아래로, 순서대로 구현한 코드입니다.
+  천천히 읽어보세요. <b>어디가 이상한지 찾으려 애쓰지 말고</b>, 요구사항과 코드가
+  어떻게 대응되는지만 확인하면 됩니다.</p>
+
+<pre><span class="cap"># ordering/views.py — 한빛몰 v1</span><code>def place_order(request):
+    body = json.loads(request.body)
+    customer_id = body["customer_id"]
+    items = body["items"]                    # [{"product_id": 12, "qty": 2}, ...]
+    address = body["address"]
+
+    if not items:
+        return JsonResponse({"error": "주문할 상품이 없습니다"}, status=400)
+
+    conn = db.connect()
+    tx = conn.begin()
+    try:
+        order_id = conn.execute(
+            "INSERT INTO orders (customer_id, status, zipcode, road, "
+            "detail, receiver, phone, total) "
+            "VALUES (%s, '결제대기', %s, %s, %s, %s, %s, 0) RETURNING id",
+            (customer_id, address["zipcode"], address["road"], address["detail"],
+             address["receiver"], address["phone"]),
+        ).scalar()
+
+        total = 0
+        for item in items:
+            product = conn.execute(
+                "SELECT * FROM products WHERE id = %s", (item["product_id"],)
+            ).one()
+            if product["status"] != "판매중":
+                raise ValueError(f"{product['name']}은 판매 중지된 상품입니다")
+
+            available = conn.execute(
+                "SELECT COALESCE(SUM(quantity - reserved), 0) FROM stock_batches "
+                "WHERE product_id = %s", (item["product_id"],)
+            ).scalar()
+            if available &lt; item["qty"]:
+                raise ValueError(f"{product['name']} 재고가 부족합니다")
+
+            # 유통기한이 이른 배치부터 예약한다
+            remain = item["qty"]
+            batches = conn.execute(
+                "SELECT * FROM stock_batches WHERE product_id = %s ORDER BY expires_on",
+                (item["product_id"],)
+            ).all()
+            for b in batches:
+                if remain == 0:
+                    break
+                take = min(b["quantity"] - b["reserved"], remain)
+                conn.execute(
+                    "UPDATE stock_batches SET reserved = reserved + %s WHERE id = %s",
+                    (take, b["id"]),
+                )
+                remain -= take
+
+            line_total = product["price"] * item["qty"]
+            total += line_total
+            conn.execute(
+                "INSERT INTO order_lines (order_id, product_id, product_name, "
+                "unit_price, qty, line_total) "
+                "VALUES (%s, %s, %s, %s, %s, %s)",
+                (order_id, product["id"], product["name"], product["price"],
+                 item["qty"], line_total),
+            )
+
+        # 3만원 미만이면 배송비 3,000원
+        if total &lt; 30000:
+            total += 3000
+
+        conn.execute("UPDATE orders SET total = %s WHERE id = %s", (total, order_id))
+
+        pg = pg_client.approve(customer_id=customer_id, amount=total, order_id=order_id)
+        if pg["resultCode"] != "0000":
+            raise ValueError("결제 실패: " + pg["resultMsg"])
+
+        conn.execute(
+            "UPDATE orders SET status = '결제완료', pg_tid = %s WHERE id = %s",
+            (pg["tid"], order_id),
+        )
+        tx.commit()
+    except Exception as e:
+        tx.rollback()
+        return JsonResponse({"error": str(e)}, status=400)
+
+    mailer.send(customer_id, "주문이 접수되었습니다", render_order_mail(order_id))
+    slack.notify("#창고", f"신규 주문 {order_id}")
+    return JsonResponse({"order_id": order_id})
+</code></pre>
+
+  <p>여기까지 <b>83줄</b>입니다. 요구사항 1번은 7~8행, 2번은 26~27행, 3번은 33~34행,
+  4번은 36~50행, 5번은 62~64행, 6번은 <code>try/except</code> 전체, 7번은 마지막 두 줄(81~82행),
+  8번은 54~60행에서 <code>order_lines</code>에 상품명과 가격을 함께 넣은 부분입니다.</p>
+
+  <p><b>요구사항과 코드가 거의 일대일로 붙어 있습니다.</b> 이게 이 코드의 가장 큰 장점입니다.</p>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 4 -->
+<section class="screen" data-title="이 코드는 잘 돌아간다">
+  <p class="kicker">1장 · 화면 4</p>
+  <h2>이 코드는 잘 돌아간다</h2>
+
+  <p>이 대목을 건너뛰면 이 장을 잘못 읽게 됩니다. 위 코드의 <b>장점</b>을 먼저 인정하고 갑시다.</p>
+
+  <div class="box good">
+    <p class="box-t">이 코드가 좋은 이유</p>
+    <ul>
+      <li><b>읽는 순서 = 벌어지는 순서.</b> 위에서 아래로 읽으면 무슨 일이 일어나는지 알 수 있습니다.
+      추적할 파일이 하나입니다.</li>
+      <li><b>이틀 만에 나왔습니다.</b> 클래스 설계 회의도, 추상화 논쟁도 없었습니다.</li>
+      <li><b>테스트가 통과했습니다.</b> 정상 주문, 재고 부족, 판매 중지, 결제 실패 — 네 가지 경로를
+      모두 테스트했고 다 통과합니다.</li>
+      <li><b>실제로 잘 팔립니다.</b> 오픈 첫 달 주문 2만 건을 이 코드가 처리했습니다.</li>
+    </ul>
+  </div>
+
+  <p>DDD를 이야기하는 글들은 이런 코드를 "안티패턴"이라 부르며 시작합니다. 그건 절반만 맞습니다.
+  이 코드의 진짜 문제는 지금 보이지 않습니다. <b>문제는 시간과 함께 옵니다.</b></p>
+
+  <p>이제 실제로 벌어진 요구사항 변경 세 개를 순서대로 반영해 보겠습니다.
+  각 변경은 그 자체로는 아주 합리적이고, 크지도 않습니다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:5rem">시점</th><th>요청</th><th>요청한 사람</th></tr>
+      <tr><td>3개월 뒤</td><td>회원 등급별 할인과 등급별 무료배송</td><td>은수 (주문팀)</td></tr>
+      <tr><td>4개월 뒤</td><td>유통기한 임박 재고 처리 규칙</td><td>도현 (창고팀)</td></tr>
+      <tr><td>6개월 뒤</td><td>고객 주문 취소 기능</td><td>지민 (CS팀)</td></tr>
+    </table>
+  </div>
+
+  <p>세 개뿐입니다. 6개월에 세 개면 아주 조용한 프로젝트입니다.</p>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 5 -->
+<section class="screen" data-title="변경 1 — 등급 할인">
+  <p class="kicker">1장 · 화면 5</p>
+  <h2>변경 1 — 회원 등급 할인</h2>
+
+  <blockquote>
+    <p><b>은수</b> — 회원 등급을 도입합니다. 일반/실버/골드예요. 실버는 3%, 골드는 5% 할인.
+    그리고 골드는 금액 상관없이 무료배송입니다. 배송비 기준 3만 원도 골드는 안 봐요.</p>
+  </blockquote>
+
+  <p>기존 코드에서 금액을 계산하는 부분은 두 군데입니다. 라인 소계를 더하는 곳과
+  배송비를 붙이는 곳. 거기에 끼워 넣습니다.</p>
+
+<pre><span class="cap"># ordering/views.py — 금액 계산 부분만</span><code>            line_total = product["price"] * item["qty"]
+            total += line_total
+            # ... (order_lines INSERT 생략)
+
+        <b class="hl">grade = conn.execute(
+            "SELECT grade FROM customers WHERE id = %s", (customer_id,)
+        ).scalar()
+
+        discount = 0
+        if grade == "실버":
+            discount = int(total * 0.03)
+        elif grade == "골드":
+            discount = int(total * 0.05)
+        total -= discount</b>
+
+        # 3만원 미만이면 배송비 3,000원
+        if total &lt; 30000 <b class="hl">and grade != "골드"</b>:
+            total += 3000
+</code></pre>
+
+  <p>12줄 추가. 테스트도 추가했고 통과합니다. 배포했습니다.</p>
+
+  <p>그런데 배포 다음 주, 은수가 슬랙으로 물어봅니다.</p>
+
+  <div class="dialog">
+    <div class="line"><div class="who">은수</div><div class="say">
+      <p>할인이 배송비 <b>전</b>에 들어가나요 <b>후</b>에 들어가나요?</p></div></div>
+    <div class="line"><div class="who">개발팀</div><div class="say">
+      <p>...전입니다.</p></div></div>
+    <div class="line"><div class="who">은수</div><div class="say">
+      <p>그럼 29,000원 주문한 실버 회원은 할인 받고 28,130원이 되니까 배송비가 붙네요?
+      할인을 받았는데 총액이 더 커지는 구간이 생기는데요.</p></div></div>
+  </div>
+
+  <div class="box warn">
+    <p class="box-t">여기서 벌어진 일</p>
+    <p>버그는 아닙니다. 코드는 적힌 대로 정확히 동작합니다. 문제는 <b>아무도 이 결정을 하지 않았다는 것</b>입니다.
+    "할인을 배송비 판정 전에 적용한다"는 업무 규칙이 <code>total -= discount</code>라는 한 줄의
+    <b>위치</b>로 결정되어 버렸습니다.</p>
+    <p>이런 결정은 코드 리뷰에서 보이지 않습니다. 리뷰어는 "총액에서 할인을 뺀다"는 것만 확인하고
+    통과시킵니다. <b>순서가 규칙이라는 사실</b>을 코드가 말해주지 않기 때문입니다.</p>
+  </div>
+
+  <p>은수와 상의해서 "배송비는 할인 전 금액으로 판정한다"로 정했습니다.
+  이제 <code>total</code> 하나로는 안 됩니다. 할인 전 금액을 따로 들고 있어야 합니다.
+  변수 하나가 늘어납니다.</p>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 6 -->
+<section class="screen" data-title="변경 2 — 유통기한">
+  <p class="kicker">1장 · 화면 6</p>
+  <h2>변경 2 — 유통기한 규칙</h2>
+
+  <blockquote>
+    <p><b>도현</b> — 지난달에 유통기한 지난 라면이 고객에게 나갔습니다. 재고에는 있다고 나오는데
+    실제로는 폐기 대상이었어요. 그리고 유통기한 3일 남은 재고는 아예 주문에 잡히면 안 됩니다.
+    포장하고 배송하는 데 이틀 걸리니까요.</p>
+  </blockquote>
+
+  <p>여기서 개발팀은 기존 코드의 <b>버그</b>를 발견합니다. 화면 3의 코드를 다시 보세요.</p>
+
+<pre><span class="cap"># 재고 확인과 예약 — 원래 코드</span><code>            available = conn.execute(
+                "SELECT COALESCE(SUM(quantity - reserved), 0) FROM stock_batches "
+                "WHERE product_id = %s", (item["product_id"],)
+            ).scalar()
+            if available &lt; item["qty"]:
+                raise ValueError(f"{product['name']} 재고가 부족합니다")
+            ...
+            batches = conn.execute(
+                "SELECT * FROM stock_batches WHERE product_id = %s ORDER BY expires_on",
+                (item["product_id"],)
+            ).all()
+</code></pre>
+
+  <p><b>유통기한을 아무도 확인하지 않습니다.</b> 기한이 지난 배치도 가용 재고에 들어가고,
+  <code>ORDER BY expires_on</code>은 오히려 <b>기한이 지난 배치를 가장 먼저</b> 예약합니다.
+  요구사항 4번("유통기한이 이른 것부터 잡는다")을 성실하게 구현한 결과가 정확히 이 사고였습니다.</p>
+
+  <p>고쳐야 할 곳은 두 군데입니다. 가용 재고를 세는 쿼리와, 배치를 고르는 쿼리.
+  <b>같은 규칙을 두 번 써야 합니다.</b></p>
+
+  <div class="tabs">
+    <div class="tab" data-label="수정 후 (두 곳 모두)">
+<pre><code>            <b class="hl">cutoff = date.today() + timedelta(days=3)</b>
+
+            available = conn.execute(
+                "SELECT COALESCE(SUM(quantity - reserved), 0) FROM stock_batches "
+                "WHERE product_id = %s <b class="hl">AND expires_on &gt; %s</b>",
+                (item["product_id"], <b class="hl">cutoff</b>)
+            ).scalar()
+            if available &lt; item["qty"]:
+                raise ValueError(f"{product['name']} 재고가 부족합니다")
+            ...
+            batches = conn.execute(
+                "SELECT * FROM stock_batches WHERE product_id = %s "
+                "<b class="hl">AND expires_on &gt; %s</b> ORDER BY expires_on",
+                (item["product_id"], <b class="hl">cutoff</b>)
+            ).all()
+</code></pre>
+    </div>
+    <div class="tab" data-label="한 달 뒤에 벌어진 일">
+<pre><code>            # 도현: "생수는 유통기한이 2년이라 3일 규칙이 필요 없어요.
+            #        신선식품만 3일이고 가공식품은 1일이면 됩니다."
+
+            <b class="hl">margin = 3 if product["category"] == "신선식품" else 1</b>
+            cutoff = date.today() + timedelta(days=margin)
+
+            available = conn.execute(
+                "SELECT COALESCE(SUM(quantity - reserved), 0) FROM stock_batches "
+                "WHERE product_id = %s AND expires_on &gt; %s",
+                (item["product_id"], cutoff)
+            ).scalar()
+            ...
+            # 그리고 관리자 화면의 '판매 가능 재고' 목록에도
+            # 같은 규칙을 넣어야 한다는 것을 이때 알게 된다.
+            # admin/stock_views.py 에 이미 비슷한 쿼리가 세 개 있다.
+</code></pre>
+    </div>
+  </div>
+
+  <div class="box bad">
+    <p class="box-t">규칙이 흩어지기 시작한다</p>
+    <p>"팔 수 있는 재고란 무엇인가"라는 <b>하나의 업무 규칙</b>이 이제 여러 곳에 복사되어 있습니다.
+    주문 코드에 두 번, 관리자 화면에 세 번. 규칙이 바뀌면 다섯 곳을 찾아야 하고,
+    그중 하나를 놓치면 <b>화면에는 팔 수 있다고 나오는데 주문은 실패하는</b> 상태가 됩니다.</p>
+    <p>이 시점의 코드는 여전히 잘 돌아갑니다. 테스트도 통과합니다.
+    하지만 <b>"이 규칙이 지금 몇 군데에 있는지 아무도 모른다"</b>는 상태에 접어들었습니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 7 -->
+<section class="screen" data-title="변경 3 — 주문 취소">
+  <p class="kicker">1장 · 화면 7</p>
+  <h2>변경 3 — 주문 취소</h2>
+
+  <blockquote>
+    <p><b>지민</b> — 고객이 직접 주문을 취소할 수 있게 해주세요. 단, 이미 출고된 건은 안 됩니다.
+    출고된 다음에는 반품으로 처리해야 해요.</p>
+  </blockquote>
+
+  <p>새 함수를 하나 만듭니다. <code>place_order</code>는 건드리지 않으니 안전해 보입니다.</p>
+
+<pre><span class="cap"># ordering/views.py — 새 함수</span><code>def cancel_order(request, order_id):
+    conn = db.connect()
+    tx = conn.begin()
+    try:
+        order = conn.execute("SELECT * FROM orders WHERE id = %s", (order_id,)).one()
+
+        if order["status"] == "출고됨":
+            raise ValueError("이미 출고된 주문은 취소할 수 없습니다")
+
+        lines = conn.execute(
+            "SELECT * FROM order_lines WHERE order_id = %s", (order_id,)
+        ).all()
+        for line in lines:
+            # 예약해 둔 재고를 풀어준다
+            remain = line["qty"]
+            batches = conn.execute(
+                "SELECT * FROM stock_batches WHERE product_id = %s AND reserved &gt; 0 "
+                "ORDER BY expires_on", (line["product_id"],)
+            ).all()
+            for b in batches:
+                if remain == 0:
+                    break
+                give_back = min(b["reserved"], remain)
+                conn.execute(
+                    "UPDATE stock_batches SET reserved = reserved - %s WHERE id = %s",
+                    (give_back, b["id"]),
+                )
+                remain -= give_back
+
+        if order["pg_tid"]:
+            pg_client.cancel(tid=order["pg_tid"], amount=order["total"])
+
+        conn.execute("UPDATE orders SET status = '취소됨' WHERE id = %s", (order_id,))
+        tx.commit()
+    except Exception as e:
+        tx.rollback()
+        return JsonResponse({"error": str(e)}, status=400)
+
+    mailer.send(order["customer_id"], "주문이 취소되었습니다", render_cancel_mail(order_id))
+    return JsonResponse({"ok": True})
+</code></pre>
+
+  <p>배포 2주 뒤, 창고팀에서 연락이 옵니다.</p>
+
+  <div class="dialog">
+    <div class="line"><div class="who">도현</div><div class="say">
+      <p>피킹까지 다 끝내고 포장하려는데 주문이 취소됐다고 나와요. 물건을 다시 갖다 놔야 하는데
+      로케이션이 어딘지 모르겠어요.</p></div></div>
+  </div>
+
+  <p>원인은 이렇습니다. 주문 상태에는 <code>'출고준비'</code>가 있고, 이 상태는 이미
+  창고 직원이 피킹을 시작한 상태입니다. 그런데 취소 조건은 <code>status == "출고됨"</code>
+  하나만 막고 있었습니다.</p>
+
+  <div class="box bad">
+    <p class="box-t">"취소 가능 여부" 규칙이 지금 몇 군데에 있나</p>
+    <ol>
+      <li><code>cancel_order()</code> — <code>status == "출고됨"</code>이면 거부</li>
+      <li>관리자 화면의 취소 버튼 표시 조건 — <code>status not in ("출고됨", "배송완료", "취소됨")</code></li>
+      <li>고객 앱의 취소 버튼 표시 조건 — <code>status in ("결제대기", "결제완료")</code>
+      <span style="color:var(--muted)">(모바일팀이 따로 짰습니다)</span></li>
+      <li>CS 어드민의 강제 취소 — 조건 없음. 지민이 쓰는 화면입니다.</li>
+    </ol>
+    <p>네 곳의 조건이 <b>모두 다릅니다.</b> 그리고 어느 것이 "맞는" 규칙인지 아무도 모릅니다.
+    문서에는 "출고 전까지 취소 가능"이라고만 적혀 있고, <b>출고가 무슨 뜻인지는 0장에서 봤듯이
+    사람마다 다릅니다.</b></p>
+  </div>
+
+  <p>고객 앱이 버튼을 숨기고 있어서 지금까지 사고가 안 났던 것입니다.
+  모바일팀이 조건을 조금만 바꾸면 언제든 같은 사고가 다시 납니다.</p>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 8 -->
+<section class="screen" data-title="6개월 뒤: 무엇이 아픈가">
+  <p class="kicker">1장 · 화면 8</p>
+  <h2>6개월 뒤: 무엇이 아픈가</h2>
+
+  <p>요구사항 세 개를 반영했을 뿐인데, 지금 코드의 상태를 정리하면 이렇습니다.
+  막연히 "복잡해졌다"고 넘기지 않고 <b>정확한 이름</b>을 붙여 봅시다. 진단이 정확해야 처방이 나옵니다.</p>
+
+  <h3>통증 1 — 규칙이 코드 위치로 결정된다</h3>
+  <p>"할인을 배송비 판정 전에 적용한다"는 규칙은 <code>total -= discount</code> 한 줄의
+  <b>위치</b>였습니다. 누가 이 줄을 세 줄 아래로 옮기면 업무 규칙이 조용히 바뀝니다.
+  테스트가 그 케이스를 안 잡고 있으면 아무도 모릅니다.</p>
+
+  <h3>통증 2 — 같은 규칙이 여러 곳에 복사된다</h3>
+  <p>"팔 수 있는 재고"는 다섯 곳, "취소 가능 여부"는 네 곳에 있습니다.
+  <b>그리고 조건이 서로 다릅니다.</b> 규칙을 바꾸려면 먼저 규칙이 어디 있는지 찾는 조사부터
+  해야 하고, 그 조사는 절대 완벽하지 않습니다.</p>
+
+  <h3>통증 3 — 업무 규칙을 테스트하려면 세상을 다 준비해야 한다</h3>
+  <p>"골드 회원이 29,000원어치를 사면 배송비가 붙는가?"를 확인하려면
+  데이터베이스, 상품 데이터, 재고 배치, 회원 등급, PG 목(mock), 메일 목, 슬랙 목이 필요합니다.
+  금액 계산 규칙 하나 검증하는 데 <b>인프라 전체</b>가 필요합니다.
+  그래서 실제로는 이런 테스트를 안 씁니다.</p>
+
+  <h3>통증 4 — 읽어도 업무를 알 수 없다</h3>
+  <p><code>place_order</code>는 이제 90줄이 넘습니다. 이 함수를 읽으면
+  SQL, JSON 파싱, 트랜잭션 관리, PG 응답 코드, 메일 발송이 보입니다.
+  <b>"한빛몰이 주문을 어떻게 처리하는가"는 보이지 않습니다.</b>
+  업무를 알고 싶으면 코드가 아니라 은수에게 물어봐야 합니다.</p>
+
+  <h3>통증 5 — 규칙을 어길 방법이 너무 많다</h3>
+  <p>데이터베이스의 <code>orders</code> 테이블은 누구나 <code>UPDATE</code>할 수 있습니다.
+  배치 스크립트, 관리자 화면, 데이터 보정 쿼리, 다른 팀의 신규 기능 —
+  <b>이 중 어느 것도 "출고된 주문은 취소할 수 없다"를 지킬 의무가 없습니다.</b>
+  규칙은 <code>cancel_order()</code>라는 <b>한 통로 안에만</b> 있고, 통로는 여러 개입니다.</p>
+
+  <div class="box note">
+    <p class="box-t">통증 5가 가장 중요합니다</p>
+    <p>1~4는 불편함이고, 5는 <b>구조적 결함</b>입니다. 규칙을 지키는 것이 "모든 개발자가
+    잊지 않고 그 함수를 호출하는 것"에 달려 있다면, 그 규칙은 <b>이미 깨져 있는 것</b>과 같습니다.
+    사람은 잊습니다. 신입은 그 함수의 존재를 모릅니다.</p>
+    <p>DDD의 핵심 아이디어를 한 문장으로 미리 말하면 이렇습니다 —
+    <b>규칙을 지키는 유일한 통로를 만들고, 그 통로를 통하지 않으면 데이터를 바꿀 수 없게 한다.</b>
+    3장에서 이걸 <span class="term" data-term="aggregate">애그리게이트</span>라는 이름으로 배웁니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 9 -->
+<section class="screen" data-title="이 상태에 붙은 이름">
+  <p class="kicker">1장 · 화면 9</p>
+  <h2>이 상태에 붙은 이름</h2>
+
+  <p>지금까지 본 코드 스타일에는 이름이 있습니다. 널리 쓰이는 이름이니 알아두면
+  대화가 짧아집니다.</p>
+
+  <h3>트랜잭션 스크립트 (Transaction Script)</h3>
+
+  <p><span class="term" data-term="txscript">트랜잭션 스크립트</span>는
+  하나의 요청을 처음부터 끝까지 <b>절차적으로 처리하는 하나의 함수</b>를 말합니다.
+  "요청 하나 = 스크립트 하나"입니다. Martin Fowler가
+  <i>Patterns of Enterprise Application Architecture</i>(2002)에서 붙인 이름입니다.</p>
+
+  <p><code>place_order</code>와 <code>cancel_order</code>가 정확히 이것입니다.
+  이 방식에서 업무 규칙은 <b>함수의 실행 순서</b>로 표현됩니다.</p>
+
+  <h3>빈혈 도메인 모델 (Anemic Domain Model)</h3>
+
+  <p>한빛몰 코드에도 "모델"은 있습니다. 다만 이렇게 생겼습니다.</p>
+
+<pre><span class="cap"># models.py — 있긴 있는 모델</span><code>@dataclass
+class Order:
+    id: int
+    customer_id: int
+    status: str
+    total: int
+    pg_tid: str | None
+
+@dataclass
+class OrderLine:
+    order_id: int
+    product_id: int
+    product_name: str
+    unit_price: int
+    qty: int
+    line_total: int
+</code></pre>
+
+  <p>데이터를 담는 상자입니다. <b>행동이 하나도 없습니다.</b>
+  <code>Order</code>는 자기가 취소될 수 있는지 모르고, 자기 총액을 계산할 줄도 모릅니다.
+  그 지식은 전부 <code>views.py</code>의 함수들에 있습니다.</p>
+
+  <p>이런 모델을 <span class="term" data-term="anemic">빈혈 도메인 모델</span>이라고 부릅니다.
+  Martin Fowler가 2003년에 <b>안티패턴</b>으로 지목하면서 붙인 이름입니다.
+  피(행동)가 빠진 껍데기라는 뜻입니다.</p>
+
+  <div class="box warn">
+    <p class="box-t">이 두 이름의 관계</p>
+    <p>둘은 항상 같이 나타납니다. 규칙이 스크립트에 있으면 모델은 비게 되고,
+    모델이 비어 있으면 규칙은 스크립트로 갈 수밖에 없습니다.
+    ORM을 쓰면 "모델 클래스"가 생기니까 도메인 모델이 있다고 착각하기 쉽지만,
+    <b>필드만 있는 클래스는 모델이 아니라 테이블의 그림자</b>입니다.</p>
+  </div>
+
+  <details class="fold">
+    <summary>더 깊이 — 왜 "빈혈"이 안티패턴인가, 반론까지</summary>
+    <div class="fold-body">
+      <p>빈혈 모델을 옹호하는 주장도 있습니다. "데이터와 로직을 분리하면 각각 테스트하기 쉽고,
+      함수형 스타일에 가깝다"는 것입니다. 실제로 규칙이 단순하고 조합이 적은 시스템에서는
+      이 주장이 맞습니다.</p>
+      <p>문제는 규칙이 <b>서로 얽힐 때</b> 생깁니다. "결제 완료 후에는 라인을 못 바꾼다",
+      "라인이 바뀌면 총액을 다시 계산한다", "총액이 바뀌면 배송비 판정을 다시 한다" —
+      이 세 규칙은 서로를 참조합니다. 데이터와 규칙이 떨어져 있으면 이 얽힘을 표현할 곳이 없어서,
+      결국 모든 스크립트가 세 규칙을 각자 알고 있어야 합니다.</p>
+      <p>Fowler 본인의 표현을 빌리면, 빈혈 모델은 <b>"객체지향의 비용은 다 내고
+      이득은 하나도 못 받는"</b> 상태입니다. 클래스와 매핑 코드는 다 쓰면서,
+      정작 객체가 자기 규칙을 지키는 이득은 못 얻습니다.</p>
+    </div>
+  </details>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 10 -->
+<section class="screen" data-title="그런데 이게 정답인 경우">
+  <p class="kicker">1장 · 화면 10</p>
+  <h2>그런데 이게 정답인 경우</h2>
+
+  <p>여기서 균형을 잡고 갑시다. 트랜잭션 스크립트는 안티패턴이 <b>아닙니다.</b>
+  Fowler가 빈혈 모델을 안티패턴이라 부른 것과 달리, 트랜잭션 스크립트는
+  <b>정당한 선택지</b>로 소개된 패턴입니다.</p>
+
+  <div class="box good">
+    <p class="box-t">트랜잭션 스크립트가 더 나은 경우</p>
+    <ul>
+      <li><b>규칙이 거의 없는 CRUD.</b> 게시판, 설문, 관리자 화면. "저장하고 꺼내는 것"이
+      업무의 전부라면 도메인 모델을 만들 이유가 없습니다. 만들면 코드가 3배가 되고 얻는 게 없습니다.</li>
+      <li><b>규칙이 한 번 정해지고 안 바뀌는 경우.</b> 정산 배치, 데이터 마이그레이션, 리포트 생성.
+      규칙이 안 바뀌면 "규칙을 한 곳에 모으는" 이득이 작습니다.</li>
+      <li><b>규칙이 데이터 집합 연산인 경우.</b> "지난달 카테고리별 매출 상위 10개"는
+      객체 100만 개를 메모리에 올려 계산하는 것보다 SQL 한 방이 옳습니다.
+      13장에서 이 이야기를 다시 합니다.</li>
+      <li><b>수명이 짧은 코드.</b> 3개월 뒤 버릴 이벤트 페이지에 설계를 투자하는 것은 낭비입니다.</li>
+    </ul>
+  </div>
+
+  <p>그럼 한빛몰의 주문 처리는 왜 다를까요? 세 가지 신호가 있습니다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:9rem">신호</th><th>한빛몰에서 관찰된 것</th></tr>
+      <tr>
+        <td><b>규칙이 많다</b></td>
+        <td>주문 하나에 얽힌 규칙이 이미 20개가 넘습니다. 최소 수량, 금액 계산 순서,
+        판매 상태, 유통기한 여유, 등급 할인, 배송비 기준, 취소 가능 시점, 재고 예약 순서…</td>
+      </tr>
+      <tr>
+        <td><b>규칙이 자주 바뀐다</b></td>
+        <td>6개월에 세 번 바뀌었고, 앞으로 더 자주 바뀔 것입니다.
+        프로모션과 물류 정책은 회사가 살아 있는 동안 계속 바뀝니다.</td>
+      </tr>
+      <tr>
+        <td><b>규칙을 어기면 돈을 잃는다</b></td>
+        <td>유통기한 지난 식품 출고, 재고 초과 판매, 출고 후 취소.
+        전부 실제 손해와 고객 신뢰로 이어집니다.</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="box note">
+    <p class="box-t">판단 기준으로 정리하면</p>
+    <p>DDD는 <b>규칙이 많고, 자주 바뀌고, 어기면 손해가 나는</b> 영역에 씁니다.
+    셋 중 하나라도 아니라면 트랜잭션 스크립트로 짜고 그 시간을 다른 데 쓰는 것이 낫습니다.</p>
+    <p>그리고 <b>한 시스템 안에서 두 방식을 섞는 것이 정상</b>입니다. 한빛몰에서도 주문과 재고는
+    도메인 모델로 가고, 공지사항과 배너 관리는 끝까지 CRUD로 갑니다. 14장에서 이 전략을 다룹니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 11 -->
+<section class="screen" data-title="도메인·모델·로직">
+  <p class="kicker">1장 · 화면 11</p>
+  <h2>도메인, 도메인 모델, 도메인 로직</h2>
+
+  <p>이 세 낱말은 앞으로 계속 나옵니다. 지금 정확히 구분해 둡시다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:8rem">낱말</th><th>뜻</th><th>한빛몰에서는</th></tr>
+      <tr>
+        <td><b><span class="term" data-term="domain">도메인</span></b></td>
+        <td>소프트웨어가 다루는 <b>업무 영역 그 자체.</b> 코드가 아닙니다.
+        회사에 소프트웨어가 없어도 도메인은 존재합니다.</td>
+        <td>온라인 판매와 창고 물류. 은수·도현·지민이 매일 하는 일.</td>
+      </tr>
+      <tr>
+        <td><b>도메인 모델</b></td>
+        <td>그 업무를 <b>이해한 방식을 표현한 구조.</b> 업무의 사진이 아니라
+        <b>지금 풀려는 문제에 필요한 만큼만 추린 지도</b>입니다.</td>
+        <td><code>Order</code>가 라인을 갖고, 총액을 계산하고, 취소 가능 여부를 판단한다는 구조.</td>
+      </tr>
+      <tr>
+        <td><b>도메인 로직</b></td>
+        <td>업무 규칙을 실제로 구현한 코드. <b>업무 담당자와 이야기할 수 있는 것</b>만
+        도메인 로직입니다.</td>
+        <td>"3만 원 미만이면 배송비 3,000원", "출고 후에는 취소 불가"</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="box warn">
+    <p class="box-t">도메인 로직과 그 밖의 것을 가르는 질문</p>
+    <p><b>"이걸 은수에게 설명하면 알아들을까?"</b></p>
+    <p>"3만 원 미만이면 배송비 3,000원" — 알아듣습니다. 도메인 로직입니다.<br>
+    "PG 응답의 <code>resultCode</code>가 <code>0000</code>이면 성공" — 못 알아듣습니다.
+    이건 <b>기술적 세부사항</b>입니다. 은수가 아는 것은 "결제가 됐는지 안 됐는지"뿐입니다.</p>
+    <p>이 구분이 10장의 ACL(부패 방지 계층)로 이어집니다.</p>
+  </div>
+
+  <h3>앞으로 갈 길 — 미리 한 번 보기</h3>
+
+  <p>2~7장에서 코드가 어디로 가는지 30초만 미리 보겠습니다. <b>지금 이해하지 못해도 괜찮습니다.</b>
+  탭을 눌러 비교해 보세요.</p>
+
+  <div class="tabs">
+    <div class="tab" data-label="지금 (1장)">
+<pre><code>def place_order(request):
+    # ... JSON 파싱, DB 연결, 트랜잭션 시작 ...
+    total = 0
+    for item in items:
+        product = conn.execute("SELECT * FROM products ...").one()
+        if product["status"] != "판매중":
+            raise ValueError(...)
+        available = conn.execute("SELECT SUM(...) ...").scalar()
+        if available &lt; item["qty"]:
+            raise ValueError(...)
+        # 배치 예약 루프 15줄 ...
+        total += product["price"] * item["qty"]
+        conn.execute("INSERT INTO order_lines ...")
+    if total &lt; 30000:
+        total += 3000
+    # ... 할인, 결제, 상태 변경, 메일, 슬랙 ...
+</code></pre>
+    </div>
+    <div class="tab" data-label="7장에 도달하면">
+<pre><code>class OrderingService:
+    """응용 서비스 — 유스케이스를 조립할 뿐, 규칙은 갖지 않는다."""
+
+    def place_order(self, cmd: PlaceOrderCommand) -&gt; OrderNumber:
+        with self.uow:
+            items = self.catalog.snapshot(cmd.items)      # 상품명·가격 스냅샷
+            order = Order.place(
+                order_number=self.uow.orders.next_order_number(date.today()),
+                customer_id=cmd.customer_id,
+                address=cmd.shipping_address,
+                items=items,
+                shipping_fee=self.fee_policy.calculate(items, cmd.shipping_address),
+                discount=self.discount_policy.calculate(items, cmd.grade),
+            )
+            self.uow.orders.add(order)
+            self.uow.commit()
+
+        self.bus.publish(order.pull_events())              # 재고 할당·메일·슬랙은 이벤트로
+        return order.order_number
+</code></pre>
+    </div>
+  </div>
+
+  <p>오른쪽 코드에는 <b>업무 규칙이 하나도 없습니다.</b> "최소 1개 라인", "총액 계산",
+  "출고 후 취소 불가"는 모두 <code>Order</code> 안으로 들어갔고, 유통기한과 FEFO는
+  <code>InventoryItem</code> 안으로 들어갔습니다. 이 함수가 하는 일은 <b>부르는 순서를 정하는 것</b>뿐입니다.</p>
+
+  <p>그리고 이렇게 되면 통증 5가 해결됩니다. <code>Order</code>를 거치지 않고는
+  주문 상태를 바꿀 방법이 없어지기 때문입니다.</p>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 12 -->
+<section class="screen" data-title="요약 · 퀴즈 · 과제">
+  <p class="kicker">1장 · 화면 12</p>
+  <h2>1장 마무리</h2>
+
+  <div class="summary">
+    <h3>핵심 요약</h3>
+    <ol>
+      <li><b>트랜잭션 스크립트</b>는 요청 하나를 절차적으로 처리하는 함수입니다.
+      빠르게 만들 수 있고, 읽는 순서가 벌어지는 순서라 직관적입니다.</li>
+      <li>규칙이 많아지면 <b>규칙이 코드 위치로 결정되고, 여러 곳에 복사되고,
+      테스트하려면 인프라 전체가 필요하고, 읽어도 업무를 알 수 없고,
+      규칙을 어길 통로가 여러 개</b>가 됩니다.</li>
+      <li>필드만 있고 행동이 없는 모델을 <b>빈혈 도메인 모델</b>이라 부릅니다.
+      트랜잭션 스크립트와 항상 같이 나타납니다.</li>
+      <li>DDD는 <b>규칙이 많고, 자주 바뀌고, 어기면 손해가 나는</b> 영역에 씁니다.
+      그렇지 않은 곳에는 쓰지 않는 것이 옳습니다.</li>
+      <li><b>도메인</b>은 업무 영역 그 자체, <b>도메인 모델</b>은 그것을 이해한 구조,
+      <b>도메인 로직</b>은 업무 담당자와 이야기할 수 있는 규칙의 코드입니다.</li>
+    </ol>
+  </div>
+
+  <div class="quiz" data-answer="2">
+    <p class="q">다음 중 <b>도메인 로직</b>이 아닌 것은 무엇일까요?</p>
+    <ol class="options">
+      <li data-why="은수에게 설명하면 바로 알아듣습니다. 도메인 로직입니다.">유통기한이 3일 미만 남은 재고는 주문에 할당하지 않는다</li>
+      <li data-why="맞습니다. 재시도 횟수와 타임아웃은 업무 규칙이 아니라 기술적 대응입니다. 은수는 '결제가 됐는지'만 압니다.">PG사 응답이 타임아웃이면 3회까지 재시도한다</li>
+      <li data-why="취소 가능 시점은 업무 규칙입니다. 이 장에서 본 사고의 원인이기도 합니다.">출고된 주문은 취소할 수 없고 반품으로 처리한다</li>
+      <li data-why="금액 계산 규칙입니다. 도메인 로직 중에서도 가장 전형적인 것입니다.">골드 회원은 주문 금액과 무관하게 배송비가 없다</li>
+    </ol>
+    <div class="explain">
+      <p><b class="lbl">해설</b> 판별 질문은 <b>"업무 담당자와 이 규칙을 두고 대화할 수 있는가"</b>입니다.
+      재시도 3회는 은수가 정할 일이 아니고, 정해도 업무에 영향이 없습니다.
+      반면 "골드는 무료배송"은 은수가 정하고, 바뀌면 매출이 바뀝니다.</p>
+      <p>다만 경계가 늘 뚜렷하지는 않습니다. "결제가 3회 실패하면 주문을 자동 취소한다"라면
+      이건 도메인 로직입니다. 고객이 겪는 결과가 달라지고, 은수가 결정할 문제이기 때문입니다.
+      <b>같은 재시도 이야기라도 누가 결정하는지에 따라 갈립니다.</b></p>
+    </div>
+  </div>
+
+  <div class="quiz" data-answer="4">
+    <p class="q">화면 8의 통증 다섯 개 중, 저자가 <b>"구조적 결함"</b>이라고 따로 지목한 것은
+    무엇이었나요? 그리고 그 이유는?</p>
+    <ol class="options">
+      <li data-why="불편하지만, 규칙을 한곳에 모으면 자연히 완화됩니다.">규칙이 여러 곳에 복사되는 것 — 유지보수 비용이 커지기 때문</li>
+      <li data-why="테스트가 어려운 것은 결과이지 원인이 아닙니다.">테스트에 인프라 전체가 필요한 것 — 테스트를 안 쓰게 되기 때문</li>
+      <li data-why="읽기 어려움은 심각하지만, 함수를 쪼개는 것으로도 상당히 완화됩니다.">함수가 길어 업무를 알 수 없는 것 — 신규 입사자가 이해하지 못하기 때문</li>
+      <li data-why="맞습니다. 규칙 준수가 '모두가 잊지 않는 것'에 달려 있으면 그 규칙은 사실상 없는 것입니다.">규칙을 어길 통로가 여러 개인 것 — 사람의 기억에 규칙 준수를 의존하기 때문</li>
+    </ol>
+    <div class="explain">
+      <p><b class="lbl">해설</b> 1~4번 통증은 <b>비용</b>의 문제입니다. 고생하면 버틸 수 있습니다.
+      5번은 <b>보장</b>의 문제입니다. 아무리 고생해도 "이 규칙이 항상 지켜진다"고 말할 수 없습니다.</p>
+      <p>이 차이가 DDD의 여러 패턴이 존재하는 이유입니다. 애그리게이트(3장)는
+      <b>규칙을 지키는 유일한 통로</b>를 만들고, 리포지토리(4장)는 그 통로를 우회하는
+      데이터 접근을 막고, 계층 구조(5장)와 헥사고날 아키텍처(11장)는
+      그 통로가 기술 코드에 오염되지 않게 지킵니다.</p>
+    </div>
+  </div>
+
+  <div class="quiz" data-answer="1">
+    <p class="q">팀에서 새 프로젝트를 시작합니다. <b>사내 공지사항 게시판</b>입니다.
+    글 작성·수정·삭제, 첨부파일, 읽음 표시가 전부입니다. 어떻게 하는 것이 옳을까요?</p>
+    <ol class="options">
+      <li data-why="맞습니다. 규칙이 거의 없는 CRUD에 도메인 모델을 얹으면 코드만 늘어납니다.">트랜잭션 스크립트로 짠다. 도메인 모델을 만들지 않는다</li>
+      <li data-why="나중에 복잡해질 것을 대비해 미리 구조를 잡는 것은 대체로 낭비로 끝납니다. 게시판이 복잡해질 확률은 낮습니다.">지금은 단순하지만 나중을 대비해 애그리게이트로 설계한다</li>
+      <li data-why="팀의 일관성은 가치가 있지만, 그 이유만으로 불필요한 구조를 얹는 것은 목적과 수단이 바뀐 것입니다.">회사 표준이 DDD이므로 게시판도 같은 구조로 맞춘다</li>
+      <li data-why="읽음 표시 정도로는 도메인 모델의 이득이 나오지 않습니다.">읽음 표시 규칙이 있으므로 그 부분만 도메인 모델로 만든다</li>
+    </ol>
+    <div class="explain">
+      <p><b class="lbl">해설</b> 규칙이 많지도, 자주 바뀌지도, 어겨서 손해가 나지도 않습니다.
+      셋 다 아니므로 DDD를 쓸 이유가 없습니다.</p>
+      <p>이 판단을 못 하면 DDD는 <b>비용만 내는 장식</b>이 됩니다. 실무에서 "DDD 했는데 별로였다"는
+      이야기의 상당 부분이 이 판단 실패에서 나옵니다. 14장 전체가 이 주제입니다.</p>
+    </div>
+  </div>
+
+  <div class="task">
+    <h3>직접 해보기</h3>
+    <p>화면 7에서 본 "취소 가능 여부" 규칙이 네 곳에 흩어져 있고 조건이 모두 다릅니다.
+    <b>지금 배운 것 없이</b>, 여러분이 아는 방법으로 이 문제를 고쳐 보세요.
+    코드를 쓰지 않고 3~5줄로 설명해도 됩니다.</p>
+    <p>그리고 여러분의 해법에 대해 이 질문에 답해 보세요 —
+    <b>"6개월 뒤 이 코드를 처음 보는 신입이 그 규칙을 우회할 수 있는가?"</b></p>
+  </div>
+
+  <details class="fold answer">
+    <summary>모범답안 — 그리고 흔한 해법이 왜 부족한지</summary>
+    <div class="fold-body">
+      <p><b>흔한 해법 1: 함수로 뽑는다</b></p>
+<pre><code>def can_cancel(order) -&gt; bool:
+    return order["status"] in ("결제대기", "결제완료")
+</code></pre>
+      <p>네 곳이 이 함수를 부르면 조건은 하나가 됩니다. <b>좋은 개선입니다.</b>
+      실제로 이것만 해도 이 장에서 본 사고는 막혔을 것입니다.</p>
+      <p>부족한 점: <b>부르지 않으면 아무 일도 일어나지 않습니다.</b> 모바일팀은 이 함수의
+      존재를 모르고, 데이터 보정 쿼리는 함수를 부를 수 없습니다.
+      <code>UPDATE orders SET status='취소됨' WHERE id=123</code> 한 줄이면 규칙은 통과됩니다.
+      통증 5가 그대로 남습니다.</p>
+
+      <p><b>흔한 해법 2: DB 제약으로 막는다</b></p>
+      <p>트리거나 <code>CHECK</code> 제약으로 상태 전이를 막는 방법입니다.
+      우회가 불가능해지므로 통증 5에는 강력합니다. 실제로 쓰이는 방법입니다.</p>
+      <p>부족한 점: 규칙이 <b>업무 언어를 잃습니다.</b> "출고된 주문은 취소할 수 없다"가
+      트리거의 SQL 조건으로 번역되면, 은수는 그것을 읽을 수 없고 개발자도 6개월 뒤에
+      왜 그 조건인지 모릅니다. 규칙이 여럿 얽히면(취소 + 라인 변경 + 총액 재계산)
+      트리거로는 표현이 급격히 어려워집니다.</p>
+
+      <p><b>이 교재가 가는 길</b></p>
+      <p>3장에서는 상태와 규칙을 <b>같은 객체 안에</b> 넣습니다.</p>
+<pre><code>class Order:
+    def cancel(self) -&gt; None:
+        if self.status not in (OrderStatus.생성됨, OrderStatus.결제대기,
+                               OrderStatus.결제완료):
+            raise AlreadyShipped("출고가 시작된 주문은 취소할 수 없습니다")
+        self.status = OrderStatus.취소됨
+</code></pre>
+      <p>그리고 4장에서 <code>status</code>를 <b>밖에서 대입할 수 없게</b> 만듭니다.
+      주문 상태를 바꾸는 유일한 방법이 <code>order.cancel()</code>이 되면,
+      규칙을 우회하려면 <b>일부러 노력해야</b> 합니다. 잊어서 우회하는 일은 없어집니다.</p>
+      <p>핵심은 함수로 뽑는 것과 객체 안에 넣는 것의 차이입니다.
+      함수는 <b>부를 수도 있고 안 부를 수도</b> 있고, 객체의 메서드는
+      <b>그 객체를 쓰는 한 반드시 거쳐야</b> 합니다.</p>
+    </div>
+  </details>
+
+  <div class="box note">
+    <p class="box-t">다음 장 예고</p>
+    <p>2장에서는 가장 작은 것부터 시작합니다. <code>total: int</code>로 돈을 표현한 것이
+    어떤 버그를 만드는지 보고, <code>Money</code>라는 객체를 만듭니다.
+    작아 보이는 이 변화가 나중에 <code>Order</code> 전체의 성격을 바꿉니다.</p>
+  </div>
+
+  <div class="chapter-end">
+    <a href="ch00.html#last"><span>이전 장</span>0장 — 이 교재를 읽는 방법과 한빛몰 이야기</a>
+    <a href="index.html"><span>다음 장은 아직 집필 전입니다</span>표지와 목차로</a>
+  </div>
+</section>
+
+</div></main>
+
+<script src="assets/book.js"></script>
+</body>
+</html>
