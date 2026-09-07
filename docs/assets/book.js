@@ -294,17 +294,19 @@
     var prevCh = neighbourReady(-1);
     var nextCh = neighbourReady(1);
 
-    function remember() {
+    // writeLast=false 이면 이 장의 진도만 남기고 '이어서 읽기' 기준점은 건드리지 않는다.
+    // (#s5 같은 딥링크로 특정 화면만 열어볼 때 기준점이 그리로 끌려가는 것을 막는다)
+    function remember(writeLast) {
       var p = loadProgress();
       var rec = p[chId] || {};
       rec.screen = cur;
       if (cur === screens.length - 1) rec.done = true;
       p[chId] = rec;
-      p['_last'] = { id: chId, screen: cur };
+      if (writeLast) p['_last'] = { id: chId, screen: cur };
       saveProgress(p);
     }
 
-    function show(i) {
+    function show(i, silentLast) {
       cur = Math.max(0, Math.min(screens.length - 1, i));
       Array.prototype.forEach.call(screens, function (s, j) {
         s.classList.toggle('is-active', j === cur);
@@ -321,7 +323,7 @@
       nextBtn.textContent = (cur === screens.length - 1 && nextCh) ? nextCh.num + ' →' : '다음 →';
 
       window.scrollTo(0, 0);
-      remember();
+      remember(!silentLast);
     }
 
     prevBtn.addEventListener('click', function () {
@@ -357,7 +359,7 @@
       var saved = loadProgress()[chId];
       if (saved && typeof saved.screen === 'number') start = saved.screen;
     }
-    show(start);
+    show(start, !!hash);
   }
 
   /* ── 표지(index.html) 초기화 ────────────────────────────────── */

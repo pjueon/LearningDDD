@@ -347,7 +347,8 @@
   <div class="box bad">
     <p class="box-t">규칙이 흩어지기 시작한다</p>
     <p>"팔 수 있는 재고란 무엇인가"라는 <b>하나의 업무 규칙</b>이 이제 여러 곳에 복사되어 있습니다.
-    주문 코드에 두 번, 관리자 화면에 세 번. 규칙이 바뀌면 다섯 곳을 찾아야 하고,
+    주문 코드에 두 곳, 그리고 관리자 화면의 <b>재고 현황</b>·<b>발주 대상 목록</b>·
+    <b>재고 엑셀 다운로드</b>에 각각 한 곳씩. 규칙이 바뀌면 다섯 곳을 찾아야 하고,
     그중 하나를 놓치면 <b>화면에는 팔 수 있다고 나오는데 주문은 실패하는</b> 상태가 됩니다.</p>
     <p>이 시점의 코드는 여전히 잘 돌아갑니다. 테스트도 통과합니다.
     하지만 <b>"이 규칙이 지금 몇 군데에 있는지 아무도 모른다"</b>는 상태에 접어들었습니다.</p>
@@ -684,14 +685,15 @@ class OrderLine:
 
     def place_order(self, cmd: PlaceOrderCommand) -&gt; OrderNumber:
         with self.uow:
-            items = self.catalog.snapshot(cmd.items)      # 상품명·가격 스냅샷
+            items = self.catalog.snapshot(cmd.items)       # 상품명·가격 스냅샷
+            grade = self.members.grade_of(cmd.customer_id)
             order = Order.place(
                 order_number=self.uow.orders.next_order_number(date.today()),
                 customer_id=cmd.customer_id,
                 address=cmd.shipping_address,
                 items=items,
                 shipping_fee=self.fee_policy.calculate(items, cmd.shipping_address),
-                discount=self.discount_policy.calculate(items, cmd.grade),
+                discount=self.discount_policy.calculate(items, grade),
             )
             self.uow.orders.add(order)
             self.uow.commit()
@@ -842,9 +844,15 @@ class OrderLine:
     작아 보이는 이 변화가 나중에 <code>Order</code> 전체의 성격을 바꿉니다.</p>
   </div>
 
+  <div class="box warn">
+    <p class="box-t">여기까지가 지금 집필된 분량입니다</p>
+    <p>2장(Entity와 Value Object)은 집필 중입니다. 표지의 목차에서 회색으로 표시된 장이
+    아직 안 나온 장이고, 새 장이 추가되면 목차에서 바로 눌러 들어갈 수 있게 됩니다.</p>
+  </div>
+
   <div class="chapter-end">
     <a href="ch00.html#last"><span>이전 장</span>0장 — 이 교재를 읽는 방법과 한빛몰 이야기</a>
-    <a href="index.html"><span>다음 장은 아직 집필 전입니다</span>표지와 목차로</a>
+    <a href="index.html"><span>돌아가기</span>표지와 목차로</a>
   </div>
 </section>
 
