@@ -9,7 +9,7 @@
   var BOOK = [
     { id: 'ch00', num: '0장', title: '이 교재를 읽는 방법과 한빛몰 이야기', part: '입문', screens: 6, hours: 0.5, ready: true },
     { id: 'ch01', num: '1장', title: '왜 DDD인가: 잘 돌아가는 나쁜 코드', part: '입문', screens: 17, hours: 3.0, ready: true },
-    { id: 'ch02', num: '2장', title: '도메인 모델의 최소 단위: Entity와 Value Object', part: '전술적 설계', screens: 14, hours: 2.5 },
+    { id: 'ch02', num: '2장', title: '도메인 모델의 최소 단위: Entity와 Value Object', part: '전술적 설계', screens: 14, hours: 2.5, ready: true },
     { id: 'ch03', num: '3장', title: 'Aggregate: 불변식을 지키는 경계', part: '전술적 설계', screens: 16, hours: 3.0 },
     { id: 'ch04', num: '4장', title: 'Repository: 도메인에서 DB를 밀어내기', part: '전술적 설계', screens: 12, hours: 2.5 },
     { id: 'ch05', num: '5장', title: 'Application Service와 계층 구조', part: '전술적 설계', screens: 13, hours: 2.5 },
@@ -45,7 +45,10 @@
     inbound: '입고예정 — 아직 창고에 없지만 들어올 날짜(ETA)가 정해진 물량. 발주만 한 것과는 다르다.',
     promised: '출고 예정일 — 주문 전량이 모여 출고할 수 있게 되는 날. 도착 예정일은 여기에 배송 리드타임을 더한 날이다.',
     batch: '배치 — 한 번에 들어온 물건 묶음. 같은 상품이라도 입고된 날이 다르면 다른 배치다. 유통기한이 배치마다 다르기 때문에 나눠 관리한다.',
-    reserved: '예약수량 — 창고에 물건은 있지만 이미 다른 주문이 잡아둔 수량. 팔 수 있는 수량은 실물수량에서 이것을 뺀 값이다.'
+    reserved: '예약수량 — 창고에 물건은 있지만 이미 다른 주문이 잡아둔 수량. 팔 수 있는 수량은 실물수량에서 이것을 뺀 값이다.',
+    vo: '값 객체 — 불변이고, 내용이 같으면 같은 것으로 보고, 바꿀 때는 새로 만들어 교체하는 객체. 금액·주소·수량처럼 "숫자처럼 다뤄도 되는" 도메인 개념이다.',
+    entity: '엔티티 — 식별자로 같음을 판단하는 객체. 내용이 다 바뀌어도 식별자가 같으면 같은 것이고, 생애 주기를 추적한다.',
+    invariantset: '불변식 — 언제 확인해도 참이어야 하는 규칙. 이 교재는 기획 단계에서 번호를 붙여 I1~I22로 관리한다.'
   };
 
   var STORE_KEY = 'ddd-book:progress';
