@@ -10,10 +10,10 @@
     { id: 'ch00', num: '0장', title: '이 교재를 읽는 방법과 한빛몰 이야기', part: '입문', screens: 6, hours: 0.5, ready: true },
     { id: 'ch01', num: '1장', title: '왜 DDD인가: 잘 돌아가는 나쁜 코드', part: '입문', screens: 12, hours: 2.0, ready: true },
     { id: 'ch02', num: '2장', title: '도메인 모델의 최소 단위: Entity와 Value Object', part: '전술적 설계', screens: 14, hours: 2.5 },
-    { id: 'ch03', num: '3장', title: 'Aggregate: 불변식을 지키는 경계', part: '전술적 설계', screens: 14, hours: 2.5 },
+    { id: 'ch03', num: '3장', title: 'Aggregate: 불변식을 지키는 경계', part: '전술적 설계', screens: 16, hours: 3.0 },
     { id: 'ch04', num: '4장', title: 'Repository: 도메인에서 DB를 밀어내기', part: '전술적 설계', screens: 11, hours: 2.0 },
     { id: 'ch05', num: '5장', title: 'Application Service와 계층 구조', part: '전술적 설계', screens: 13, hours: 2.5 },
-    { id: 'ch06', num: '6장', title: 'Domain Service, Factory, 그리고 스냅샷', part: '전술적 설계', screens: 11, hours: 2.0 },
+    { id: 'ch06', num: '6장', title: 'Domain Service, Factory, 그리고 스냅샷', part: '전술적 설계', screens: 12, hours: 2.5 },
     { id: 'ch07', num: '7장', title: 'Domain Event: 애그리게이트 사이를 잇기', part: '전술적 설계', screens: 13, hours: 2.5 },
     { id: 'ch08', num: '8장', title: '유비쿼터스 언어: 코드와 대화가 같은 말을 쓸 때', part: '전략적 설계', screens: 9, hours: 1.5 },
     { id: 'ch09', num: '9장', title: 'Bounded Context: 하나의 모델은 어디까지 유효한가', part: '전략적 설계', screens: 13, hours: 2.5 },
@@ -38,7 +38,12 @@
     anemic: '빈혈 도메인 모델 — 데이터만 들고 있고 행동(규칙)이 없는 객체. 규칙은 전부 서비스 함수에 있다.',
     txscript: '트랜잭션 스크립트 — 하나의 요청을 처음부터 끝까지 절차적으로 처리하는 함수. 단순한 업무에는 충분한 정답이다.',
     aggregate: '애그리게이트 — 함께 일관성을 지켜야 하는 객체 묶음. 바깥에서는 대표(루트)만 만질 수 있다.',
-    ubiquitous: '유비쿼터스 언어 — 업무 담당자와 개발자, 그리고 코드가 모두 같은 뜻으로 쓰는 낱말들.'
+    ubiquitous: '유비쿼터스 언어 — 업무 담당자와 개발자, 그리고 코드가 모두 같은 뜻으로 쓰는 낱말들.',
+    onhand: '실물재고 — 창고에 지금 실제로 있는 수량. 창고팀이 "재고"라고 부르는 것.',
+    available: '가용재고 — 실물재고에서 이미 예약된 수량을 뺀 것. 지금 당장 내보낼 수 있는 수량.',
+    atp: '판매가능수량(ATP) — 가용재고 + 입고예정 잔량. 주문팀이 "재고"라고 부르는 것. 가용재고와 다른 개념이다.',
+    inbound: '입고예정 — 아직 창고에 없지만 들어올 날짜(ETA)가 정해진 물량. 발주만 한 것과는 다르다.',
+    promised: '출고 예정일 — 주문 전량이 모여 출고할 수 있게 되는 날. 도착 예정일은 여기에 배송 리드타임을 더한 날이다.'
   };
 
   var STORE_KEY = 'ddd-book:progress';
