@@ -1,0 +1,1861 @@
+<!DOCTYPE html>
+<html lang="ko" data-chapter="ch03">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3장 · Aggregate: 불변식을 지키는 경계 — 도메인 주도 설계 첫걸음</title>
+<link rel="stylesheet" href="assets/book.css">
+</head>
+<body>
+
+<main id="book"><div class="inner">
+
+<!-- ─────────────────────────────────────────── 화면 1 -->
+<section class="screen" data-title="이 장에서 할 일">
+  <p class="kicker">3장 · 화면 1</p>
+  <h1>Aggregate<br>불변식을 지키는 경계</h1>
+
+  <p class="lead">2장에서 부품을 만들었습니다. <code>Money</code>, <code>Quantity</code>,
+  <code>Address</code>. 이제 조립할 차례입니다. 그런데 조립은 <b>필드를 한 클래스에 모으는 일</b>이
+  아닙니다. <b>규칙을 지킬 경계를 긋는 일</b>입니다.</p>
+
+  <p>2장 마지막에 이런 문장을 남겼습니다 — "이 함수는 여전히 주문 밖에 있는 계산기입니다.
+  누군가 이 함수를 부르지 않고 총액을 직접 계산해 저장하면 규칙은 무시됩니다."</p>
+
+  <p>이 장은 그 문장을 없애는 장입니다. 규칙을 <b>어길 수 없게</b> 만듭니다.
+  그리고 그 규칙을 지키는 울타리에 붙은 이름이 <b>애그리게이트(Aggregate)</b>입니다.</p>
+
+  <div class="box note">
+    <p class="box-t">이 장의 지도 — 세 덩어리로 되어 있습니다</p>
+    <ul>
+      <li><b>화면 2~7 · 주문 애그리게이트.</b> <code>Order</code>를 만들며 불변식
+      I1~I5를 코드로 강제합니다. 그 과정에서 "애그리게이트 루트", "경계", "ID 참조"라는
+      세 가지 규칙이 나옵니다.</li>
+      <li><b>화면 8~9 · 재고 애그리게이트.</b> <code>InventoryItem</code>과
+      <span class="term" data-term="batch">배치</span>를 만들고
+      <span class="term" data-term="fefo">FEFO</span> 할당을 구현합니다(I7~I10).</li>
+      <li><b>화면 10~14 · 새 요구사항이 들어옵니다.</b> "입고 예정인 물건도 팔게 해주세요."
+      이 한 문장이 방금 만든 재고 모델을 갈라놓고, 마지막에는 <b>애그리게이트 경계 자체를
+      찌르는 질문</b>이 됩니다.</li>
+    </ul>
+  </div>
+
+  <div class="box warn">
+    <p class="box-t">이 장은 무겁습니다</p>
+    <p>16화면 · 3시간으로, 이 교재에서 가장 긴 장입니다.
+    <b>화면 9까지 읽고 하루 쉬는 것을 권합니다.</b> 화면 10부터는 새 요구사항을 받아
+    앞의 코드를 고치는 내용이라, 앞부분이 머리에 남아 있어야 합니다.</p>
+    <p>그리고 이 장은 DDD의 허리입니다. 4장 이후는 대부분 "여기서 만든 애그리게이트를
+    어떻게 저장하고, 조립하고, 잇는가"에 대한 이야기입니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 2 -->
+<section class="screen" data-title="같은 주에 일어난 세 건의 사고">
+  <p class="kicker">3장 · 화면 2</p>
+  <h2>같은 주에 일어난 세 건의 사고</h2>
+
+  <p>1장의 <code>place_order()</code>가 배포된 지 반년이 지났습니다. 그동안 CS팀이 쓰는
+  관리자 화면, 정산 배치, 재고 보정 스크립트가 하나씩 늘었습니다. 모두 같은 테이블을 씁니다.</p>
+
+  <div class="dialog">
+    <div class="line"><div class="who">CS팀</div><div class="say">
+      <p>주문 상세 화면에 <b>상품이 하나도 없는 주문</b>이 있습니다. 금액은 3,000원이고요.
+      배송비만 남은 것 같은데 이게 뭔가요?</p></div></div>
+    <div class="line"><div class="who">정산팀</div><div class="say">
+      <p>어제 주문 중 열두 건이 <b>라인 합계와 총액이 다릅니다.</b> 2장에서 고쳤다고
+      하지 않았나요?</p></div></div>
+    <div class="line"><div class="who">창고팀</div><div class="say">
+      <p><span class="term" data-term="picking">피킹</span> 지시서에 <b>취소된 주문</b>이
+      올라와 있습니다. 직원이 이미 물건을 꺼냈어요.</p></div></div>
+  </div>
+
+  <p>원인을 하나씩 찾아보면 이렇습니다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:9rem">사고</th><th>원인</th></tr>
+      <tr>
+        <td>라인 0개 주문</td>
+        <td>CS 관리자 화면의 "라인 삭제" 버튼. 마지막 한 줄까지 지울 수 있었다.
+        지운 뒤 총액을 다시 계산하지도 않았다.</td>
+      </tr>
+      <tr>
+        <td>총액 불일치</td>
+        <td>프로모션 배치가 <code>UPDATE orders SET discount = ...</code>만 실행했다.
+        <code>total_amount</code> 컬럼은 그대로 두었다.</td>
+      </tr>
+      <tr>
+        <td>취소 주문 출고</td>
+        <td>취소 처리 코드가 환불 API를 먼저 부르고 <code>status</code>를 나중에 바꾼다.
+        환불은 성공했는데 그 뒤에서 실패해 상태가 <code>결제완료</code>로 남았다.
+        피킹 지시 생성 배치는 <code>WHERE status = '결제완료'</code>로 뽑는다.</td>
+      </tr>
+    </table>
+  </div>
+
+  <p>세 사고의 공통점은 <b>코드가 틀렸다는 것이 아닙니다.</b> 각 코드는 자기 자리에서
+  자기 일을 합니다. 문제는 <b>지켜야 할 규칙이 코드 어디에도 적혀 있지 않다</b>는 것입니다.
+  규칙은 개발자의 머릿속에만 있었고, 새 코드를 쓰는 사람은 그 규칙을 몰랐습니다.</p>
+
+  <h3>불변식(invariant)</h3>
+
+  <p><b><span class="term" data-term="invariant">불변식</span>이란 "언제 확인해도 반드시 참이어야
+  하는 규칙"</b>입니다. "주문이 저장될 때 참"이 아니라 <b>언제나</b> 참이어야 합니다.</p>
+
+  <p>한빛몰의 주문에는 다섯 개가 있습니다. 이 교재는 기획 단계에서 번호를 붙여 관리합니다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:3rem">번호</th><th>불변식</th><th style="width:11rem">어겨지면</th></tr>
+      <tr><td><b>I1</b></td><td>주문 라인이 최소 1개 있어야 한다</td>
+        <td>빈 주문. 사고 1번</td></tr>
+      <tr><td><b>I2</b></td><td>총액 = Σ(라인 소계) − 할인액 + 배송비</td>
+        <td>금액 불일치. 사고 2번</td></tr>
+      <tr><td><b>I3</b></td><td>라인 수량은 1 이상이다</td>
+        <td>0개 주문, 음수 주문</td></tr>
+      <tr><td><b>I4</b></td><td><code>결제완료</code> 이후에는 라인을 추가·삭제·수량변경할 수 없다</td>
+        <td>결제한 금액과 다른 물건이 나감</td></tr>
+      <tr><td><b>I5</b></td><td>주문 취소는 출고 시작 전까지만 가능하다</td>
+        <td>이미 나간 물건을 "취소". 사고 3번</td></tr>
+    </table>
+  </div>
+
+  <p>I3은 2장에서 이미 해결했습니다. <code>Quantity</code>가 1 미만을 거부하므로
+  수량 0인 라인은 <b>만들 수가 없습니다.</b> 나머지 넷은 <b>여러 값에 걸친 규칙</b>이라
+  값 객체 하나로는 지킬 수 없습니다.</p>
+
+  <div class="box note">
+    <p class="box-t">규칙이 걸치는 범위가 곧 경계다</p>
+    <p>I2를 지키려면 <b>라인 전부와 할인액과 배송비를 동시에</b> 봐야 합니다.
+    I1을 지키려면 라인 목록 전체를 봐야 합니다. 즉 이 넷은 <b>"주문 하나"라는 덩어리 안에서만</b>
+    확인할 수 있습니다.</p>
+    <p>이 문장을 뒤집으면 이 장의 핵심이 나옵니다. <b>함께 확인해야 하는 것들이 곧 하나의
+    덩어리</b>이고, 그 덩어리 밖에서는 안을 건드릴 수 없어야 규칙이 지켜집니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 3 -->
+<section class="screen" data-title="Order ① 라인과 금액">
+  <p class="kicker">3장 · 화면 3</p>
+  <h2><code>Order</code> 만들기 ① — 라인과 금액</h2>
+
+  <p>2장에서 <code>Order</code>의 껍데기(식별자와 <code>__eq__</code>)까지는 만들었습니다.
+  이제 안을 채웁니다. 먼저 라인부터.</p>
+
+<pre><span class="cap"># domain/order.py — 주문 라인 (내부 엔티티)</span><code>class OrderLine:
+    def __init__(self, sku: str, product_name: str,
+                 unit_price: Money, quantity: Quantity) -&gt; None:
+        self.line_id = uuid4()                        # 1
+        self.sku = sku                                # 2
+        self.product_name = product_name              # 3
+        self.unit_price = unit_price                  # 3
+        self.quantity = quantity
+
+    @property
+    def subtotal(self) -&gt; Money:                      # 4
+        return self.unit_price * self.quantity.value
+
+    def __eq__(self, other: object) -&gt; bool:          # 5
+        if not isinstance(other, OrderLine):
+            return NotImplemented
+        return self.line_id == other.line_id
+
+    def __hash__(self) -&gt; int:
+        return hash(self.line_id)
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">4행</span> 라인에도 <b>식별자가 있습니다.</b> 같은 상품을 두 줄로
+    담을 수 있고("사은품용 1개, 내 것 2개"), 그러면 두 줄은 내용이 같아도 다른 줄입니다.
+    식별자가 필요하다는 것은 <b>라인이 값 객체가 아니라 엔티티</b>라는 뜻입니다.</li>
+
+    <li><span class="ln">5행</span> <span class="term" data-term="sku">SKU</span>를
+    <b>문자열로</b> 들고 있습니다. <code>Product</code> 객체가 아닙니다. 왜 그런지는
+    화면 7에서 다룹니다. 지금은 "상품 1개 = SKU 1개"라고 가정합니다.
+    <span class="later">9장에서 다시 볼 문제</span></li>
+
+    <li><span class="ln">6~7행</span> 상품명과 단가를 <b>복사해서</b> 보관합니다(I6).
+    카탈로그에서 가격이 바뀌어도 과거 주문 금액은 변하지 않습니다. 1장 화면 2의
+    8번 요구사항이 이것이었습니다. 왜 참조가 아니라 복사인지는 6장에서 정면으로 다룹니다.</li>
+
+    <li><span class="ln">10~12행</span> 소계를 <b>저장하지 않고 계산합니다.</b>
+    저장하면 단가나 수량이 바뀔 때 같이 안 바뀔 위험이 생깁니다.
+    "계산할 수 있는 값은 저장하지 않는다" — 사고 2번이 바로 저장해 둔 값이 낡아서
+    생긴 일이었습니다.</li>
+
+    <li><span class="ln">14~17행</span> 2장에서 배운 대로 <b>식별자 기준</b> 동등성입니다.
+    수량이 바뀌어도 같은 라인입니다.</li>
+  </ol>
+
+  <p>이제 <code>Order</code>가 라인을 품습니다.</p>
+
+<pre><span class="cap"># domain/order.py — Order (__eq__·__hash__ 는 2장에서 만든 것 그대로)</span><code>class Order:
+    def __init__(self, order_number: OrderNumber, customer_id: UUID,
+                 shipping_address: Address,
+                 discount: Money = Money.ZERO,
+                 shipping_fee: Money = Money.ZERO) -&gt; None:
+        self._order_number = order_number
+        self.customer_id = customer_id                    # 1
+        self.shipping_address = shipping_address
+        self.status = OrderStatus.생성됨
+        self._lines: list[OrderLine] = []                 # 2
+        self.discount = discount
+        self.shipping_fee = shipping_fee
+
+    @property
+    def lines(self) -&gt; tuple[OrderLine, ...]:             # 3
+        return tuple(self._lines)
+
+    def add_line(self, sku: str, product_name: str,
+                 unit_price: Money, quantity: Quantity) -&gt; None:
+        self._lines.append(                               # 4
+            OrderLine(sku, product_name, unit_price, quantity))
+
+    @property
+    def amounts(self) -&gt; Amounts:                         # 5
+        subtotal = sum((line.subtotal for line in self._lines), Money.ZERO)
+        return Amounts(subtotal=subtotal, discount=self.discount,
+                       shipping_fee=self.shipping_fee)
+
+    @property
+    def total_amount(self) -&gt; Money:                      # 6
+        return self.amounts.total
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">7행</span> 회원을 <code>Customer</code> 객체가 아니라
+    <b><code>UUID</code>로</b> 들고 있습니다. 라인의 SKU와 같은 이유이고, 화면 7의 주제입니다.</li>
+
+    <li><span class="ln">10행</span> 라인 목록을 <code>_lines</code>라는
+    <b>밑줄 이름의 리스트</b>로 둡니다. 밖에서 이 리스트를 직접 얻지 못하게 하려는 것입니다.</li>
+
+    <li><span class="ln">14~16행</span> 그래서 밖에는 <code>tuple</code>로 <b>복사해서</b>
+    줍니다. <code>tuple</code>은 <code>append</code>가 없으므로
+    <code>order.lines.append(...)</code>가 <b>불가능</b>해집니다. 라인을 넣는 길은
+    <code>add_line()</code> 하나뿐입니다.
+    <br>파이썬에는 진짜 <code>private</code>이 없어서 <code>order._lines.append(...)</code>는
+    여전히 됩니다. 하지만 그건 <b>일부러 규칙을 깨는 코드</b>이고, 리뷰에서 눈에 띕니다.
+    실수로 깨는 것과는 다릅니다.</li>
+
+    <li><span class="ln">18~21행</span> <code>OrderLine</code>을 <b><code>Order</code>가
+    만듭니다.</b> 호출자는 완성된 라인 객체를 건네지 않습니다. 이렇게 하면 라인을 만드는
+    규칙(예: 앞으로 추가될 "같은 SKU는 한 줄로 합친다")을 넣을 자리가 한 곳으로 정해집니다.</li>
+
+    <li><span class="ln">23~27행</span> 2장의 <code>calculate_amounts()</code>에서
+    <b>조립 부분만</b> 여기로 들어왔습니다. <code>sum()</code>의 두 번째 인수
+    <code>Money.ZERO</code>는 <b>시작값</b>입니다. 파이썬 <code>sum()</code>의 기본 시작값은
+    정수 <code>0</code>이라 <code>0 + Money(...)</code>에서 터집니다. 라인이 0개일 때
+    <code>Money.ZERO</code>가 나오게 하는 역할도 합니다.</li>
+
+    <li><span class="ln">29~31행</span> <b>총액은 필드가 아니라 계산값입니다.</b>
+    <code>order.total_amount = 5000</code>은 파이썬이 거부합니다(setter 없는
+    <code>property</code>라 <code>AttributeError</code>). I2를 <b>어길 방법이 없어졌습니다.</b>
+    사고 2번 같은 <code>UPDATE</code>는 4장에서 리포지토리를 만들 때 다시 막습니다.</li>
+  </ol>
+
+  <div class="box warn">
+    <p class="box-t">여기서 정직하게 남겨두는 문제</p>
+    <p><code>discount</code>는 생성할 때 받아서 그대로 들고 있습니다. 그런데
+    <code>add_line()</code>으로 라인을 하나 더 담으면 소계가 늘어나는데
+    <b>할인액은 그대로</b>입니다. 등급 할인이 5%였다면 이제 5%가 아닌 값이 됩니다.</p>
+    <p>I2("총액 = 소계 − 할인 + 배송비")는 여전히 참입니다. 어긋난 것은 <b>"할인액은 소계의
+    5%다"라는 다른 규칙</b>이고, 그 규칙은 <b>회원 등급과 프로모션</b>을 알아야 계산할 수 있습니다.
+    등급은 주문 밖(회원 컨텍스트)에 있습니다. <b>주문이 알 수 없는 것으로 만든 규칙은
+    주문 안에 넣을 수 없습니다.</b></p>
+    <p>그래서 지금은 밖에서 받은 값을 그대로 둡니다. 이 계산을 누가 언제 하는가는
+    6장 도메인 서비스(<code>DiscountPolicy</code>)의 주제입니다.
+    <span class="later">6장에서 다시 볼 문제</span></p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 4 -->
+<section class="screen" data-title="Order ② 상태가 행동을 막는다">
+  <p class="kicker">3장 · 화면 4</p>
+  <h2><code>Order</code> 만들기 ② — 상태가 행동을 막는다</h2>
+
+  <p>I4와 I5는 <b>상태에 따라 할 수 있는 일이 달라진다</b>는 규칙입니다.
+  먼저 규칙을 어겼을 때 낼 예외부터 만듭니다.</p>
+
+<pre><span class="cap"># domain/errors.py</span><code>class DomainError(Exception):
+    """도메인 규칙을 어겼을 때 나는 예외의 뿌리. (2장에서 정의)"""
+
+
+class OrderCannotBeModified(DomainError): ...   # I4
+class EmptyOrder(DomainError): ...              # I1
+class LineNotFound(DomainError): ...
+class AlreadyShipped(DomainError): ...          # I5
+class InsufficientStock(DomainError): ...       # 화면 9에서 쓴다
+</code></pre>
+
+  <div class="box note">
+    <p class="box-t">왜 <code>ValueError</code>를 쓰지 않는가</p>
+    <p><code>DomainError</code>를 뿌리로 두면 <b>업무 규칙 위반</b>과
+    <b>프로그램 버그</b>를 구분할 수 있습니다. 5장에서 응용 서비스를 만들 때
+    <code>except DomainError</code> 한 줄로 "고객에게 사유를 보여줄 오류"를 잡고,
+    나머지는 500 오류로 내보냅니다.</p>
+    <p>이름도 업무 언어입니다. <code>AlreadyShipped</code>는 CS팀이 쓰는 말이고,
+    로그에 찍혔을 때 개발자가 아닌 사람도 무슨 일인지 압니다.
+    <code>ValueError("invalid status")</code>는 그렇지 않습니다.</p>
+  </div>
+
+  <p>이제 <code>Order</code>에 행동을 붙입니다.</p>
+
+<pre><span class="cap"># domain/order.py — Order 안에 이어서</span><code>    MODIFIABLE = (OrderStatus.생성됨, OrderStatus.결제대기)      # 1
+    CANCELLABLE = (OrderStatus.생성됨, OrderStatus.결제대기,
+                   OrderStatus.결제완료, OrderStatus.출고준비)
+
+    def _ensure_modifiable(self) -&gt; None:                     # 2
+        if self.status not in self.MODIFIABLE:
+            raise OrderCannotBeModified(
+                f"{self.status.name} 주문은 라인을 바꿀 수 없습니다")
+
+    def add_line(self, sku: str, product_name: str,
+                 unit_price: Money, quantity: Quantity) -&gt; None:
+        self._ensure_modifiable()                             # 3
+        self._lines.append(
+            OrderLine(sku, product_name, unit_price, quantity))
+
+    def change_quantity(self, line_id: UUID, quantity: Quantity) -&gt; None:
+        self._ensure_modifiable()
+        self._find(line_id).quantity = quantity               # 4
+
+    def remove_line(self, line_id: UUID) -&gt; None:
+        self._ensure_modifiable()
+        if len(self._lines) == 1:                             # 5
+            raise EmptyOrder("주문에는 라인이 최소 한 개 있어야 합니다")
+        self._lines.remove(self._find(line_id))
+
+    def cancel(self) -&gt; None:
+        if self.status not in self.CANCELLABLE:               # 6
+            raise AlreadyShipped(
+                f"{self.status.name} 주문은 취소가 아니라 반품 대상입니다")
+        self.status = OrderStatus.취소됨
+
+    def _find(self, line_id: UUID) -&gt; OrderLine:              # 7
+        for line in self._lines:
+            if line.line_id == line_id:
+                return line
+        raise LineNotFound(str(line_id))
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">1~3행</span> "바꿀 수 있는 상태"와 "취소할 수 있는 상태"를
+    <b>목록으로 적어둡니다.</b> 상태가 하나 늘어날 때 고칠 곳이 여기 두 줄입니다.
+    조건문이 메서드마다 흩어져 있으면 새 상태를 넣을 때 반드시 하나를 빠뜨립니다.</li>
+
+    <li><span class="ln">5~8행</span> 검사를 <b>한 곳에 모읍니다.</b> I4는 "라인을
+    추가·삭제·수량변경할 수 없다"는 하나의 규칙인데 메서드는 셋입니다. 규칙이 하나면
+    코드도 하나여야 합니다(2장 화면 14 퀴즈 3의 논지와 같습니다).</li>
+
+    <li><span class="ln">12행</span> 세 메서드가 모두 <b>첫 줄에서</b> 같은 검사를 부릅니다.
+    이 패턴을 <b>가드(guard)</b>라고 부릅니다. 상태를 바꾸기 전에 먼저 막습니다.</li>
+
+    <li><span class="ln">18행</span> 수량 변경은 <code>Quantity</code>를 받습니다.
+    <code>int</code>가 아닙니다. 그래서 <b>0이나 음수는 여기까지 오지도 못합니다</b> —
+    2장의 <code>Quantity</code>가 생성 시점에 막습니다. 이것이 I3입니다.
+    <b>이 메서드에는 수량 검사 코드가 한 줄도 없는데 I3이 지켜집니다.</b></li>
+
+    <li><span class="ln">22~23행</span> I1입니다. 마지막 한 줄은 지울 수 없습니다.
+    CS 관리자 화면이 무엇을 하든 빈 주문은 만들 수 없습니다.
+    <br>"그럼 주문 전체를 없애고 싶을 때는?" — 그건 <b>취소</b>라는 다른 행위입니다.
+    업무에서 다른 일이면 코드에서도 다른 메서드여야 합니다.</li>
+
+    <li><span class="ln">26~30행</span> I5입니다. <code>출고됨</code>·<code>배송완료</code>는
+    목록에 없으므로 취소가 막힙니다. 예외 이름과 메시지가 <b>대안을 알려줍니다</b> —
+    "이건 취소가 아니라 반품이다". 좋은 도메인 예외는 무엇이 틀렸는지만 말하지 않고
+    <b>업무적으로 무엇을 해야 하는지</b>를 말합니다.</li>
+
+    <li><span class="ln">32~36행</span> 라인을 <b>객체가 아니라 <code>line_id</code>로</b>
+    지시받습니다. 왜 이렇게 하는지가 다음 화면의 주제입니다.</li>
+  </ol>
+
+  <div class="tabs">
+    <div class="tab" data-label="1장 — 서비스 함수">
+<pre><code># 취소 처리. 이 검사를 부르는 것을 잊으면 그냥 통과한다
+def cancel_order(order_id: int) -&gt; None:
+    with conn.begin():
+        row = conn.execute(
+            "SELECT status FROM orders WHERE id = %s", (order_id,)).one()
+        if row["status"] in ("출고됨", "배송완료"):
+            raise Exception("이미 출고된 주문입니다")
+
+        refund(order_id)                     # 여기서 실패하면?
+        conn.execute("UPDATE orders SET status = '취소됨' "
+                     "WHERE id = %s", (order_id,))
+</code></pre>
+    </div>
+    <div class="tab" data-label="3장 — 애그리게이트">
+<pre><code># 취소 처리. 검사를 부르는 것을 잊을 수 없다 — 그게 취소 자체이므로
+order = repo.get(order_number)               # 리포지토리는 4장
+order.cancel()                               # 검사 + 상태 변경이 한 덩어리
+uow.commit()                                 # 트랜잭션 경계는 5장
+</code></pre>
+    </div>
+  </div>
+
+  <p>왼쪽 코드의 문제는 검사가 <b>취소 처리와 분리된 별개의 단계</b>라는 점입니다.
+  다른 개발자가 "관리자 강제 취소" 기능을 만들면서 <code>UPDATE</code>만 쓰면
+  검사는 통과되지 않습니다. 사고 3번이 그렇게 났습니다.</p>
+
+  <p>오른쪽에서는 <b>상태를 바꾸는 유일한 통로가 <code>cancel()</code></b>이고,
+  검사는 그 안에 있습니다. 검사를 건너뛰려면 <code>cancel()</code>을 안 부르면 되는데,
+  그러면 취소가 안 됩니다.</p>
+
+  <div class="box good">
+    <p class="box-t">이 화면에서 일어난 일</p>
+    <p><b>"규칙을 지켜야 한다"가 "규칙을 어길 수 없다"로 바뀌었습니다.</b>
+    코드 리뷰로 잡던 것을 타입과 캡슐화가 잡습니다. 1장 화면 13의 통증 5번
+    (규칙을 어길 통로가 여러 개)이 여기서 사라집니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 5 -->
+<section class="screen" data-title="이 울타리에 붙은 이름">
+  <p class="kicker">3장 · 화면 5</p>
+  <h2>이 울타리에 붙은 이름 — 애그리게이트</h2>
+
+  <p>지금까지 한 일을 정리하면 이렇습니다.</p>
+
+  <ul>
+    <li><code>Order</code>와 <code>OrderLine</code>을 <b>한 덩어리</b>로 묶었다.</li>
+    <li>그 덩어리 안의 규칙(I1·I2·I4·I5)은 덩어리 안에서 지킨다.</li>
+    <li>바깥에서는 <b><code>Order</code>만</b> 만질 수 있다.
+    <code>OrderLine</code>은 밖에서 만들지도, 목록에 직접 넣지도 못한다.</li>
+  </ul>
+
+  <p>이 구조에 붙은 이름이 <b><span class="term" data-term="aggregate">애그리게이트(Aggregate)</span></b>이고,
+  바깥이 유일하게 참조하는 대표 객체를 <b><span class="term" data-term="root">애그리게이트 루트</span></b>라고
+  부릅니다. 여기서는 <code>Order</code>가 루트, <code>OrderLine</code>이 내부 엔티티입니다.</p>
+
+  <figure class="fig">
+    <svg viewBox="0 0 700 210" role="img" aria-label="주문 애그리게이트의 경계와 루트">
+      <g class="svg-line" stroke-width="1.4" stroke-dasharray="6 4">
+        <rect x="150" y="14" width="400" height="182" rx="14"/>
+      </g>
+      <g class="svg-line" stroke-width="1.4">
+        <rect x="200" y="40" width="300" height="40" rx="9"/>
+      </g>
+      <g class="svg-line" stroke-width="1.2">
+        <rect x="230" y="110" width="110" height="34" rx="8"/>
+        <rect x="360" y="110" width="110" height="34" rx="8"/>
+        <rect x="230" y="154" width="240" height="28" rx="8"/>
+      </g>
+      <g class="svg-muted" stroke="currentColor" stroke-width="1.2" fill="none">
+        <path d="M285 80 V106"/>
+        <path d="M415 80 V106"/>
+        <path d="M60 60 H196"/>
+        <path d="M60 130 H226"/>
+      </g>
+      <g class="svg-muted" stroke="none">
+        <path d="M281 106 l4 7 4 -7 z"/>
+        <path d="M411 106 l4 7 4 -7 z"/>
+        <path d="M196 56 l7 4 -7 4 z"/>
+      </g>
+      <g class="svg-muted" stroke="currentColor" stroke-width="1.6" fill="none">
+        <path d="M218 122 l16 16 M234 122 l-16 16"/>
+      </g>
+      <g text-anchor="middle" font-size="13" font-weight="700" class="svg-fg">
+        <text x="350" y="65">Order &nbsp;(애그리게이트 루트)</text>
+      </g>
+      <g text-anchor="middle" font-size="11.5" class="svg-fg">
+        <text x="285" y="131">OrderLine</text>
+        <text x="415" y="131">OrderLine</text>
+        <text x="350" y="172">Address · Money · Quantity (값 객체)</text>
+      </g>
+      <g font-size="10.5" class="svg-muted">
+        <text x="0" y="52">바깥 코드는</text>
+        <text x="0" y="64">루트만 부른다</text>
+        <text x="0" y="126">내부로 직접</text>
+        <text x="0" y="138">들어갈 수 없다</text>
+        <text x="556" y="26">애그리게이트 경계</text>
+      </g>
+    </svg>
+    <figcaption>점선이 애그리게이트 경계입니다. 밖에서 들어오는 화살표는 루트에만 닿습니다.
+    내부 엔티티를 직접 가리키는 화살표는 존재하면 안 됩니다.</figcaption>
+  </figure>
+
+  <h3>그래서 왜 <code>line_id</code>로 지시하는가</h3>
+
+  <p>화면 4의 <code>change_quantity(line_id, quantity)</code>가 라인 객체가 아니라
+  식별자를 받는 이유가 여기 있습니다. 만약 라인 객체를 밖으로 꺼내 쓰게 하면 이렇게 됩니다.</p>
+
+<pre><span class="cap"># 만약 라인을 밖에서 직접 만질 수 있다면</span><code>&gt;&gt;&gt; line = order.lines[0]
+&gt;&gt;&gt; line.quantity = Quantity(5)      # 상태 검사(I4)를 건너뛴다
+&gt;&gt;&gt; order.status
+&lt;OrderStatus.결제완료: 3&gt;            # 결제까지 끝난 주문인데 수량이 바뀌었다
+</code></pre>
+
+  <p>규칙은 <code>Order</code>에 있는데 변경은 <code>OrderLine</code>에서 일어났습니다.
+  <b>규칙을 아는 객체를 거치지 않았으므로 규칙이 적용되지 않습니다.</b></p>
+
+  <div class="box warn">
+    <p class="box-t">파이썬에서는 이걸 완전히 막을 수 없습니다</p>
+    <p><code>order.lines[0].quantity = ...</code>는 여전히 실행됩니다.
+    <code>tuple</code>로 감싸도 <b>안에 든 객체 자체는 가변</b>이기 때문입니다.
+    자바나 C#이라면 인터페이스로 읽기 전용 뷰를 줄 수 있지만 파이썬은 그렇지 않습니다.</p>
+    <p>그래서 파이썬에서 애그리게이트는 <b>강제가 아니라 설계 합의</b>에 가깝습니다.
+    중요한 것은 <b>"올바른 길이 가장 편한 길"</b>이 되게 만드는 것입니다.
+    <code>order.change_quantity(line_id, qty)</code>는 한 줄이고,
+    규칙을 우회하려면 리스트를 뒤져 객체를 꺼내는 부자연스러운 코드를 써야 합니다.
+    그런 코드는 리뷰에서 눈에 띕니다.</p>
+    <p>덧붙여, 라인을 밖으로 아예 안 주는 선택도 있습니다.
+    "화면에 뿌릴 데이터"는 4장의 리포지토리와 5장의 DTO가 따로 담당합니다.</p>
+  </div>
+
+  <details class="fold">
+    <summary>더 깊이 — 이 이름은 어디서 왔나</summary>
+    <div class="fold-body">
+      <p>애그리게이트는 에릭 에반스(Eric Evans)의 <b>『도메인 주도 설계』</b>(2003, 통칭 Blue Book)에
+      나오는 용어입니다. 원문의 정의는 대략 이렇습니다 — <b>"데이터 변경의 목적으로 하나의 단위로
+      취급되는 연관 객체들의 묶음."</b></p>
+      <p>여기서 <b>"데이터 변경의 목적으로"</b>가 핵심입니다. 읽기 위한 묶음이 아닙니다.
+      "주문 목록 화면에 회원 이름도 같이 보여줘야 하니까 <code>Order</code>가
+      <code>Customer</code>를 갖고 있어야겠다"는 <b>애그리게이트를 나누는 근거가 되지 못합니다.</b>
+      읽기는 13장 CQRS의 영역입니다.</p>
+      <p>번역어로 "집합체"를 쓰기도 하지만, 이 교재는 원어 그대로 <b>애그리게이트</b>를 씁니다.
+      "집합"이라는 말이 <code>set</code>이나 "여러 개 모음"으로 읽혀 오해를 부르기 때문입니다.
+      실무 대화에서도 대부분 원어를 씁니다.</p>
+    </div>
+  </details>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 6 -->
+<section class="screen" data-title="경계는 어디까지인가">
+  <p class="kicker">3장 · 화면 6</p>
+  <h2>경계는 어디까지인가</h2>
+
+  <p>애그리게이트가 "함께 규칙을 지키는 묶음"이라면, 자연스러운 질문이 따라옵니다.
+  <b>주문과 재고도 함께 지켜야 할 규칙이 있지 않나요?</b></p>
+
+  <div class="dialog">
+    <div class="line"><div class="who">개발팀 신입</div><div class="say">
+      <p>"재고보다 많이 주문할 수 없다"도 불변식 아닌가요? 그러면 <code>Order</code> 안에
+      재고를 넣어야 항상 지켜지는 것 아닌가요?</p></div></div>
+  </div>
+
+  <p>좋은 질문이고, 논리적으로 일관됩니다. 실제로 해보면 이렇게 됩니다.</p>
+
+<pre><span class="cap"># 만약 재고를 주문 애그리게이트 안에 넣는다면</span><code>class Order:
+    def add_line(self, item: InventoryItem, quantity: Quantity) -&gt; None:
+        if item.available_quantity &lt; quantity.value:
+            raise InsufficientStock(...)
+        item.reserve(quantity.value)        # 재고를 주문이 직접 바꾼다
+        self._lines.append(...)
+</code></pre>
+
+  <p>동작합니다. 규칙도 지켜집니다. 그런데 여기에는 <b>보이지 않는 대가</b>가 있습니다.</p>
+
+  <h3>대가 1 — 저장 단위가 함께 커진다</h3>
+
+  <p>애그리게이트는 <b>통째로 읽고 통째로 저장</b>합니다(4장에서 자세히 봅니다).
+  주문 하나를 읽으려면 그 주문이 참조하는 모든 SKU의 재고와 배치를 전부 읽어야 합니다.
+  주문 목록 화면은 이제 주문 20건 × 라인 3개 × 배치 10개를 읽습니다.</p>
+
+  <h3>대가 2 — 동시성 지옥</h3>
+
+  <p>이게 진짜 문제입니다. 12장에서 자세히 다루지만, 여기서 그림만 봐 두겠습니다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:5rem">시각</th><th>고객 A의 주문</th><th>고객 B의 주문</th></tr>
+      <tr><td>10:00:00</td><td>"생수 2박스" 주문 시작. 생수 재고를 잠근다</td><td></td></tr>
+      <tr><td>10:00:01</td><td>결제 승인 대기 (외부 PG, 평균 1.2초)</td>
+        <td>"휴지 1개 + <b>생수 1박스</b>" 주문 시작 → <b>대기</b></td></tr>
+      <tr><td>10:00:02</td><td>커밋. 잠금 해제</td><td>이제서야 진행</td></tr>
+    </table>
+  </div>
+
+  <p>고객 B는 생수 때문에 기다렸습니다. 인기 상품 하나가 <b>그 상품을 담은 모든 주문을
+  줄 세웁니다.</b> 블랙프라이데이에 잘 팔리는 SKU 하나가 전체 주문을 직렬화합니다.</p>
+
+  <div class="box bad">
+    <p class="box-t">큰 애그리게이트가 만드는 것</p>
+    <p><b>"한 번에 바꾸는 범위"가 곧 "동시에 못 하는 범위"</b>입니다.
+    애그리게이트를 크게 잡으면 일관성은 쉬워지지만 <b>동시 처리량이 그만큼 줄어듭니다.</b>
+    그리고 이 비용은 처음에는 보이지 않습니다. 트래픽이 늘어야 보이고,
+    그때는 이미 코드가 그 구조에 얽혀 있습니다.</p>
+  </div>
+
+  <h3>그럼 재고 초과 주문은 어떻게 막나</h3>
+
+  <p>막지 않습니다. 정확히는, <b>"주문을 저장하는 순간"에 막지 않습니다.</b>
+  주문을 받은 뒤 <b>재고 애그리게이트가 자기 트랜잭션에서</b> 할당을 시도하고,
+  모자라면 그때 실패 처리합니다. 고객에게는 "품절되어 주문이 취소되었습니다"가 나갑니다.</p>
+
+  <p>업무적으로 이게 이상한가요? 아닙니다. <b>실제 쇼핑몰이 그렇게 동작합니다.</b>
+  주문 완료 메일을 받은 뒤 품절 안내를 받아본 적이 있을 겁니다. 그건 버그가 아니라
+  <b>설계된 동작</b>입니다. 이것을 <b>결과적 일관성</b>이라고 부르고, 12장의 주제입니다.</p>
+
+  <div class="box note">
+    <p class="box-t">경계를 그을 때 던지는 세 가지 질문</p>
+    <ol>
+      <li><b>이 규칙은 정말 "즉시" 지켜져야 하는가?</b> 1초 뒤에 지켜져도 되는 규칙이라면
+      한 애그리게이트에 넣을 이유가 없습니다. 대부분의 규칙이 여기에 해당합니다.</li>
+      <li><b>규칙을 어겼을 때 업무적으로 되돌릴 수 있는가?</b> 재고 초과 주문은
+      취소·환불로 되돌릴 수 있습니다(비용은 들지만 가능합니다). 되돌릴 수 없는 것만
+      즉시 막아야 합니다.</li>
+      <li><b>누가 이 규칙의 주인인가?</b> "재고보다 많이 팔지 않는다"의 주인은
+      재고팀이지 주문팀이 아닙니다. 규칙은 <b>주인의 애그리게이트</b>에 둡니다.</li>
+    </ol>
+    <p>세 질문을 통과하면 애그리게이트는 <b>작아집니다.</b> 그래서 흔히
+    "애그리게이트는 작게 유지하라"고 말합니다. 다만 이 규칙이 언제 틀리는지는
+    화면 15에서 따로 다룹니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 7 -->
+<section class="screen" data-title="애그리게이트끼리는 ID로만">
+  <p class="kicker">3장 · 화면 7</p>
+  <h2>애그리게이트끼리는 ID로만 참조한다</h2>
+
+  <p>경계를 나눴으면, 그 경계를 넘는 방법도 정해야 합니다. 규칙은 한 줄입니다 —
+  <b>다른 애그리게이트는 객체가 아니라 식별자로 참조한다.</b></p>
+
+  <div class="tabs">
+    <div class="tab" data-label="객체 참조 (하지 않는다)">
+<pre><code>class Order:
+    customer: Customer          # 회원 애그리게이트 통째로
+    ...
+
+class OrderLine:
+    product: Product            # 상품 애그리게이트 통째로
+    quantity: Quantity
+
+    @property
+    def subtotal(self) -&gt; Money:
+        return self.product.price * self.quantity.value
+</code></pre>
+    </div>
+    <div class="tab" data-label="ID 참조 (이렇게 한다)">
+<pre><code>class Order:
+    customer_id: UUID           # 식별자만
+    ...
+
+class OrderLine:
+    sku: str                    # 식별자만
+    product_name: str           # 주문 시점 스냅샷 (I6)
+    unit_price: Money           # 주문 시점 스냅샷 (I6)
+    quantity: Quantity
+
+    @property
+    def subtotal(self) -&gt; Money:
+        return self.unit_price * self.quantity.value
+</code></pre>
+    </div>
+  </div>
+
+  <p>왼쪽이 훨씬 자연스러워 보입니다. ORM도 이런 모양을 권합니다.
+  그런데 왼쪽에는 세 가지 문제가 있습니다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:8rem">문제</th><th>무슨 일이 벌어지나</th></tr>
+      <tr>
+        <td><b>과거가 바뀐다</b></td>
+        <td><code>self.product.price</code>는 <b>지금 가격</b>입니다. 상품 가격이 오르면
+        <b>작년 주문의 총액도 같이 오릅니다.</b> 1장 화면 2의 8번 요구사항이
+        정확히 이걸 금지했습니다.</td>
+      </tr>
+      <tr>
+        <td><b>경계가 새어나간다</b></td>
+        <td><code>order.customer.grade = MemberGrade.골드</code>라고 쓸 수 있습니다.
+        주문 코드가 회원을 바꿉니다. 문법적으로 막을 수 없고, 이런 줄은 반드시 생깁니다.</td>
+      </tr>
+      <tr>
+        <td><b>읽는 범위가 커진다</b></td>
+        <td>주문 하나를 읽으면 회원과 상품이 딸려 옵니다. ORM의 지연 로딩으로 미루면
+        나중에 예상 못 한 곳에서 쿼리가 터집니다(N+1).</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="box good">
+    <p class="box-t">ID 참조가 주는 것</p>
+    <p><b>주문 애그리게이트를 테스트하는 데 회원도 상품도 필요 없습니다.</b>
+    <code>uuid4()</code>와 문자열 <code>"SKU-001"</code>이면 충분합니다.
+    데이터베이스도, 픽스처도 없이 <code>Order</code>의 모든 규칙을 테스트할 수 있습니다.
+    1장 화면 13의 통증 3번(테스트에 DB가 필요하다)이 여기서 사라집니다.</p>
+    <p>그리고 나중에 회원 서비스가 별도 프로세스로 떨어져 나가도
+    <b>주문 코드는 한 줄도 바뀌지 않습니다.</b> <code>UUID</code>는 프로세스 경계를 넘어도
+    똑같이 <code>UUID</code>입니다.</p>
+  </div>
+
+  <h3>그럼 상품명은 어디서 오나</h3>
+
+  <p><code>OrderLine</code>은 <code>product_name</code>과 <code>unit_price</code>를
+  들고 있습니다. 이 값은 주문을 만들 때 <b>카탈로그에서 한 번 복사</b>해 옵니다.
+  누가 복사해 오는가는 5장(응용 서비스)과 6장(스냅샷)의 주제입니다.</p>
+
+  <div class="box warn">
+    <p class="box-t">이 장이 깔고 있는 전제 하나</p>
+    <p><code>OrderLine.sku</code>에 지금은 <b><code>Product.id</code>를 그대로</b> 넣습니다.
+    "상품 1개 = SKU 1개"라고 가정하기 때문입니다. 지금은 이상해 보이지 않을 것입니다 —
+    실무에서 가장 흔한 상태이기도 합니다.</p>
+    <p>9장에서 요구사항 두 개가 들어옵니다. "3개 묶음 세트를 판다"(상품 1개 : SKU 3개),
+    "같은 라면을 낱개와 박스로 따로 판다"(SKU 1개 : 상품 2개). 그때 이 전제가 깨지고
+    <code>Product</code>가 쪼개집니다. <span class="later">9장에서 다시 볼 문제</span></p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 8 -->
+<section class="screen" data-title="재고 ① 배치와 예약수량">
+  <p class="kicker">3장 · 화면 8</p>
+  <h2>두 번째 애그리게이트 — 재고</h2>
+
+  <p>이제 경계 반대편입니다. 재고는 이 교재에서 <b>가장 여러 번 다시 등장하는 모델</b>입니다.
+  동시성(12장), 이벤트(7장), 컨텍스트 분리(9장)가 모두 여기서 출발합니다.</p>
+
+  <p>먼저 용어를 다시 확인합니다. 1장 화면 4에서 한 번 봤습니다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:8rem">용어</th><th>뜻</th></tr>
+      <tr><td><span class="term" data-term="batch">배치</span></td>
+        <td>한 번에 들어온 물건 묶음. 같은 생수라도 3월 5일 입고분과 3월 20일 입고분은
+        <b>다른 배치</b>입니다. 유통기한이 다르기 때문에 나눠 관리합니다.</td></tr>
+      <tr><td><span class="term" data-term="reserved">예약수량</span></td>
+        <td>창고에 물건은 있지만 <b>이미 다른 주문이 잡아둔</b> 수량. 아직 나가지 않았지만
+        남에게 팔면 안 됩니다.</td></tr>
+      <tr><td><span class="term" data-term="allocation">할당</span></td>
+        <td>특정 주문을 위해 재고를 잡는 행위. <b>물건이 움직인 게 아닙니다.</b>
+        숫자만 바뀝니다. 실제로 꺼내는 것은
+        <span class="term" data-term="picking">피킹</span>입니다.</td></tr>
+      <tr><td><span class="term" data-term="fefo">FEFO</span></td>
+        <td>유통기한이 이른 것부터 내보내는 규칙. 입고 순서인 FIFO와 다릅니다.
+        나중에 들어온 물건의 유통기한이 더 이를 수 있습니다.</td></tr>
+    </table>
+  </div>
+
+  <p>재고의 불변식은 이렇습니다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:3rem">번호</th><th>불변식</th></tr>
+      <tr><td><b>I7</b></td><td>가용수량 = 실물수량 − 예약수량. 항상 성립한다</td></tr>
+      <tr><td><b>I8</b></td><td>예약수량 ≤ 해당 배치의 수량 (초과 예약 불가)</td></tr>
+      <tr><td><b>I9</b></td><td>어떤 수량도 음수가 될 수 없다</td></tr>
+      <tr><td><b>I10</b></td><td>할당은 유통기한이 이른 배치부터(FEFO).
+        유통기한이 지난 배치에는 할당할 수 없다</td></tr>
+    </table>
+  </div>
+
+  <p>I7·I8·I9는 <b>배치 하나 안에서</b> 확인할 수 있습니다. I10은 <b>배치 전체를 보고</b>
+  순서를 정해야 합니다. 그래서 경계는 "한 SKU의 모든 배치"입니다.</p>
+
+<pre><span class="cap"># domain/inventory.py — 배치 (내부 엔티티)</span><code>class StockBatch:
+    def __init__(self, quantity: int, received_on: date,
+                 expires_on: date | None) -&gt; None:
+        self.batch_id = uuid4()
+        self.received_on = received_on       # 언제 창고에 들어왔나
+        self.expires_on = expires_on         # 유통기한. 없는 상품도 있다
+        self.quantity = quantity             # 실물수량
+        self.reserved = 0                    # 예약수량
+
+    @property
+    def available(self) -&gt; int:              # 1  (I7)
+        return self.quantity - self.reserved
+
+    def reserve(self, count: int) -&gt; None:
+        if count &gt; self.available:           # 2  (I8, I9)
+            raise InsufficientStock(
+                f"배치 {self.batch_id}: 가용 {self.available}, 요청 {count}")
+        self.reserved += count               # 3
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">10~12행</span> 가용수량도 <b>저장하지 않고 계산합니다.</b>
+    I7이 "항상 성립한다"고 했는데, 저장하면 실물수량을 고칠 때 가용수량을 같이 고쳐야 하고
+    언젠가 잊습니다. <b>계산값으로 두면 어긋날 수가 없습니다.</b></li>
+
+    <li><span class="ln">14~17행</span> I8과 I9를 <b>같은 한 줄이 지킵니다.</b>
+    <code>count</code>가 가용수량을 넘지 않으면 <code>reserved</code>는 <code>quantity</code>를
+    넘을 수 없고(I8), 따라서 <code>available</code>도 음수가 될 수 없습니다(I9).</li>
+
+    <li><span class="ln">18행</span> <code>self.reserved += count</code>는
+    1장 화면 7에서 봤던 SQL <code>SET reserved = reserved + %s</code>와 같은 일입니다.
+    다만 <b>두 주문이 동시에</b> 이 줄을 지날 때 무슨 일이 벌어지는지는 아직 안 다뤘습니다.
+    <span class="later">12장에서 다시 볼 문제</span></li>
+  </ol>
+
+  <p>이제 루트입니다.</p>
+
+<pre><span class="cap"># domain/inventory.py — 재고 애그리게이트 루트</span><code>class InventoryItem:
+    def __init__(self, sku: str) -&gt; None:
+        self.sku = sku                       # 1
+        self._batches: list[StockBatch] = []
+
+    @property
+    def batches(self) -&gt; tuple[StockBatch, ...]:
+        return tuple(self._batches)
+
+    def receive(self, quantity: int, received_on: date,
+                expires_on: date | None) -&gt; None:            # 2
+        self._batches.append(
+            StockBatch(quantity, received_on, expires_on))
+
+    @property
+    def available_quantity(self) -&gt; int:                     # 3
+        return sum(b.available for b in self._batches)
+
+    def __eq__(self, other: object) -&gt; bool:                 # 4
+        if not isinstance(other, InventoryItem):
+            return NotImplemented
+        return self.sku == other.sku
+
+    def __hash__(self) -&gt; int:
+        return hash(self.sku)
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">3행</span> 식별자가 <code>UUID</code>가 아니라 <b>SKU 문자열</b>입니다.
+    재고는 SKU 단위로 관리하는 것이 업무 그 자체라, 별도 식별자를 만들면 오히려 헷갈립니다.
+    그리고 지금은 이 값에 <code>Product.id</code>를 그대로 씁니다.
+    <span class="later">9장에서 다시 볼 문제</span></li>
+
+    <li><span class="ln">10~13행</span> <code>Order.add_line()</code>과 같은 모양입니다.
+    <b>배치를 루트가 만듭니다.</b> 밖에서 <code>StockBatch(...)</code>를 만들어 리스트에
+    끼워 넣는 길은 없습니다.</li>
+
+    <li><span class="ln">15~17행</span> SKU 전체의 가용수량. 배치별 가용수량의 합입니다.
+    <b>이 프로퍼티는 화면 13에서 다시 고칩니다.</b> 지금은 배치가 한 종류뿐이라
+    이걸로 충분합니다.</li>
+
+    <li><span class="ln">19~25행</span> 루트도 엔티티이므로 식별자 기준 동등성을 씁니다.
+    <code>InventoryItem("SKU-001")</code> 두 개는 배치 목록이 달라도 <b>같은 SKU의 재고</b>입니다.</li>
+  </ol>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 9 -->
+<section class="screen" data-title="재고 ② FEFO 할당">
+  <p class="kicker">3장 · 화면 9</p>
+  <h2>재고 애그리게이트 ② — FEFO 할당</h2>
+
+  <p>I10을 구현합니다. "유통기한이 이른 배치부터, 지난 배치는 빼고."</p>
+
+<pre><span class="cap"># domain/inventory.py — InventoryItem 안에</span><code>    def allocate(self, quantity: int, as_of: date) -&gt; None:
+        candidates = [b for b in self._batches                       # 1
+                      if b.available &gt; 0
+                      and (b.expires_on is None or b.expires_on &gt; as_of)]
+        candidates.sort(key=lambda b: b.expires_on or date.max)      # 2
+
+        total = sum(b.available for b in candidates)
+        if total &lt; quantity:                                         # 3
+            raise InsufficientStock(
+                f"{self.sku}: 요청 {quantity}, 가용 {total}")
+
+        remaining = quantity
+        for batch in candidates:                                     # 4
+            take = min(remaining, batch.available)
+            batch.reserve(take)
+            remaining -= take
+            if remaining == 0:
+                return
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">2~4행</span> 후보를 고릅니다. 남은 게 없는 배치와
+    <b>유통기한이 지난 배치</b>를 뺍니다. 그래서 <code>as_of</code>(기준일)를 인수로 받습니다.
+    <br><b>왜 <code>date.today()</code>를 안 쓰는가</b>: 함수 안에서 현재 시각을 읽으면
+    테스트에서 "내일이면 만료되는 배치"를 만들 수 없습니다. 시간을 밖에서 넣으면
+    어떤 날짜든 시험해 볼 수 있습니다. <b>도메인 코드는 시계를 갖지 않는다</b>는 원칙입니다.</li>
+
+    <li><span class="ln">5행</span> FEFO 정렬입니다. <code>b.expires_on or date.max</code>는
+    "유통기한이 없으면 아주 먼 미래로 친다"는 뜻입니다. <code>None</code>은 다른 날짜와
+    비교할 수 없어서 <code>sort()</code>가 터지므로, 정렬할 수 있는 값으로 바꿔 줍니다.
+    결과적으로 <b>유통기한 없는 물건은 맨 뒤로</b> 갑니다. 상하는 것부터 내보내는 것이
+    업무적으로도 맞습니다.</li>
+
+    <li><span class="ln">7~10행</span> <b>먼저 전체를 확인하고, 그다음에 예약합니다.</b>
+    이 순서가 중요합니다. 순서를 뒤집어 배치를 돌면서 예약하다가 중간에 모자라면,
+    <b>이미 예약한 것들이 남습니다.</b> 예외가 났는데 상태는 반쯤 바뀐 상태가 되고,
+    이것이 불변식을 깨는 가장 흔한 방식입니다.</li>
+
+    <li><span class="ln">13~18행</span> 앞에서부터 채웁니다. 한 배치로 모자라면
+    다음 배치로 넘어갑니다. 이렇게 <b>한 주문이 여러 배치에 걸쳐</b> 할당될 수 있습니다.
+    이 사실이 화면 14에서 중요해집니다.</li>
+  </ol>
+
+  <p>동작을 확인해 봅시다.</p>
+
+<pre><span class="cap"># 생수 SKU-001: 배치 두 개</span><code>&gt;&gt;&gt; item = InventoryItem("SKU-001")
+&gt;&gt;&gt; item.receive(10, received_on=date(2026, 9, 1),
+...              expires_on=date(2026, 12, 31))    # 배치 A
+&gt;&gt;&gt; item.receive(20, received_on=date(2026, 9, 5),
+...              expires_on=date(2026, 10, 15))    # 배치 B (나중 입고, 이른 유통기한)
+&gt;&gt;&gt; item.available_quantity
+30
+
+&gt;&gt;&gt; item.allocate(25, as_of=date(2026, 9, 7))
+&gt;&gt;&gt; [(b.quantity, b.reserved) for b in item.batches]
+[(10, 5), (20, 20)]        # B(20개)를 먼저 다 쓰고 A에서 5개
+&gt;&gt;&gt; item.available_quantity
+5
+</code></pre>
+
+  <p>B가 나중에 들어왔지만 유통기한이 이르므로 먼저 나갔습니다. <b>FIFO였다면 A부터</b>
+  나갔을 것이고, B는 10월 15일에 폐기됐을 것입니다. 이 한 줄의 정렬 규칙이
+  <b>연간 폐기 손실</b>을 좌우합니다. 도메인 규칙이 돈이 되는 전형적인 예입니다.</p>
+
+  <details class="fold">
+    <summary>더 깊이 — 유통기한 지난 재고는 왜 가용수량에서 안 빠지나</summary>
+    <div class="fold-body">
+      <p>날카로운 독자라면 눈치챘을 것입니다. <code>allocate()</code>는 만료 배치를 빼는데
+      <code>available_quantity</code>는 <b>안 뺍니다.</b> 만료된 배치가 10개 남아 있으면
+      가용수량은 10인데 할당은 실패합니다.</p>
+      <p>이유는 단순합니다. <code>available_quantity</code>는 프로퍼티라
+      <b>기준일을 받을 수 없습니다.</b> <code>available_quantity(as_of)</code>처럼
+      메서드로 바꾸면 해결되지만, 그러면 이 값을 읽는 모든 곳이 날짜를 알아야 합니다.</p>
+      <p>한빛몰은 <b>다른 선택</b>을 했습니다 — 창고에서 매일 아침 만료 배치를 폐기 처리해
+      재고에서 없애는 업무 절차가 이미 있습니다. 그래서 만료 배치는 <b>애초에 오래 남아 있지
+      않습니다.</b> <code>allocate()</code>의 만료 검사는 그 절차가 늦어진 하루치를
+      막는 안전망입니다.</p>
+      <p><b>여기서 얻을 것</b>: 코드로 완벽하게 막는 것만이 답이 아닙니다.
+      업무 절차가 이미 막고 있는 것을 코드가 또 막으면, 코드는 복잡해지는데 얻는 것은 없습니다.
+      <b>"이 규칙은 누가 지키고 있나"를 먼저 묻는 것</b>이 DDD에서 도메인 전문가와
+      대화해야 하는 이유입니다.</p>
+    </div>
+  </details>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 10 -->
+<section class="screen" data-title="새 요구사항이 들어온다">
+  <p class="kicker">3장 · 화면 10</p>
+  <h2>"입고 예정인 물건도 팔게 해주세요"</h2>
+
+  <p>여기까지가 이 장의 전반부입니다. 지금부터는 <b>새 요구사항 하나가 들어와
+  방금 만든 모델을 흔드는</b> 이야기입니다.</p>
+
+  <div class="dialog">
+    <div class="line"><div class="who">은수 (주문팀)</div><div class="say">
+      <p>경쟁사는 품절 상품에 "3일 뒤 발송"이라고 써 놓고 주문을 받습니다.
+      우리는 그냥 품절 표시가 뜨고 고객이 나갑니다. <b>입고 예정인 물건도 팔게 해주세요.</b></p></div></div>
+    <div class="line"><div class="who">도현 (창고팀)</div><div class="say">
+      <p>없는 물건을 어떻게 팝니까? 재고 시스템에 없는 수량인데요.</p></div></div>
+    <div class="line"><div class="who">은수</div><div class="say">
+      <p>있어요. 발주해서 <b>다음 주 화요일에 200개 들어오기로 확정된</b> 물량이요.
+      그걸 미리 파는 겁니다. 대신 고객에게 <b>출고 예정일을 정확히 알려줘야</b> 합니다.</p></div></div>
+    <div class="line"><div class="who">도현</div><div class="say">
+      <p>그럼 창고에 이미 있는 건요? 그건 오늘 나갈 수 있는데.</p></div></div>
+    <div class="line"><div class="who">은수</div><div class="say">
+      <p>당연히 <b>있는 것부터</b> 나가야죠. 창고에 3개 있고 5개 주문이 들어오면
+      3개는 창고에서, 2개는 입고 예정분에서요.</p></div></div>
+  </div>
+
+  <p>요구사항을 정리하면 이렇습니다.</p>
+
+  <blockquote>
+    <ol>
+      <li>입고 예정(<span class="term" data-term="eta">ETA</span> 확정) 물량도 판매 수량에 포함한다.</li>
+      <li>할당은 <b>창고에 있는 것부터</b>, 그다음 입고 예정분에서 한다.</li>
+      <li>고객에게 <b>출고 예정일</b>을 알려준다.</li>
+      <li>한빛몰은 분할 출고를 하지 않는다. <b>전량이 모여야</b> 나간다.</li>
+    </ol>
+  </blockquote>
+
+  <h3>개발팀이 처음 떠올린 세 가지 방법</h3>
+
+  <div class="box bad">
+    <p class="box-t">방법 1 — 입고 예정 수량을 그냥 재고에 더한다</p>
+<pre><code>item.receive(200, received_on=next_tuesday, expires_on=...)
+</code></pre>
+    <p>가장 빠릅니다. 그리고 즉시 무너집니다. <b>창고팀 화면에도 200개가 실물로 보입니다.</b>
+    도현이 재고 실사를 하면 200개가 비고, 피킹 지시서에 없는 물건이 뜹니다.
+    <b>"창고에 있다"와 "팔 수 있다"를 같은 숫자로 만들면 안 됩니다.</b></p>
+  </div>
+
+  <div class="box bad">
+    <p class="box-t">방법 2 — 별도 테이블을 만든다</p>
+    <p><code>expected_inbounds</code> 테이블을 새로 만들고, 주문 화면에서
+    <code>재고 + 입고예정</code>을 더해 보여줍니다.</p>
+    <p>재고 애그리게이트는 안 건드리니 안전해 보입니다. 그런데 <b>할당은 누가 하나요?</b>
+    "창고 것부터, 없으면 입고 예정분에서"라는 규칙은 <b>두 곳의 숫자를 동시에</b> 봐야 합니다.
+    규칙이 재고 밖으로 나가면, 그 규칙을 부르지 않고 재고만 건드리는 코드가 다시 생깁니다.
+    <b>화면 2의 사고 세 건이 그대로 재현됩니다.</b></p>
+  </div>
+
+  <div class="box bad">
+    <p class="box-t">방법 3 — 주문에 "예약 주문" 플래그를 단다</p>
+    <p><code>Order.is_backorder = True</code>로 두고 별도 흐름을 탑니다.</p>
+    <p>주문 5개 중 3개가 창고에 있는 경우를 표현할 수 없습니다.
+    그리고 이건 <b>주문 쪽 모델로 재고 문제를 푸는</b> 것입니다.
+    화면 6에서 본 질문 3번 — "누가 이 규칙의 주인인가?" — 의 답은 재고팀입니다.</p>
+  </div>
+
+  <div class="box good">
+    <p class="box-t">실제로 바뀌어야 하는 것</p>
+    <p>세 방법이 모두 어긋나는 이유는 같습니다. <b>업무에 새로 생긴 개념을 코드에
+    새 개념으로 만들지 않고</b>, 기존 개념에 끼워 넣으려 했기 때문입니다.</p>
+    <p>업무에서 실제로 생긴 것은 <b>"아직 안 들어온, 그러나 들어올 날이 확정된 물량"</b>이라는
+    새로운 종류의 배치입니다. 그러면 코드에도 그 개념이 있어야 합니다.
+    다음 화면에서 <b>배치가 두 종류로 갈라집니다.</b></p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 11 -->
+<section class="screen" data-title="배치가 두 종류로 갈라진다">
+  <p class="kicker">3장 · 화면 11</p>
+  <h2>배치가 두 종류로 갈라진다</h2>
+
+  <p>창고 배치와 입고예정 배치는 <b>가진 정보가 다릅니다.</b></p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:8rem"></th><th>창고 배치</th><th>입고예정 배치</th></tr>
+      <tr><td>실물</td><td>있다</td><td>없다</td></tr>
+      <tr><td><code>received_on</code></td><td>입고된 날</td><td><b>없음</b></td></tr>
+      <tr><td><code>eta</code></td><td><b>없음</b></td><td>들어올 날</td></tr>
+      <tr><td>피킹 대상</td><td>가능</td><td>불가능</td></tr>
+      <tr><td>재고 실사</td><td>센다</td><td>안 센다</td></tr>
+    </table>
+  </div>
+
+  <p>여기서 새 불변식이 나옵니다.</p>
+
+  <blockquote>
+    <p><b>I18.</b> 창고 배치는 <code>eta</code>가 없고 <code>received_on</code>이 있다.
+    입고예정 배치는 그 반대다. <b>둘 다 있거나 둘 다 없는 배치는 존재할 수 없다.</b></p>
+  </blockquote>
+
+<pre><span class="cap"># domain/inventory.py — 배치 종류와 I18</span><code>class BatchKind(Enum):
+    창고 = auto()          # 입고 완료. 실물이 있다
+    입고예정 = auto()       # 아직 없다. 들어올 날(ETA)만 정해져 있다
+
+
+class StockBatch:
+    def __init__(self, kind: BatchKind, quantity: int,
+                 received_on: date | None, eta: date | None,
+                 expires_on: date | None) -&gt; None:
+        if kind is BatchKind.창고:                              # 1
+            if received_on is None or eta is not None:
+                raise DomainError("창고 배치는 입고일만 가진다")
+        else:
+            if eta is None or received_on is not None:
+                raise DomainError("입고예정 배치는 ETA만 가진다")
+
+        self.batch_id = uuid4()
+        self.kind = kind
+        self.received_on = received_on
+        self.eta = eta
+        self.expires_on = expires_on
+        self.quantity = quantity
+        self.reserved = 0
+
+    @property
+    def available(self) -&gt; int:                                # 2
+        return self.quantity - self.reserved
+
+    def reserve(self, count: int) -&gt; None:
+        if count &gt; self.available:
+            raise InsufficientStock(
+                f"배치 {self.batch_id}: 가용 {self.available}, 요청 {count}")
+        self.reserved += count
+
+    def arrive(self, received_on: date) -&gt; None:               # 3
+        if self.kind is BatchKind.창고:
+            raise DomainError("이미 입고된 배치입니다")
+        self.kind = BatchKind.창고
+        self.received_on = received_on
+        self.eta = None
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">10~15행</span> I18을 <b>생성자에서</b> 검사합니다.
+    2장에서 값 객체의 <code>__post_init__</code>이 하던 일과 같은 역할입니다.
+    <b>규칙을 어긴 배치는 만들어질 수 없습니다.</b> 만든 뒤에 검사하는 방식(<code>validate()</code>
+    메서드를 따로 두고 호출하는 방식)은 부르는 것을 잊을 수 있습니다.</li>
+
+    <li><span class="ln">25~27행</span> <code>available</code>은 <b>두 종류 모두에 대해</b>
+    <code>quantity - reserved</code>입니다. 입고예정 배치도 예약할 수 있고, 예약되면 남은 양이
+    줄어야 하기 때문입니다. 창고/입고예정을 구분하는 일은 <b>배치가 아니라 루트</b>가 합니다
+    (화면 13). 배치는 자기 수량만 지킵니다.</li>
+
+    <li><span class="ln">35~40행</span> <b>물건이 실제로 들어오면 배치의 종류가 바뀝니다.</b>
+    새 배치를 만드는 게 아닙니다 — <code>batch_id</code>가 그대로여야
+    <b>이미 이 배치에 걸린 예약(<code>reserved</code>)이 유지</b>됩니다.
+    입고예정분을 예약해 둔 주문이 그대로 창고 배치의 예약으로 이어집니다.
+    <br>이것이 <b>엔티티의 정의 그 자체</b>입니다. 내용이 다 바뀌어도(종류, 입고일, ETA)
+    식별자가 같으면 같은 것입니다. 값 객체였다면 이 연속성을 표현할 수 없습니다.</li>
+  </ol>
+
+  <p>루트에는 입고 흐름을 담당하는 메서드가 붙습니다.</p>
+
+<pre><span class="cap"># domain/inventory.py — InventoryItem 안에</span><code>    def expect(self, quantity: int, eta: date,
+               expires_on: date | None) -&gt; None:                # 1
+        self._batches.append(StockBatch(
+            BatchKind.입고예정, quantity,
+            received_on=None, eta=eta, expires_on=expires_on))
+
+    def receive(self, quantity: int, received_on: date,
+                expires_on: date | None) -&gt; None:               # 2
+        self._batches.append(StockBatch(
+            BatchKind.창고, quantity,
+            received_on=received_on, eta=None, expires_on=expires_on))
+
+    def arrive(self, batch_id: UUID, received_on: date) -&gt; None:  # 3
+        self._find(batch_id).arrive(received_on)
+
+    def delay(self, batch_id: UUID, new_eta: date) -&gt; None:       # 4
+        batch = self._find(batch_id)
+        if batch.kind is not BatchKind.입고예정:
+            raise DomainError("이미 입고된 배치는 지연될 수 없습니다")
+        batch.eta = new_eta
+
+    def _find(self, batch_id: UUID) -&gt; StockBatch:
+        for batch in self._batches:
+            if batch.batch_id == batch_id:
+                return batch
+        raise DomainError(f"배치 없음: {batch_id}")
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">1~5행</span> <b>입고 예정 등록.</b> 발주가 확정되고 공급사가 날짜를
+    확답하면 부릅니다. "발주만 한 것"과 "ETA가 확정된 것"은 다르고,
+    <span class="term" data-term="inbound">입고예정</span>은 후자만 가리킵니다.</li>
+
+    <li><span class="ln">7~11행</span> 예정 없이 바로 들어오는 경우입니다(반품 입고, 긴급 매입).
+    화면 8의 <code>receive()</code>와 같은 이름이지만 이제 <code>BatchKind.창고</code>를
+    명시합니다.</li>
+
+    <li><span class="ln">13~14행</span> 물건이 도착했습니다. 루트가 배치를 찾아
+    배치에게 시킵니다. <b>밖에서는 <code>batch_id</code>만 알면 됩니다</b> —
+    화면 5의 <code>line_id</code>와 같은 구조입니다.</li>
+
+    <li><span class="ln">16~20행</span> <b>입고가 밀렸습니다.</b> 흔한 일입니다.
+    그런데 이 한 줄이 나중에 큰일을 만듭니다 — 이 배치에서 이미 할당받고
+    <b>고객에게 날짜를 약속한 주문들</b>이 있기 때문입니다.
+    재고는 어느 주문이 자기를 기다리는지 <b>모릅니다</b>(ID 참조는 한 방향입니다).
+    어떻게 알리는지가 7장의 주제입니다. <span class="later">7장에서 다시 볼 문제</span></li>
+  </ol>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 12 -->
+<section class="screen" data-title="할당 우선순위">
+  <p class="kicker">3장 · 화면 12</p>
+  <h2>할당 우선순위 — 있는 것부터</h2>
+
+  <p>은수의 말을 그대로 옮기면 불변식이 됩니다.</p>
+
+  <blockquote>
+    <p><b>I19.</b> 할당 우선순위는 <b>창고 배치 전체가 입고예정 배치보다 앞선다.</b>
+    창고 배치끼리는 <span class="term" data-term="fefo">FEFO</span>,
+    입고예정 배치끼리는 ETA가 이른 순.</p>
+  </blockquote>
+
+  <p>"창고 배치 <b>전체가</b>"라는 부분이 중요합니다. 유통기한이 12월인 창고 배치와
+  유통기한이 10월인 입고예정 배치가 있으면, <b>FEFO만 보면 입고예정 배치가 먼저</b>입니다.
+  그러면 창고에 물건을 두고 고객을 기다리게 합니다. 그건 업무적으로 틀렸습니다.</p>
+
+  <p>정렬 규칙을 코드로 옮깁니다.</p>
+
+<pre><span class="cap"># domain/inventory.py — InventoryItem 안에</span><code>    def _candidates(self, as_of: date) -&gt; list[StockBatch]:
+        usable = [b for b in self._batches
+                  if b.available &gt; 0
+                  and (b.expires_on is None or b.expires_on &gt; as_of)]
+
+        def priority(b: StockBatch) -&gt; tuple[int, date]:          # 1
+            if b.kind is BatchKind.창고:
+                return (0, b.expires_on or date.max)              # 2
+            return (1, b.eta)                                     # 3
+
+        return sorted(usable, key=priority)
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">6행</span> 정렬 기준을 <b>튜플</b>로 돌려줍니다.
+    파이썬은 튜플을 <b>앞에서부터 차례로</b> 비교합니다. <code>(0, ...)</code>는
+    <code>(1, ...)</code>보다 무조건 앞이고, 첫 값이 같을 때만 두 번째 값을 비교합니다.
+    <br>이 한 줄에 I19 전체가 들어 있습니다. <b>"큰 순서" 안에 "작은 순서"가 있는 규칙</b>은
+    거의 항상 튜플 키로 표현됩니다. <code>if</code>를 겹쳐 쓰면 읽기도 어렵고 틀리기도 쉽습니다.</li>
+
+    <li><span class="ln">7~8행</span> 창고 배치는 첫 값 <code>0</code>. 그 안에서는
+    유통기한 순(FEFO). 화면 9와 같습니다.</li>
+
+    <li><span class="ln">9행</span> 입고예정 배치는 첫 값 <code>1</code>. 그 안에서는
+    ETA가 이른 순입니다. 빨리 들어오는 것부터 써야 고객에게 약속할 날짜가 앞당겨집니다.
+    <br><code>b.eta</code>에 <code>or date.max</code>가 없는 것에 주목하세요.
+    입고예정 배치는 <b>I18에 의해 ETA가 반드시 있습니다.</b> 없을 수 없는 값에
+    기본값을 붙이면, 읽는 사람은 "없을 수도 있구나"라고 오해합니다.</li>
+  </ol>
+
+  <p>이제 <code>allocate()</code>가 이 순서를 씁니다.</p>
+
+  <div class="tabs">
+    <div class="tab" data-label="화면 9 — 창고만">
+<pre><code>    def allocate(self, quantity: int, as_of: date) -&gt; None:
+        candidates = [b for b in self._batches
+                      if b.available &gt; 0
+                      and (b.expires_on is None or b.expires_on &gt; as_of)]
+        candidates.sort(key=lambda b: b.expires_on or date.max)
+
+        total = sum(b.available for b in candidates)
+        if total &lt; quantity:
+            raise InsufficientStock(
+                f"{self.sku}: 요청 {quantity}, 가용 {total}")
+
+        remaining = quantity
+        for batch in candidates:
+            take = min(remaining, batch.available)
+            batch.reserve(take)
+            remaining -= take
+            if remaining == 0:
+                return
+</code></pre>
+    </div>
+    <div class="tab" data-label="화면 12 — 입고예정 포함">
+<pre><code>    def allocate(self, quantity: int, as_of: date) -&gt; "Allocation":
+        candidates = <b class="hl">self._candidates(as_of)</b>
+
+        total = sum(b.available for b in candidates)
+        if total &lt; quantity:
+            raise InsufficientStock(
+                f"{self.sku}: 요청 {quantity}, 판매가능 {total}")
+
+        <b class="hl">lines: list[AllocationLine] = []</b>
+        <b class="hl">ready_on = as_of</b>
+        remaining = quantity
+        for batch in candidates:
+            take = min(remaining, batch.available)
+            batch.reserve(take)
+            <b class="hl">lines.append(AllocationLine(batch.batch_id, take))</b>
+            <b class="hl">ready_on = max(ready_on, batch.eta or as_of)</b>
+            remaining -= take
+            if remaining == 0:
+                break
+
+        <b class="hl">return Allocation(lines=tuple(lines), ready_on=ready_on)</b>
+</code></pre>
+    </div>
+  </div>
+
+  <p>골격은 그대로입니다. 바뀐 것은 두 가지 — <b>후보를 고르는 규칙</b>이
+  <code>_candidates()</code>로 나갔고, <b>결과를 값으로 돌려줍니다.</b>
+  <code>Allocation</code>이 무엇인지는 화면 14에서 설명합니다.
+  지금은 "언제 출고할 수 있는지를 함께 돌려준다"는 것만 알면 됩니다.</p>
+
+  <p>동작을 봅시다. 창고에 3개, 다음 주 화요일 입고 예정 200개인 상황입니다.</p>
+
+<pre><span class="cap"># 오늘은 2026-09-07 (월)</span><code>&gt;&gt;&gt; item = InventoryItem("SKU-001")
+&gt;&gt;&gt; item.receive(3, received_on=date(2026, 9, 1), expires_on=None)
+&gt;&gt;&gt; item.expect(200, eta=date(2026, 9, 15), expires_on=None)
+
+&gt;&gt;&gt; alloc = item.allocate(5, as_of=date(2026, 9, 7))
+&gt;&gt;&gt; [(b.kind.name, b.quantity, b.reserved) for b in item.batches]
+[('창고', 3, 3), ('입고예정', 200, 2)]     # 창고 3개를 먼저, 나머지 2개를 예정분에서
+&gt;&gt;&gt; alloc.ready_on
+datetime.date(2026, 9, 15)                 # 2개를 기다려야 하므로
+</code></pre>
+
+  <div class="box good">
+    <p class="box-t">여기서 확인할 것</p>
+    <p><b>은수가 말한 규칙이 코드에 그대로 있습니다.</b> "있는 것부터, 그다음 빨리 오는 것부터."
+    <code>_candidates()</code>를 도현이나 은수에게 보여주면서 설명할 수 있습니다.
+    <b>업무 담당자에게 읽어 줄 수 있는 코드</b>가 유비쿼터스 언어의 목표이고,
+    8장에서 이 이야기를 정면으로 다룹니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 13 -->
+<section class="screen" data-title="'재고'가 셋으로 갈라졌다">
+  <p class="kicker">3장 · 화면 13</p>
+  <h2>"재고"라는 낱말이 셋으로 갈라졌다</h2>
+
+  <p>화면 8의 <code>available_quantity</code>는 배치 전체의 가용수량을 더했습니다.
+  이제 배치가 두 종류이므로 <b>이 값이 무엇을 뜻하는지가 모호해졌습니다.</b></p>
+
+  <div class="dialog">
+    <div class="line"><div class="who">도현 (창고팀)</div><div class="say">
+      <p>재고 화면에 203개라고 나오는데요, 창고에는 3개밖에 없습니다.
+      이거 <b>실사할 때 200개 비는 걸로</b> 나옵니다.</p></div></div>
+    <div class="line"><div class="who">은수 (주문팀)</div><div class="say">
+      <p>203개 맞는데요? 5개 팔았으니까 지금 198개 더 팔 수 있어요.</p></div></div>
+    <div class="line"><div class="who">도현</div><div class="say">
+      <p>아니요. <b>재고는 3개</b>입니다.</p></div></div>
+    <div class="line"><div class="who">은수</div><div class="say">
+      <p><b>재고는 203개</b>예요.</p></div></div>
+  </div>
+
+  <p>둘 다 맞습니다. 두 사람은 <b>서로 다른 것</b>을 "재고"라고 부르고 있었습니다.
+  요구사항이 들어오기 전에는 두 값이 같았기 때문에 <b>다르다는 사실이 드러나지 않았습니다.</b></p>
+
+  <p>세어 보면 셋입니다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:9rem">낱말</th><th>정의</th><th style="width:6rem">이 예에서</th>
+        <th style="width:7rem">누가 쓰나</th></tr>
+      <tr>
+        <td><b><span class="term" data-term="onhand">실물재고</span></b></td>
+        <td>창고에 지금 실제로 있는 수량. 예약됐든 아니든 물리적으로 있는 것</td>
+        <td>3</td><td>창고팀(도현)<br>재고 실사</td>
+      </tr>
+      <tr>
+        <td><b><span class="term" data-term="available">가용재고</span></b></td>
+        <td>실물재고 − 예약수량. <b>지금 당장 꺼내 보낼 수 있는</b> 수량</td>
+        <td>0</td><td>피킹 담당<br>긴급 출고 판단</td>
+      </tr>
+      <tr>
+        <td><b><span class="term" data-term="atp">판매가능수량</span></b><br>(ATP)</td>
+        <td>가용재고 + 입고예정 잔량. <b>지금 주문받을 수 있는</b> 수량</td>
+        <td>198</td><td>주문팀(은수)<br>상품 상세 화면</td>
+      </tr>
+    </table>
+  </div>
+
+  <blockquote>
+    <p><b>I20.</b> 판매가능수량(ATP) = 가용수량 + 입고예정 잔량.
+    <b>가용수량과 다른 개념이며 혼용하지 않는다.</b></p>
+  </blockquote>
+
+  <p>세 낱말이 코드에서도 셋이어야 합니다.</p>
+
+<pre><span class="cap"># domain/inventory.py — InventoryItem 안에</span><code>    @property
+    def on_hand_quantity(self) -&gt; int:                    # 1  실물재고
+        return sum(b.quantity for b in self._batches
+                   if b.kind is BatchKind.창고)
+
+    @property
+    def available_quantity(self) -&gt; int:                  # 2  가용재고 (I7)
+        return sum(b.available for b in self._batches
+                   if b.kind is BatchKind.창고)
+
+    @property
+    def sellable_quantity(self) -&gt; int:                   # 3  판매가능수량 (I20)
+        return sum(b.available for b in self._batches)
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">1~4행</span> 실물재고는 <code>quantity</code>의 합입니다.
+    <b>예약을 빼지 않습니다.</b> 예약은 장부상의 표시일 뿐 물건은 창고에 있고,
+    도현이 실사에서 세는 것이 이 숫자입니다.</li>
+
+    <li><span class="ln">6~9행</span> 가용재고는 <code>available</code>(= 수량 − 예약)의 합인데
+    <b>창고 배치만</b> 셉니다. 화면 8과 달라진 것은 <code>if</code> 한 줄입니다.</li>
+
+    <li><span class="ln">11~13행</span> 판매가능수량은 <b>필터가 없습니다.</b>
+    모든 배치의 남은 양을 더합니다. 세 프로퍼티의 차이가
+    <b>"무엇을 세느냐(<code>quantity</code>냐 <code>available</code>이냐)"와
+    "어떤 배치를 세느냐" 두 축</b>뿐이라는 것이 한눈에 보입니다.</li>
+  </ol>
+
+  <div class="box note">
+    <p class="box-t">이름을 셋으로 나눈 것이 이 화면의 성과다</p>
+    <p><code>stock</code>이나 <code>quantity</code>처럼 뭉뚱그린 이름을 그대로 뒀다면,
+    상품 상세 화면이 <code>available_quantity</code>를 쓰고(0이라 품절 표시)
+    피킹 화면이 <code>sellable_quantity</code>를 쓰는(198개를 꺼내라고 지시하는)
+    사고가 반드시 납니다.</p>
+    <p><b>업무에서 다른 것이면 코드에서도 다른 이름이어야 합니다.</b>
+    이것이 유비쿼터스 언어(8장)의 실천이고, 지금 그 효과를 먼저 봤습니다.</p>
+  </div>
+
+  <div class="box warn">
+    <p class="box-t">그런데 이건 더 큰 문제의 신호다</p>
+    <p>다시 보세요. 세 낱말은 <b>쓰는 사람이 다릅니다.</b> 창고팀, 피킹 담당, 주문팀.
+    같은 <code>InventoryItem</code> 클래스가 <b>세 팀의 서로 다른 관심사</b>를 한꺼번에
+    담고 있습니다.</p>
+    <p>도현과 은수가 다투던 것은 숫자가 아니라 <b>"재고"라는 낱말의 소유권</b>이었습니다.
+    두 사람은 사실 <b>다른 세계에 살고 있고</b>, 그 세계의 경계를
+    <b>바운디드 컨텍스트(Bounded Context)</b>라고 부릅니다.</p>
+    <p>지금은 프로퍼티 세 개로 봉합했습니다. 9장에서 이 봉합을 뜯고
+    <b>창고 컨텍스트와 재고 컨텍스트로 나눕니다.</b> 그때 이 화면을 다시 펴게 될 것입니다.
+    <span class="later">9장에서 다시 볼 문제</span></p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 14 -->
+<section class="screen" data-title="경계를 찌르는 질문">
+  <p class="kicker">3장 · 화면 14</p>
+  <h2>경계를 찌르는 질문 — 출고 예정일</h2>
+
+  <p>요구사항 3번이 남았습니다. <b>"고객에게 출고 예정일을 알려준다."</b>
+  이게 이 장에서 가장 까다로운 부분입니다.</p>
+
+  <p>출고 예정일을 계산하려면 <b>어느 배치에서 할당됐는지</b> 알아야 합니다.
+  창고 3개 + 입고예정 2개로 할당됐다면, 한빛몰은 분할 출고를 하지 않으므로
+  <b>입고예정분이 도착하는 날</b>이 출고일입니다.</p>
+
+  <blockquote>
+    <p><b>I21.</b> 할당 결과에는 <b>출고 준비 완료일</b>이 함께 나온다.
+    분할 출고를 하지 않으므로 이 날짜는 할당된 배치들의 ETA 중 가장 늦은 날이다
+    (창고 배치는 오늘로 본다).</p>
+  </blockquote>
+
+  <p>여기서 화면 7의 규칙과 충돌이 생깁니다.</p>
+
+  <div class="dialog">
+    <div class="line"><div class="who">개발팀</div><div class="say">
+      <p>주문이 출고일을 알려면 <b>어느 배치에서 할당됐는지</b>를 알아야 합니다.
+      그럼 <code>Order</code>가 <code>StockBatch</code>를 참조해야 하는 것 아닌가요?
+      방금 "애그리게이트끼리는 ID로만"이라고 배웠는데요.</p></div></div>
+  </div>
+
+  <p>참조하면 안 됩니다. <code>StockBatch</code>는 <b>재고 애그리게이트의 내부 엔티티</b>입니다.
+  루트도 아닌 내부 엔티티를 밖에서 가리키는 것은 화면 5에서 금지한 바로 그것입니다.
+  게다가 배치는 계속 변합니다 — 입고되면 종류가 바뀌고, 다 나가면 사라집니다.</p>
+
+  <h3>답: 엔티티가 아니라 <b>값</b>을 돌려준다</h3>
+
+  <p><code>allocate()</code>가 <b>그 순간의 할당 결과를 찍은 값 객체</b>를 반환합니다.</p>
+
+<pre><span class="cap"># domain/inventory.py — 할당 결과 (값 객체)</span><code>@dataclass(frozen=True)
+class AllocationLine:
+    batch_id: UUID                    # 1
+    quantity: int
+
+
+@dataclass(frozen=True)
+class Allocation:
+    lines: tuple[AllocationLine, ...]
+    ready_on: date                    # 2  전량이 모이는 날 (I21)
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">3행</span> 배치 <b>객체가 아니라 식별자</b>입니다.
+    이 값을 받은 쪽은 배치를 만질 수 없습니다. 나중에 "이 할당을 취소해줘"라고 할 때
+    재고 애그리게이트에게 <b>돌려주기 위한</b> 값입니다.</li>
+
+    <li><span class="ln">10행</span> 주문이 실제로 쓰는 것은 이 한 줄입니다.
+    화면 12의 <code>ready_on = max(ready_on, batch.eta or as_of)</code>가 계산한 값입니다.
+    창고 배치만으로 다 채워졌으면 <code>as_of</code>(오늘)가 그대로 남습니다.</li>
+  </ol>
+
+  <div class="box good">
+    <p class="box-t">값 객체가 경계를 지키는 방식</p>
+    <p><code>Allocation</code>은 <b>불변</b>이고 <b>식별자가 없습니다.</b>
+    그래서 이걸 주문이 들고 있어도 <b>재고를 바꿀 방법이 없습니다.</b>
+    재고의 배치가 그 뒤에 어떻게 변하든 이 값은 변하지 않습니다.</p>
+    <p><b>애그리게이트 경계를 넘어 나가는 것은 값이어야 합니다.</b>
+    엔티티를 넘기면 경계가 새고, ID만 넘기면 정보가 부족합니다.
+    값 객체가 그 사이의 답입니다. 6장 스냅샷, 7장 도메인 이벤트, 5장 DTO가
+    모두 같은 원리 위에 있습니다.</p>
+  </div>
+
+  <h3>주문 쪽 — 약속은 스냅샷이다</h3>
+
+  <p>주문은 <code>ready_on</code>을 받아 <b>자기 안에 적어둡니다.</b></p>
+
+<pre><span class="cap"># domain/order.py — 약속 (값 객체)</span><code>@dataclass(frozen=True)
+class Promise:                        # I22
+    ship_on: date                     # 출고 예정일 = 할당 결과의 ready_on
+    arrive_by: date                   # 도착 예정일 = ship_on + 배송 리드타임
+    promised_at: datetime             # 1  언제 약속했는지
+
+
+class Order:
+    # __init__ 에 self.promise: Promise | None = None 이 추가된다
+
+    def promise_delivery(self, promise: Promise) -&gt; None:
+        if self.promise is not None:                        # 2
+            raise DomainError(
+                "이미 약속한 주문입니다. repromise() 를 쓰십시오")
+        self.promise = promise
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">5행</span> <b>언제 약속했는지</b>를 함께 적습니다.
+    CS팀이 "고객님께 9월 10일로 안내드린 게 맞습니다"라고 확인해 줄 근거이고,
+    나중에 약속이 바뀌었을 때 <b>무엇이 언제부터 바뀌었는지</b>의 기준이 됩니다.</li>
+
+    <li><span class="ln">11~15행</span> <b>최초 약속은 한 번뿐</b>입니다.
+    입고가 밀려 날짜를 바꿔야 하면 <code>promise_delivery()</code>를 다시 부르는 게 아니라
+    <code>repromise(promise, reason)</code>라는 <b>다른 이름의 행위</b>를 씁니다.
+    <br>업무적으로 다른 일이기 때문입니다 — 최초 약속은 조용히 해도 되지만
+    <b>재조정은 반드시 고객 통지를 동반</b>합니다. 같은 메서드를 쓰면 통지를 빠뜨립니다.
+    <code>repromise()</code>는 7장에서 만듭니다. <span class="later">7장에서 다시 볼 문제</span></li>
+  </ol>
+
+  <p>둘을 이어 붙이면 이렇게 됩니다.</p>
+
+<pre><span class="cap"># 두 애그리게이트를 잇는 코드. 이 조립은 5장 응용 서비스의 일이다</span><code>&gt;&gt;&gt; today = date(2026, 9, 7)
+&gt;&gt;&gt; alloc = item.allocate(5, as_of=today)          # 재고 애그리게이트
+&gt;&gt;&gt; alloc.ready_on
+datetime.date(2026, 9, 15)
+
+&gt;&gt;&gt; lead_time = shipping_policy.lead_time          # 배송 컨텍스트가 아는 값
+&gt;&gt;&gt; order.promise_delivery(Promise(                # 주문 애그리게이트
+...     ship_on=alloc.ready_on,
+...     arrive_by=alloc.ready_on + lead_time,
+...     promised_at=datetime.now()))
+&gt;&gt;&gt; str(order.promise.ship_on), str(order.promise.arrive_by)
+('2026-09-15', '2026-09-17')
+</code></pre>
+
+  <div class="box note">
+    <p class="box-t">배송 리드타임을 상수로 박지 않는 이유</p>
+    <p>한빛몰의 배송 리드타임은 지금 2일 고정입니다. <code>timedelta(days=2)</code>라고
+    쓰고 싶어집니다. 쓰지 않습니다 — <b>그 값은 배송 컨텍스트의 것</b>이고,
+    도서산간 지역이나 택배사 변경 같은 이유로 바뀝니다.</p>
+    <p>주문이나 재고 코드에 박아 두면 <b>배송 정책이 바뀔 때 주문 코드를 고쳐야</b> 합니다.
+    "왜 배송이 바뀌었는데 주문 코드를 고치지?"라는 질문이 나오면
+    <b>그건 경계를 잘못 그었다는 신호</b>입니다(9장에서 이 신호를 다시 씁니다).
+    지금은 밖에서 받는 값으로 둡니다.</p>
+  </div>
+
+  <div class="box warn">
+    <p class="box-t">이 코드가 아직 어디에도 없다는 것</p>
+    <p>위 조립 코드는 <b>지금 어느 클래스에도 들어 있지 않습니다.</b>
+    <code>Order</code>가 할 수도 없고(재고를 모릅니다), <code>InventoryItem</code>이
+    할 수도 없습니다(주문을 모릅니다). 애그리게이트 둘 다 상대를 모르는 것이
+    <b>이 장이 만든 결과</b>입니다.</p>
+    <p>그럼 누가 하나요? <b>응용 서비스</b>입니다. 두 애그리게이트를 꺼내 와서 순서대로
+    부르고 트랜잭션을 커밋하는 층이고, 5장의 주제입니다.
+    그리고 "두 애그리게이트를 한 트랜잭션에서 바꿔도 되나?"라는 질문은 7장과 12장에서
+    다시 나옵니다. <span class="later">5장에서 다시 볼 문제</span></p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 15 -->
+<section class="screen" data-title="만든 것과 못 한 것">
+  <p class="kicker">3장 · 화면 15</p>
+  <h2>3장이 만든 것, 그리고 아직 못 한 것</h2>
+
+  <p>이 장에서 만든 두 애그리게이트의 전체 모습입니다.</p>
+
+  <figure class="fig">
+    <svg viewBox="0 0 700 250" role="img" aria-label="주문 애그리게이트와 재고 애그리게이트, 그리고 둘 사이의 값 전달">
+      <g class="svg-line" stroke-width="1.4" stroke-dasharray="6 4">
+        <rect x="14" y="14" width="300" height="150" rx="14"/>
+        <rect x="386" y="14" width="300" height="150" rx="14"/>
+      </g>
+      <g class="svg-line" stroke-width="1.4">
+        <rect x="44" y="38" width="240" height="34" rx="9"/>
+        <rect x="416" y="38" width="240" height="34" rx="9"/>
+      </g>
+      <g class="svg-line" stroke-width="1.2">
+        <rect x="44" y="96" width="115" height="30" rx="8"/>
+        <rect x="169" y="96" width="115" height="30" rx="8"/>
+        <rect x="416" y="96" width="115" height="30" rx="8"/>
+        <rect x="541" y="96" width="115" height="30" rx="8"/>
+      </g>
+      <g class="svg-muted" stroke="currentColor" stroke-width="1.2" fill="none">
+        <path d="M101 72 V92"/>
+        <path d="M226 72 V92"/>
+        <path d="M473 72 V92"/>
+        <path d="M598 72 V92"/>
+        <path d="M290 196 H410"/>
+        <path d="M410 224 H290"/>
+      </g>
+      <g class="svg-muted" stroke="none">
+        <path d="M97 92 l4 7 4 -7 z"/>
+        <path d="M222 92 l4 7 4 -7 z"/>
+        <path d="M469 92 l4 7 4 -7 z"/>
+        <path d="M594 92 l4 7 4 -7 z"/>
+        <path d="M410 192 l7 4 -7 4 z"/>
+        <path d="M290 220 l-7 4 7 4 z"/>
+      </g>
+      <g text-anchor="middle" font-size="12.5" font-weight="700" class="svg-fg">
+        <text x="164" y="60">Order</text>
+        <text x="536" y="60">InventoryItem</text>
+      </g>
+      <g text-anchor="middle" font-size="11" class="svg-fg">
+        <text x="101" y="115">OrderLine</text>
+        <text x="226" y="115">Promise</text>
+        <text x="473" y="115">StockBatch</text>
+        <text x="598" y="115">StockBatch</text>
+      </g>
+      <g text-anchor="middle" font-size="10" class="svg-muted">
+        <text x="164" y="146">I1 · I2 · I4 · I5</text>
+        <text x="536" y="146">I7~I10 · I18 · I19 · I20</text>
+        <text x="101" y="30">주문 애그리게이트</text>
+        <text x="490" y="30">재고 애그리게이트</text>
+        <text x="350" y="188">sku (문자열)</text>
+        <text x="350" y="242">Allocation (값 객체) · I21</text>
+      </g>
+    </svg>
+    <figcaption>두 애그리게이트는 서로의 내부를 모릅니다. 주문은 SKU 문자열만 넘기고,
+    재고는 <code>Allocation</code>이라는 값을 돌려줍니다. 화살표가 루트에만 닿습니다.</figcaption>
+  </figure>
+
+  <h3>애그리게이트 설계 규칙 네 줄</h3>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:11rem">규칙</th><th>근거</th></tr>
+      <tr><td><b>한 트랜잭션에 한 애그리게이트</b></td>
+        <td>동시에 잠기는 범위가 곧 동시에 처리 못 하는 범위다 (화면 6)</td></tr>
+      <tr><td><b>바깥은 루트만 참조한다</b></td>
+        <td>규칙을 아는 객체를 거치지 않으면 규칙이 적용되지 않는다 (화면 5)</td></tr>
+      <tr><td><b>다른 애그리게이트는 ID로</b></td>
+        <td>과거가 바뀌지 않고, 경계가 새지 않고, 읽는 범위가 커지지 않는다 (화면 7)</td></tr>
+      <tr><td><b>경계를 넘는 것은 값으로</b></td>
+        <td>값은 불변이라 받은 쪽이 원본을 바꿀 수 없다 (화면 14)</td></tr>
+    </table>
+  </div>
+
+  <h3>반대 의견 — "애그리게이트는 작게"가 틀릴 때</h3>
+
+  <p>이 장은 계속 "작게 나눠라"고 말했습니다. 그런데 이 규칙에도 대가가 있습니다.</p>
+
+  <div class="box bad">
+    <p class="box-t">작게 나눈 대가</p>
+    <ul>
+      <li><b>즉시 일관성을 포기합니다.</b> 재고 초과 주문이 잠깐 존재하고,
+      나중에 취소됩니다. CS 문의가 늘고, 사과 쿠폰 비용이 듭니다.</li>
+      <li><b>조립 코드가 필요합니다.</b> 응용 서비스(5장), 도메인 이벤트(7장),
+      보상 트랜잭션(12장)이 전부 "쪼개 놓은 것을 다시 잇는" 장치입니다.
+      쪼개지 않았다면 필요 없었을 코드입니다.</li>
+      <li><b>추적이 어려워집니다.</b> 하나의 업무 흐름이 여러 트랜잭션에 흩어지면
+      "지금 이 주문이 어디까지 갔나"를 알기 위해 로그를 여러 개 봐야 합니다.</li>
+    </ul>
+  </div>
+
+  <p>그래서 <b>다음 조건이면 크게 묶는 것이 옳습니다.</b></p>
+
+  <ul>
+    <li><b>동시 접근이 사실상 없다.</b> 사내 관리 도구, 하루 수십 건짜리 업무.
+    큰 애그리게이트의 유일한 실질적 비용이 동시성인데, 그게 없으면 비용이 0입니다.</li>
+    <li><b>규칙 위반을 되돌릴 수 없다.</b> 회계 전표, 의료 처방, 정산 마감처럼
+    "잠깐 어긋났다가 나중에 맞추면 됨"이 허용되지 않는 도메인이 있습니다.</li>
+    <li><b>함께 안 바뀌는 경우가 없다.</b> 항상 같이 읽고 같이 쓰는 두 덩어리를
+    억지로 나누면 조립 코드만 늘고 얻는 게 없습니다. 경계를 잘못 그었다는 신호이기도 합니다.</li>
+  </ul>
+
+  <div class="box note">
+    <p class="box-t">규칙보다 먼저 오는 것</p>
+    <p>"애그리게이트는 작게"는 <b>결론이지 근거가 아닙니다.</b> 근거는 화면 6의 세 질문
+    (즉시성 / 되돌릴 수 있는가 / 규칙의 주인이 누구인가)입니다.
+    세 질문에 답하면 크기는 결과로 나옵니다.</p>
+    <p>면접이나 설계 리뷰에서 "왜 이렇게 나눴나요?"라는 질문에
+    <b>"작게 유지하는 게 좋다고 해서"라고 답하면 안 됩니다.</b>
+    "이 규칙은 1초 뒤에 지켜져도 되고, 어겨도 취소로 되돌릴 수 있으며,
+    규칙의 주인이 재고팀이라서"가 답입니다.</p>
+  </div>
+
+  <h3>이 장이 남긴 빚</h3>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:4rem">갚을 곳</th><th>미룬 것</th></tr>
+      <tr><td><b>4장</b></td><td>애그리게이트를 통째로 저장하고 꺼내는 방법.
+        <code>UPDATE orders SET ...</code>를 막는 마지막 통로</td></tr>
+      <tr><td><b>5장</b></td><td>화면 14의 조립 코드가 살 곳. 트랜잭션 경계</td></tr>
+      <tr><td><b>6장</b></td><td>라인이 바뀌어도 할인액이 안 따라오는 문제(화면 3).
+        상품명·가격을 왜 복사하는가(I6)</td></tr>
+      <tr><td><b>7장</b></td><td><code>delay()</code>가 이미 약속한 주문들에게 어떻게 전해지나.
+        <code>repromise()</code></td></tr>
+      <tr><td><b>9장</b></td><td>"상품 1개 = SKU 1개" 전제(화면 3·7·8).
+        "재고"가 셋으로 갈라진 것의 진짜 의미(화면 13)</td></tr>
+      <tr><td><b>12장</b></td><td>두 주문이 동시에 같은 배치를 예약할 때(화면 8).
+        분할 출고를 허용할지의 결정(I21을 바꾸는 결정)</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 16 -->
+<section class="screen" data-title="요약 · 퀴즈 · 과제">
+  <p class="kicker">3장 · 화면 16</p>
+  <h2>3장 마무리</h2>
+
+  <div class="summary">
+    <h3>핵심 요약</h3>
+    <ol>
+      <li><b><span class="term" data-term="invariant">불변식</span></b>은 언제 확인해도 참이어야 하는 규칙입니다.
+      <b>규칙이 걸치는 범위가 곧 애그리게이트의 경계</b>입니다.
+      여러 값에 걸친 규칙은 값 객체 하나로 지킬 수 없습니다.</li>
+      <li><b><span class="term" data-term="aggregate">애그리게이트</span></b>는 함께 일관성을 지키는 묶음이고,
+      바깥은 <b><span class="term" data-term="root">루트</span>만</b> 만집니다.
+      내부 엔티티는 루트가 만들고, 밖에서는 <code>line_id</code>·<code>batch_id</code> 같은
+      식별자로 지시합니다.</li>
+      <li>경계는 <b>세 질문</b>으로 긋습니다 — 이 규칙은 즉시 지켜져야 하는가,
+      어겼을 때 업무적으로 되돌릴 수 있는가, <b>규칙의 주인이 누구인가.</b>
+      "작게 유지하라"는 이 셋의 결론이지 근거가 아닙니다.</li>
+      <li>다른 애그리게이트는 <b>ID로만</b> 참조하고, 경계를 넘어 나가는 것은
+      <b>값 객체</b>여야 합니다. <code>Allocation</code>이 그 예입니다 —
+      주문은 배치를 만지지 못한 채 출고일만 받아 갑니다.</li>
+      <li>요구사항 하나가 <b>낱말을 갈라놓습니다.</b> "재고"는 실물재고·가용재고·
+      판매가능수량 셋이 되었습니다. <b>업무에서 다른 것이면 코드에서도 다른 이름</b>이어야 하고,
+      낱말이 갈라지는 자리가 곧 컨텍스트 경계의 흔적입니다.</li>
+    </ol>
+  </div>
+
+  <div class="quiz" data-answer="3">
+    <p class="q">팀원이 "주문 목록 화면에 회원 이름을 보여줘야 하니
+    <code>Order</code>가 <code>Customer</code>를 참조하게 하자"고 제안합니다.
+    어떻게 답해야 할까요?</p>
+    <ol class="options">
+      <li data-why="객체 참조는 화면 7의 세 문제(과거가 바뀜, 경계 누수, 읽는 범위 증가)를 그대로 불러옵니다. 화면 편의가 이 비용을 정당화하지 못합니다.">
+        화면에 필요하니 참조를 추가한다. 실용이 원칙보다 중요하다</li>
+      <li data-why="이름도 스냅샷으로 복사하면 회원이 개명했을 때 과거 주문의 이름이 낡습니다. 가격과 달리 이름은 '주문 시점의 값을 지켜야 하는' 값이 아닙니다.">
+        회원 이름을 <code>Order</code>에 스냅샷으로 복사해 둔다</li>
+      <li data-why="맞습니다. 애그리게이트는 '데이터 변경'의 단위이지 '화면 표시'의 단위가 아닙니다.">
+        읽기는 애그리게이트로 풀 문제가 아니다. 조회 전용 방법을 따로 쓴다</li>
+      <li data-why="회원 이름이 필요하다는 요구는 정당합니다. 거절할 사안이 아니라 다른 수단으로 풀 사안입니다.">
+        주문 화면에 회원 이름을 넣지 않기로 한다</li>
+    </ol>
+    <div class="explain">
+      <p><b class="lbl">해설</b> 에반스의 정의에 <b>"데이터 변경의 목적으로"</b>라는 단서가
+      붙어 있는 이유가 이것입니다(화면 5의 접힌 상자). 애그리게이트는
+      <b>쓰기 모델</b>이고, 화면은 <b>읽기</b>입니다. 읽기 요구로 쓰기 모델을 바꾸면
+      쓰기 모델이 화면 수만큼 뚱뚱해집니다.</p>
+      <p>구체적인 수단은 세 가지가 있고, 이 교재에서 순서대로 나옵니다.
+      <b>(1)</b> 응용 서비스가 두 리포지토리에서 각각 읽어 DTO로 조립한다(5장).
+      <b>(2)</b> 조회 전용 쿼리 객체를 만들어 조인 한 번으로 읽는다 — 도메인 모델을
+      거치지 않습니다(13장 CQRS의 최소 형태).
+      <b>(3)</b> 읽기 전용 테이블을 따로 유지한다(13장).</p>
+      <p><b>대부분의 프로젝트는 (1)이나 (2)로 충분합니다.</b> 13장에서 (3)이 왜
+      대부분에게 과한지도 함께 다룹니다.</p>
+    </div>
+  </div>
+
+  <div class="quiz" data-answer="2">
+    <p class="q">창고에 <b>5개</b>(유통기한 2026-12-31), 입고예정 <b>10개</b>(ETA 2026-09-20)가
+    있고, 이 중 창고 배치에 이미 <b>2개가 예약</b>되어 있습니다. 오늘은 2026-09-07입니다.
+    <code>item.allocate(6, as_of=date(2026, 9, 7))</code>의 결과는?</p>
+    <ol class="options">
+      <li data-why="유통기한(12-31)이 ETA(09-20)보다 늦다고 해서 입고예정이 먼저 나가지 않습니다. I19는 창고 배치 '전체'가 앞선다고 못박습니다.">
+        입고예정 배치에서 6개. <code>ready_on</code>은 09-20</li>
+      <li data-why="맞습니다. 창고 가용 3개(5−2)를 먼저 쓰고 모자란 3개를 입고예정에서 채웁니다. 전량이 모이는 날은 09-20입니다.">
+        창고 3개 + 입고예정 3개. <code>ready_on</code>은 09-20</li>
+      <li data-why="창고 배치의 가용수량은 5가 아니라 3입니다. 이미 2개가 예약되어 있습니다(I7).">
+        창고 5개 + 입고예정 1개. <code>ready_on</code>은 09-20</li>
+      <li data-why="판매가능수량(ATP)은 3 + 10 = 13이므로 6개 요청은 충분히 가능합니다. 실패하지 않습니다.">
+        <code>InsufficientStock</code> 예외. 창고 가용이 3개뿐이므로</li>
+    </ol>
+    <div class="explain">
+      <p><b class="lbl">해설</b> 세 가지가 한꺼번에 걸린 문제입니다 —
+      I7(가용 = 실물 − 예약), I19(창고 우선), I21(<code>ready_on</code>은 가장 늦은 날).</p>
+      <p>4번 선택지를 고르셨다면 <b>가용재고와 판매가능수량을 혼동한 것</b>입니다.
+      화면 13의 도현·은수 대화가 정확히 이 혼동이었고, <code>allocate()</code>의
+      실패 판정 기준은 <b>ATP</b>입니다.</p>
+      <p>여기서 한 걸음 더 — <b><code>ready_on</code>이 09-20이라는 사실이
+      업무적으로 불편하다는 것을 눈치채셨나요?</b> 창고에 3개가 이미 있는데
+      고객은 13일을 기다립니다. 3개를 먼저 보내면 고객이 더 만족할 수 있습니다.
+      한빛몰이 분할 출고를 안 하기로 한 것은 <b>포장·배송비가 두 배</b>이기 때문입니다.
+      이 결정을 뒤집으면 I21이 바뀌고, 그 변경이 코드에 어디까지 번지는지를
+      12장에서 실제로 해 봅니다.</p>
+    </div>
+  </div>
+
+  <div class="quiz" data-answer="1">
+    <p class="q">동료가 <code>InventoryItem</code>에 이런 메서드를 추가하자고 합니다.
+    <code>def allocate_for(self, order: Order) -&gt; None</code> — 주문을 통째로 받아
+    라인별로 알아서 할당하는 메서드입니다. 무엇이 문제일까요?</p>
+    <ol class="options">
+      <li data-why="맞습니다. 재고가 주문 객체를 받는 순간 두 애그리게이트가 서로를 알게 되고, ID 참조 규칙이 깨집니다.">
+        재고 애그리게이트가 주문 애그리게이트를 <b>객체로</b> 알게 된다</li>
+      <li data-why="메서드 이름은 오히려 업무 언어에 가깝습니다. 이름이 문제가 아닙니다.">
+        <code>allocate_for</code>라는 이름이 업무 용어가 아니다</li>
+      <li data-why="반환값을 Allocation 으로 바꾸면 개선되지만, 인수로 Order 를 받는 문제는 그대로 남습니다.">
+        반환값이 <code>None</code>이라 출고 예정일을 알 수 없다</li>
+      <li data-why="한 주문에 여러 SKU가 있는 것은 사실이지만, 그건 이 설계의 본질적 결함이 아니라 부수적 불편입니다.">
+        한 주문에 여러 SKU가 있어서 <code>InventoryItem</code> 하나로는 처리할 수 없다</li>
+    </ol>
+    <div class="explain">
+      <p><b class="lbl">해설</b> 4번도 사실이지만, 진짜 문제는 <b>의존 방향</b>입니다.
+      <code>inventory.py</code>가 <code>order.py</code>를 <code>import</code> 하게 되고,
+      주문 모델이 바뀔 때마다 재고 코드가 영향을 받습니다.</p>
+      <p><b>이걸 알아채는 실전 신호</b>: 도메인 모듈의 <code>import</code> 문을 보세요.
+      한 애그리게이트 파일이 <b>다른 애그리게이트 파일을 import 하고 있다면</b>
+      경계가 새고 있는 것입니다. <code>uuid</code>·<code>datetime</code> 같은 표준 라이브러리와
+      공용 값 객체(<code>Money</code>) 외에는 들어오지 않아야 합니다.
+      11장에서 이 규칙을 디렉터리 구조와 자동 검사로 굳힙니다.</p>
+      <p>덧붙여 — 그럼 여러 SKU를 가진 주문 하나의 <code>ready_on</code>은 어떻게 구할까요?
+      SKU마다 <code>allocate()</code>를 부르고, <b>돌려받은 <code>ready_on</code> 중
+      가장 늦은 날</b>을 고르면 됩니다. 그 조립을 하는 곳이 응용 서비스(5장)입니다.</p>
+    </div>
+  </div>
+
+  <div class="task">
+    <h3>직접 해보기</h3>
+    <p>할당을 <b>되돌리는</b> 기능을 만들어 보세요. 주문이 취소되면 잡아둔 재고를
+    풀어줘야 합니다.</p>
+<pre><code>class InventoryItem:
+    def release(self, allocation: Allocation) -&gt; None:
+        ...
+</code></pre>
+    <ul>
+      <li>인수가 <b>수량이 아니라 <code>Allocation</code></b>인 이유를 먼저 설명해 보세요.</li>
+      <li>I7·I8·I9가 깨지지 않아야 합니다.</li>
+      <li>이 메서드를 <b>누가 부르는지</b>도 생각해 보세요.
+      <code>Order.cancel()</code> 안에서 부르면 될까요?</li>
+    </ul>
+  </div>
+
+  <details class="fold answer">
+    <summary>모범답안 — 그리고 흔한 두 가지 접근</summary>
+    <div class="fold-body">
+      <p><b>흔한 접근 1: 수량만 받는다</b></p>
+<pre><code>def release(self, quantity: int) -&gt; None:
+    remaining = quantity
+    for batch in self._batches:
+        back = min(remaining, batch.reserved)
+        batch.reserved -= back
+        remaining -= back
+</code></pre>
+      <p>동작은 합니다. 문제는 <b>어느 배치의 예약을 푸는지 아무도 모른다</b>는 것입니다.
+      A 주문이 배치 1에서 3개를 잡았고 B 주문이 배치 2에서 3개를 잡았는데,
+      A를 취소하면서 <b>배치 2의 예약이 풀릴</b> 수 있습니다. 합계는 맞으니
+      테스트도 통과합니다. 그리고 배치 2가 출고될 때 물건이 비어 있는 것을 창고에서 발견합니다.</p>
+      <p><b>합계가 맞는다고 상태가 맞는 것이 아닙니다.</b> 예약은 "누가 무엇을 잡았는가"이고,
+      수량만으로는 그 정보가 사라집니다.</p>
+
+      <p><b>흔한 접근 2: 주문번호를 배치에 적어둔다</b></p>
+<pre><code>class StockBatch:
+    reservations: dict[str, int]     # {주문번호: 수량}
+</code></pre>
+      <p>정확해집니다. 그런데 <b>재고가 주문번호를 알게 됩니다.</b>
+      화면 7의 규칙(ID 참조)까지는 지켰지만, 재고 애그리게이트가
+      <b>주문의 생애 주기를 신경 쓰기 시작</b>합니다 — "취소된 주문의 예약은 언제 정리하나",
+      "주문번호가 없는 예약(안전재고 확보)은 어떻게 표현하나".
+      <b>재고의 관심사가 아닌 것이 재고 안으로 들어왔습니다.</b></p>
+      <p>다만 이 설계가 항상 틀린 것은 아닙니다. 12장에서 동시성을 다룰 때,
+      "누가 무엇을 예약했는지"를 재고가 알아야 하는 요구가 실제로 생기면
+      그때 도입할 수 있습니다. <b>지금은 그 요구가 없습니다.</b></p>
+
+      <p><b>모범답안</b></p>
+<pre><code>    def release(self, allocation: Allocation) -&gt; None:
+        for line in allocation.lines:                 # 1
+            batch = self._find(line.batch_id)
+            if line.quantity &gt; batch.reserved:        # 2
+                raise DomainError(
+                    f"배치 {batch.batch_id}: 예약 {batch.reserved}보다 "
+                    f"많은 {line.quantity}를 해제할 수 없습니다")
+
+        for line in allocation.lines:                 # 3
+            self._find(line.batch_id).reserved -= line.quantity
+</code></pre>
+      <ol class="notes">
+        <li><span class="ln">2행</span> <code>Allocation</code>이 <b>어느 배치에서
+        몇 개를 잡았는지</b>를 이미 들고 있습니다. 그래서 정확히 그만큼만 되돌립니다.
+        <code>allocate()</code>가 값을 돌려주게 만든 설계가 여기서 값을 합니다.</li>
+        <li><span class="ln">4~7행</span> 화면 9와 같은 이유로 <b>먼저 전부 검사</b>합니다.
+        중간에 실패하면 절반만 해제된 상태가 남습니다. 이 검사가 I9(음수 금지)를 지킵니다.</li>
+        <li><span class="ln">9~10행</span> 검사를 통과한 뒤에 한 번에 반영합니다.</li>
+      </ol>
+
+      <p><b>누가 부르는가 — 이게 진짜 문제입니다</b></p>
+      <p><code>Order.cancel()</code> 안에서 부르고 싶어집니다. 하지만
+      <code>Order</code>는 <code>InventoryItem</code>을 <b>알지 못합니다</b>(화면 7).
+      알게 만들면 이 장에서 그은 경계가 무너집니다.</p>
+      <p>그리고 더 근본적으로, 취소와 예약 해제는 <b>다른 애그리게이트의 일</b>입니다.
+      한 트랜잭션에서 둘 다 바꾸면 화면 6에서 본 잠금 문제가 그대로 돌아옵니다.</p>
+      <p>정답은 <b>"주문이 취소됐다"는 사실을 알리고, 재고가 그 사실을 듣고 스스로
+      해제하는 것</b>입니다. 그 장치가 <b>도메인 이벤트</b>이고 7장의 주제입니다.
+      <b>이 과제의 진짜 답은 "3장의 도구만으로는 깔끔하게 풀 수 없다"</b>이고,
+      그 불편함이 7장을 읽을 이유가 됩니다.</p>
+      <p>참고로 <code>Allocation</code>을 어디에 보관해 뒀다가 취소 때 꺼내는지도
+      아직 정하지 않았습니다. 그건 4장(리포지토리)의 문제입니다.</p>
+    </div>
+  </details>
+
+  <div class="box note">
+    <p class="box-t">다음 장 예고</p>
+    <p>애그리게이트를 만들었습니다. 그런데 이 장의 코드 어디에도
+    <b><code>INSERT</code>도 <code>SELECT</code>도 없습니다.</b> 지금까지 만든 객체들은
+    메모리에만 있고, 프로세스가 끝나면 사라집니다.</p>
+    <p>4장에서 <b>리포지토리</b>를 만듭니다. 그리고 이 장에서 계속 미뤄둔
+    "<code>UPDATE orders SET total_amount = ...</code>를 어떻게 막나"의 마지막 답이
+    거기서 나옵니다 — <b>애그리게이트 단위로만 저장하고 꺼낸다</b>는 규칙입니다.</p>
+  </div>
+
+  <div class="chapter-end">
+    <a href="ch02.html#last"><span>이전 장</span>2장 — 도메인 모델의 최소 단위: Entity와 Value Object</a>
+    <a href="index.html"><span>4장은 아직 집필 전입니다</span>표지와 목차로</a>
+  </div>
+</section>
+
+</div></main>
+
+<script src="assets/book.js"></script>
+</body>
+</html>
