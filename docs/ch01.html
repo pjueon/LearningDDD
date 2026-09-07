@@ -74,8 +74,182 @@
 </section>
 
 <!-- ─────────────────────────────────────────── 화면 3 -->
-<section class="screen" data-title="그래서 이렇게 짰다">
+<section class="screen" data-title="데이터베이스 구조">
   <p class="kicker">1장 · 화면 3</p>
+  <h2>코드를 보기 전에 — 데이터가 어떻게 생겼나</h2>
+
+  <p>코드는 결국 <b>테이블을 읽고 쓰는 일</b>입니다. 그래서 테이블 구조를 먼저 알면
+  코드가 훨씬 쉽게 읽힙니다. 한빛몰 v1의 데이터베이스는 테이블 다섯 개로 되어 있습니다.</p>
+
+  <figure class="fig">
+    <svg viewBox="0 0 700 185" role="img" aria-label="한빛몰 v1 데이터베이스의 다섯 테이블과 관계">
+      <g class="svg-line" stroke-width="1.2">
+        <rect x="14"  y="16"  width="132" height="46" rx="8"/>
+        <rect x="186" y="16"  width="132" height="46" rx="8"/>
+        <rect x="358" y="16"  width="132" height="46" rx="8"/>
+        <rect x="358" y="120" width="132" height="46" rx="8"/>
+        <rect x="530" y="120" width="132" height="46" rx="8"/>
+      </g>
+      <g class="svg-muted" stroke="currentColor" stroke-width="1.2" fill="none">
+        <path d="M148 39 H182"/>
+        <path d="M320 39 H354"/>
+        <path d="M424 64 V116"/>
+        <path d="M492 143 H526"/>
+      </g>
+      <g class="svg-muted" stroke="none">
+        <path d="M182 35 l7 4 -7 4 z"/>
+        <path d="M354 35 l7 4 -7 4 z"/>
+        <path d="M420 116 l4 7 4 -7 z"/>
+        <path d="M526 139 l7 4 -7 4 z"/>
+      </g>
+      <g text-anchor="middle" font-size="12.5" font-weight="700" class="svg-fg">
+        <text x="80"  y="38">customers</text>
+        <text x="252" y="38">orders</text>
+        <text x="424" y="38">order_lines</text>
+        <text x="424" y="142">products</text>
+        <text x="596" y="142">stock_batches</text>
+      </g>
+      <g text-anchor="middle" font-size="10" class="svg-muted">
+        <text x="80"  y="53">회원</text>
+        <text x="252" y="53">주문 1건</text>
+        <text x="424" y="53">주문에 담긴 상품 1줄</text>
+        <text x="424" y="157">판매하는 상품</text>
+        <text x="596" y="157">입고 묶음(배치)</text>
+      </g>
+      <g text-anchor="middle" font-size="9.5" class="svg-muted">
+        <text x="165" y="32">1:N</text>
+        <text x="337" y="32">1:N</text>
+        <text x="440" y="95">N:1</text>
+        <text x="509" y="136">1:N</text>
+      </g>
+    </svg>
+    <figcaption>화살표는 "이쪽 한 행이 저쪽 여러 행을 가진다"는 뜻입니다. 회원 하나가 주문 여럿을,
+    주문 하나가 주문 라인 여럿을, 상품 하나가 배치 여럿을 가집니다.</figcaption>
+  </figure>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:8.5rem">테이블</th><th>한 행이 뜻하는 것</th><th>주요 컬럼</th></tr>
+      <tr>
+        <td><code>customers</code></td>
+        <td>회원 한 명</td>
+        <td><code>id</code>, <code>name</code>, <code>grade</code>(등급)</td>
+      </tr>
+      <tr>
+        <td><code>products</code></td>
+        <td>판매하는 상품 하나</td>
+        <td><code>id</code>, <code>name</code>, <code>price</code>(현재 판매가),
+        <code>status</code>(<code>'판매중'</code>/<code>'판매중지'</code>)</td>
+      </tr>
+      <tr>
+        <td><code>stock_batches</code></td>
+        <td><b>입고 묶음 하나</b> (아래에서 자세히)</td>
+        <td><code>id</code>, <code>product_id</code>, <code>quantity</code>,
+        <code>reserved</code>, <code>received_on</code>, <code>expires_on</code></td>
+      </tr>
+      <tr>
+        <td><code>orders</code></td>
+        <td>주문 한 건</td>
+        <td><code>id</code>, <code>customer_id</code>, <code>status</code>,
+        <code>total</code>, <code>pg_tid</code>, 배송지 컬럼들</td>
+      </tr>
+      <tr>
+        <td><code>order_lines</code></td>
+        <td>주문에 담긴 상품 한 줄</td>
+        <td><code>order_id</code>, <code>product_id</code>, <b><code>product_name</code>,
+        <code>unit_price</code></b>, <code>qty</code>, <code>line_total</code></td>
+      </tr>
+    </table>
+  </div>
+
+  <p><code>order_lines</code>에 <code>product_name</code>과 <code>unit_price</code>가
+  <b>또</b> 있는 것이 눈에 걸릴 수 있습니다. <code>product_id</code>로 상품 테이블을 찾으면
+  되는데 왜 베껴 놨을까요? 요구사항 8번("주문 시점의 상품명과 가격을 보관") 때문입니다.
+  <b>이 한 가지 중복이 이 교재에서 가장 여러 번 다시 등장하는 설계 판단입니다.</b></p>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 4 -->
+<section class="screen" data-title="'배치'가 무엇인가">
+  <p class="kicker">1장 · 화면 4</p>
+  <h2>'배치'가 무엇인가</h2>
+
+  <p>코드에 <code>stock_batches</code>라는 테이블이 계속 나오니 이것만 먼저 확실히 해두겠습니다.
+  창고 업무를 안 해봤으면 낯선 개념입니다.</p>
+
+  <div class="box note">
+    <p class="box-t">배치 (batch)</p>
+    <p><b>한 번에 들어온 물건 묶음</b>을 뜻합니다. 같은 상품이라도 <b>들어온 날이 다르면 다른 배치</b>입니다.</p>
+  </div>
+
+  <p>왜 이렇게 나눠 관리하는지가 중요합니다. 한빛몰이 라면을 파는 상황을 보겠습니다.</p>
+
+  <div class="dialog">
+    <div class="line"><div class="who">3월 2일</div><div class="say">
+      <p>라면 40개 입고. 제조일이 달라서 <b>유통기한은 9월 1일</b>.</p></div></div>
+    <div class="line"><div class="who">3월 20일</div><div class="say">
+      <p>라면 60개 추가 입고. 이번 것은 <b>유통기한이 9월 19일</b>.</p></div></div>
+  </div>
+
+  <p>창고에는 이제 라면 100개가 있습니다. 그런데 <b>"라면 100개"라고만 기록하면 회사가 손해를 봅니다.</b></p>
+
+  <ul>
+    <li>9월 1일이 지나면 40개는 <b>팔 수 없는 물건</b>이 됩니다. 그런데 100개라고만 적혀 있으면
+    시스템은 여전히 100개를 팔 수 있다고 생각합니다.</li>
+    <li>주문이 들어왔을 때 <b>어느 쪽을 먼저 내보내야 하는지</b> 알 수 없습니다.
+    9월 19일짜리를 먼저 팔아버리면, 남은 9월 1일짜리는 기한이 지나 폐기됩니다.</li>
+  </ul>
+
+  <p>그래서 <b>입고 묶음마다 한 행</b>으로 기록합니다. 위 상황을 테이블로 적으면 이렇습니다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th colspan="6"><code>stock_batches</code></th></tr>
+      <tr><th>id</th><th>product_id</th><th>quantity</th><th>reserved</th>
+          <th>received_on</th><th>expires_on</th></tr>
+      <tr><td>101</td><td>12</td><td>40</td><td>5</td><td>2026-03-02</td><td>2026-09-01</td></tr>
+      <tr><td>102</td><td>12</td><td>60</td><td>0</td><td>2026-03-20</td><td>2026-09-19</td></tr>
+    </table>
+  </div>
+
+  <p>둘 다 <code>product_id</code>가 12번(라면)입니다. <b>한 상품이 여러 배치를 가집니다.</b>
+  그러면 "라면 재고가 몇 개냐"는 질문은 이제 <b>두 행을 더해서</b> 대답해야 합니다.</p>
+
+  <h3><code>reserved</code> — 찜해둔 수량</h3>
+
+  <p>컬럼 하나만 더 봅시다. 101번 배치는 <code>quantity</code>가 40인데
+  <code>reserved</code>가 5입니다.</p>
+
+  <div class="box">
+    <p><b><code>quantity</code></b> — 창고에 <b>실제로 있는</b> 수량. 40개.<br>
+    <b><code>reserved</code></b> — 그중 <b>이미 다른 주문이 잡아둔</b> 수량. 5개.<br>
+    <b>지금 팔 수 있는 수량</b> = <code>quantity - reserved</code> = <b>35개</b></p>
+  </div>
+
+  <p>물건 5개는 아직 창고 선반에 그대로 있습니다. 다만 <b>임자가 있습니다.</b>
+  어제 들어온 주문이 아직 출고되지 않은 상태라면, 그 5개는 창고에 있지만 다른 고객에게 팔면 안 됩니다.
+  이렇게 물건을 옮기지 않고 <span class="term" data-term="allocation">잡아두는 것</span>이
+  주문 처리의 첫 단계입니다.</p>
+
+  <p>그래서 라면의 전체 판매 가능 수량은 <b>(40−5) + (60−0) = 95개</b>입니다.
+  바로 다음 화면 코드에 이 계산식이 SQL로 등장합니다.</p>
+
+  <details class="fold">
+    <summary>더 깊이 — 배치를 안 쓰는 회사도 있습니다</summary>
+    <div class="fold-body">
+      <p>유통기한이 없는 물건(가구, 공구, 의류)을 파는 회사는 배치를 나눌 이유가 적습니다.
+      "재고 100개"로 관리하고, 입고 이력은 별도 로그로만 남깁니다. 훨씬 간단합니다.</p>
+      <p>배치가 필요해지는 조건은 세 가지 중 하나입니다 — <b>유통기한이 있다</b>(식품, 의약품),
+      <b>원가가 입고 시점마다 다르다</b>(정산·회계 때문), <b>추적 의무가 있다</b>(리콜 대응).
+      한빛몰은 식품을 팔기 때문에 첫 번째에 해당합니다.</p>
+      <p>여러분 회사의 재고가 단순한 숫자 하나라면, 그건 잘못된 것이 아니라
+      <b>배치가 필요 없는 업무</b>일 가능성이 큽니다. 필요 없는 구조를 미리 만들지 않는 것도 설계입니다.</p>
+    </div>
+  </details>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 5 -->
+<section class="screen" data-title="그래서 이렇게 짰다">
+  <p class="kicker">1장 · 화면 5</p>
   <h2>그래서 이렇게 짰다</h2>
 
   <p>요구사항 여덟 개를 위에서부터 아래로, 순서대로 구현한 코드입니다.
@@ -174,12 +348,324 @@
   <p><b>요구사항과 코드가 거의 일대일로 붙어 있습니다.</b> 이게 이 코드의 가장 큰 장점입니다.</p>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 4 -->
+<!-- ─────────────────────────────────────────── 화면 6 -->
+<section class="screen" data-title="코드 해설 ① 트랜잭션">
+  <p class="kicker">1장 · 화면 6</p>
+  <h2>코드 해설 ① — 준비와 트랜잭션</h2>
+
+  <p>앞 화면의 코드를 세 덩어리로 나눠 읽겠습니다. <b>SQL과 데이터베이스 관용구를 처음 보는
+  분도 따라올 수 있게</b> 짚고 갑니다. 이미 익숙한 부분은 건너뛰세요.</p>
+
+  <details class="fold">
+    <summary>먼저 — SQL 세 문장만 알면 됩니다</summary>
+    <div class="fold-body">
+      <div class="table-wrap">
+        <table>
+          <tr><th style="width:6rem">문장</th><th>하는 일</th><th>예</th></tr>
+          <tr><td><code>SELECT</code></td><td>있는 행을 <b>읽는다</b></td>
+              <td><code>SELECT * FROM products WHERE id = 12</code><br>
+              → products 테이블에서 id가 12인 행을 가져온다</td></tr>
+          <tr><td><code>INSERT</code></td><td>새 행을 <b>넣는다</b></td>
+              <td><code>INSERT INTO orders (customer_id) VALUES (7)</code><br>
+              → orders 테이블에 새 주문 행을 하나 만든다</td></tr>
+          <tr><td><code>UPDATE</code></td><td>있는 행을 <b>고친다</b></td>
+              <td><code>UPDATE orders SET total = 5000 WHERE id = 3</code><br>
+              → 3번 주문의 total 값을 5000으로 바꾼다</td></tr>
+        </table>
+      </div>
+      <p><code>WHERE</code>는 "어떤 행에 대해서"를 정하는 조건입니다. <code>WHERE</code>를 빼면
+      <b>테이블의 모든 행</b>에 적용됩니다. <code>UPDATE</code>에서 이걸 빠뜨리는 것이
+      실무의 유명한 사고입니다.</p>
+    </div>
+  </details>
+
+<pre><span class="cap"># 1~19행</span><code>def place_order(request):
+    body = json.loads(request.body)              # 1
+    customer_id = body["customer_id"]
+    items = body["items"]
+    address = body["address"]
+
+    if not items:                                # 2
+        return JsonResponse({"error": "주문할 상품이 없습니다"}, status=400)
+
+    conn = db.connect()                          # 3
+    tx = conn.begin()                            # 4
+    try:
+        order_id = conn.execute(
+            "INSERT INTO orders (customer_id, status, zipcode, road, "      # 5
+            "detail, receiver, phone, total) "
+            "VALUES (%s, '결제대기', %s, %s, %s, %s, %s, 0) RETURNING id",   # 6 7
+            (customer_id, address["zipcode"], address["road"], address["detail"],
+             address["receiver"], address["phone"]),                        # 8
+        ).scalar()                                                          # 9
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">2행</span> HTTP 요청 본문은 그냥 <b>글자 뭉치</b>입니다.
+    <code>json.loads()</code>가 그것을 파이썬 딕셔너리로 바꿔줍니다. 이 시점부터
+    <code>body["items"]</code>처럼 꺼내 쓸 수 있습니다. 검증은 아무것도 하지 않았습니다 —
+    <code>items</code>가 문자열이거나 수량이 <code>-5</code>여도 여기서는 통과합니다.</li>
+
+    <li><span class="ln">7~8행</span> 요구사항 1번("상품이 하나 이상")을 여기서 막습니다.
+    <b>업무 규칙이 웹 요청을 받는 함수 맨 앞에 있다</b>는 점을 기억해 두세요.
+    같은 규칙이 필요한 다른 경로(관리자 주문 대행, 배치 주문 등)는 이 검사를 받지 못합니다.</li>
+
+    <li><span class="ln">10행</span> <b>커넥션</b>은 데이터베이스와 연결된 통신선입니다.
+    이 선을 통해서만 SQL을 보낼 수 있습니다.</li>
+
+    <li><span class="ln">11행</span> <b>트랜잭션</b>의 시작입니다. 이 코드에서 가장 중요한
+    개념이라 아래 상자에서 따로 설명합니다.</li>
+
+    <li><span class="ln">14~16행</span> 파이썬 문자열 세 개가 나란히 놓여 있으면 파이썬이
+    <b>하나로 붙여줍니다.</b> 실제로 데이터베이스에 가는 것은
+    <code>INSERT INTO orders (customer_id, status, ...) VALUES (...)</code>라는 한 문장입니다.
+    긴 SQL을 여러 줄로 나눠 쓰는 흔한 방식인데, 줄 끝의 공백을 빠뜨리면
+    <code>road</code>와 <code>detail</code>이 붙어버려 문법 오류가 납니다.</li>
+
+    <li><span class="ln">16행</span> <code>%s</code>는 <b>"여기에 값이 들어올 자리"</b>라는
+    표시입니다. 실제 값은 17~18행의 튜플로 따로 넘깁니다. 왜
+    <code>f"... id = {customer_id}"</code>처럼 문자열을 직접 만들지 않을까요?
+    고객이 이름에 <code>'; DROP TABLE orders; --</code>를 넣으면 그게 SQL 문장으로 실행됩니다
+    (SQL 인젝션). <code>%s</code>로 넘기면 데이터베이스가 그것을 <b>값으로만</b> 취급합니다.
+    <b>예외 없이 항상 이렇게 씁니다.</b></li>
+
+    <li><span class="ln">16행</span> <code>RETURNING id</code>는 "행을 넣은 다음, 그 행에
+    자동으로 붙은 <code>id</code>를 알려달라"는 뜻입니다. 주문 번호는 데이터베이스가 자동 증가로
+    만들어주기 때문에 넣기 전에는 우리가 그 값을 모릅니다. 뒤에서 주문 라인을 넣을 때
+    "몇 번 주문의 라인인지" 적어야 하므로 이 값이 필요합니다.</li>
+
+    <li><span class="ln">17~18행</span> <code>%s</code> 자리에 들어갈 값들입니다.
+    <b>개수와 순서가 위의 <code>%s</code>와 정확히 맞아야 합니다.</b> 컬럼을 하나 추가하면
+    두 곳(컬럼 목록, 값 목록)을 동시에 고쳐야 하고, 실수하면 우편번호 자리에 전화번호가 들어갑니다.
+    타입 검사가 도와주지 않는 영역입니다.</li>
+
+    <li><span class="ln">19행</span> <code>.scalar()</code>는 결과에서 <b>값 하나만</b>
+    꺼내는 메서드입니다. <code>RETURNING id</code>가 "1행 1열"을 돌려주므로 그 숫자 하나를 받습니다.
+    (<code>.one()</code>은 행 하나 전체, <code>.all()</code>은 행 여러 개 — 다음 화면에서 셋 다 나옵니다.)</li>
+  </ol>
+
+  <div class="box note">
+    <p class="box-t">트랜잭션이란</p>
+    <p>여러 개의 데이터 변경을 <b>한 덩어리로 묶어서, 전부 되거나 전부 안 되게</b> 만드는 장치입니다.
+    <code>conn.begin()</code>으로 시작하고 <code>tx.commit()</code>으로 확정하며, 중간에 문제가
+    생기면 <code>tx.rollback()</code>으로 시작 전 상태로 되돌립니다.</p>
+    <p>왜 필요한가 — 이 함수는 <b>주문 행을 넣고, 재고 예약 수량을 늘리고, 주문 라인을 넣고,
+    주문 상태를 바꿉니다.</b> 세 번째 단계에서 서버가 죽었다고 해봅시다. 트랜잭션이 없으면
+    주문은 만들어졌는데 상태는 <code>결제대기</code>이고 재고는 이미 예약된,
+    <b>아무도 처리할 수 없는 주문</b>이 남습니다. 트랜잭션이 있으면 그 변경들이 통째로 사라집니다.</p>
+    <p>그리고 커밋하기 전의 변경은 <b>다른 사용자에게 보이지 않습니다.</b> 즉 이 함수가 도는 동안
+    다른 고객은 아직 줄어들지 않은 재고를 보고 있습니다. 이 사실이 12장 동시성 문제의 출발점입니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 7 -->
+<section class="screen" data-title="코드 해설 ② 재고 예약">
+  <p class="kicker">1장 · 화면 7</p>
+  <h2>코드 해설 ② — 상품 확인과 재고 예약</h2>
+
+  <p>함수의 몸통입니다. 주문에 담긴 상품을 하나씩 돌면서 확인하고, 재고를 잡고, 주문 라인을 넣습니다.
+  화면 4에서 본 라면 배치 두 개를 계속 예로 쓰겠습니다 —
+  <b>101번 배치 40개(5개 예약됨, 기한 9/1), 102번 배치 60개(기한 9/19).
+  팔 수 있는 수량은 (40−5) + (60−0) = 95개.</b></p>
+
+<pre><span class="cap"># 21~60행</span><code>        total = 0
+        for item in items:
+            product = conn.execute(
+                "SELECT * FROM products WHERE id = %s", (item["product_id"],)
+            ).one()                                                     # 1
+            if product["status"] != "판매중":                             # 2
+                raise ValueError(f"{product['name']}은 판매 중지된 상품입니다")
+
+            available = conn.execute(
+                "SELECT COALESCE(SUM(quantity - reserved), 0) FROM stock_batches "  # 3
+                "WHERE product_id = %s", (item["product_id"],)
+            ).scalar()
+            if available &lt; item["qty"]:
+                raise ValueError(f"{product['name']} 재고가 부족합니다")
+
+            # 유통기한이 이른 배치부터 예약한다
+            remain = item["qty"]
+            batches = conn.execute(
+                "SELECT * FROM stock_batches WHERE product_id = %s ORDER BY expires_on",  # 4
+                (item["product_id"],)
+            ).all()                                                     # 5
+            for b in batches:
+                if remain == 0:
+                    break
+                take = min(b["quantity"] - b["reserved"], remain)        # 6
+                conn.execute(
+                    "UPDATE stock_batches SET reserved = reserved + %s WHERE id = %s",  # 7
+                    (take, b["id"]),
+                )
+                remain -= take
+
+            line_total = product["price"] * item["qty"]
+            total += line_total
+            conn.execute(
+                "INSERT INTO order_lines (order_id, product_id, product_name, "  # 8
+                "unit_price, qty, line_total) "
+                "VALUES (%s, %s, %s, %s, %s, %s)",
+                (order_id, product["id"], product["name"], product["price"],
+                 item["qty"], line_total),
+            )
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">23~25행</span> <code>SELECT *</code>는 "그 행의 <b>모든 컬럼</b>을
+    달라"는 뜻입니다. <code>.one()</code>은 "결과가 정확히 한 행일 것"을 기대하고 그 행을 꺼냅니다.
+    상품이 없으면 여기서 예외가 나는데, 그 예외는 뒤의 <code>except Exception</code>에 잡혀
+    <b>"주문 실패"라는 400 응답</b>으로 나갑니다. 없는 상품이 요청됐다는 사실은 어디에도 남지 않습니다.</li>
+
+    <li><span class="ln">26행</span> 요구사항 2번입니다. <code>"판매중"</code>이라는
+    <b>글자를 비교</b>합니다. 누군가 상품 테이블에 <code>"판매 중"</code>(공백 하나)을 넣으면
+    이 조건은 조용히 참이 되고 판매 중지 상품이 팔립니다. 데이터베이스도 파이썬도 막아주지 않습니다.
+    <span class="later">2장에서 다시 볼 문제</span></li>
+
+    <li><span class="ln">29~32행</span> SQL 함수 두 개가 나옵니다.
+    <code>SUM(quantity - reserved)</code>는 조건에 맞는 <b>모든 행</b>에 대해
+    <code>quantity - reserved</code>를 계산해 <b>합계</b>를 냅니다.
+    라면이라면 (40−5) + (60−0) = 95입니다.</p>
+    <p><code>COALESCE(A, B)</code>는 "A가 <code>NULL</code>이면 B를 써라"는 뜻입니다.
+    조건에 맞는 행이 <b>하나도 없으면</b> <code>SUM</code>은 0이 아니라 <code>NULL</code>을
+    돌려주고, 파이썬에서 그건 <code>None</code>이 되어 <code>None &lt; 5</code> 비교에서 예외가 납니다.
+    그래서 0으로 바꿔주는 것입니다. <b>재고 행이 없는 신규 상품에서 터지는 흔한 버그</b>를
+    막는 장치입니다.</li>
+
+    <li><span class="ln">39행</span> <code>ORDER BY expires_on</code> — 유통기한
+    <b>오름차순</b>(이른 것부터)으로 정렬합니다. 요구사항 4번(유통기한 이른 것부터)이
+    이 한 조각으로 구현되어 있습니다. <span class="later">화면 11에서 이게 버그로 드러납니다</span></li>
+
+    <li><span class="ln">41행</span> <code>.all()</code>은 행을 <b>전부</b> 리스트로 가져옵니다.
+    지금까지 세 가지가 나왔습니다 — <code>.scalar()</code>는 값 하나,
+    <code>.one()</code>은 행 하나, <code>.all()</code>은 행 여러 개입니다.</li>
+
+    <li><span class="ln">45행</span> 배치별로 <b>가져갈 수 있는 만큼만</b> 가져갑니다.
+    35개 남은 배치에서 50개가 필요하면 35개만 빼고, 나머지 15개는 다음 배치에서 뺍니다.
+    <code>remain</code>이 0이 되면 루프를 빠져나갑니다.</li>
+
+    <li><span class="ln">47행</span> 여기가 이 함수에서 <b>가장 잘 짜인 줄</b>입니다.
+    <code>SET reserved = reserved + %s</code>는 <b>"지금 값이 무엇이든 거기에 더해라"</b>는
+    뜻입니다. 파이썬에서 <code>새값 = b["reserved"] + take</code>를 계산해 그 숫자를 대입하는 것과
+    결과가 달라질 수 있습니다. 후자는 <b>내가 행을 읽은 시점의 값</b>을 기준으로 하므로,
+    그 사이 다른 주문이 예약을 했다면 그 예약을 덮어써서 지워버립니다.
+    데이터베이스에서 더하면 그 순간의 실제 값에 더해집니다.
+    <span class="later">12장에서 이것으로도 부족한 이유를 봅니다</span></li>
+
+    <li><span class="ln">54~60행</span> 요구사항 8번입니다. 주문 라인에 <code>product_id</code>만
+    적어도 될 것 같은데 <code>product_name</code>과 <code>unit_price</code>까지 <b>복사</b>합니다.
+    상품 가격이 나중에 바뀌어도 이미 나간 주문의 금액이 흔들리지 않게 하기 위해서입니다.
+    데이터베이스 정규화 관점에서는 중복이지만, <b>업무 관점에서는 다른 사실</b>입니다 —
+    "지금 상품의 가격"과 "그때 고객이 지불한 가격"은 애초에 서로 다른 것입니다.
+    <span class="later">6장에서 이 판단을 정면으로 다룹니다</span></li>
+  </ol>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 8 -->
+<section class="screen" data-title="코드 해설 ③ 결제와 마무리">
+  <p class="kicker">1장 · 화면 8</p>
+  <h2>코드 해설 ③ — 금액, 결제, 그리고 마무리</h2>
+
+<pre><span class="cap"># 62~83행</span><code>        # 3만원 미만이면 배송비 3,000원
+        if total &lt; 30000:                                    # 1
+            total += 3000
+
+        conn.execute("UPDATE orders SET total = %s WHERE id = %s", (total, order_id))  # 2
+
+        pg = pg_client.approve(customer_id=customer_id, amount=total, order_id=order_id)  # 3
+        if pg["resultCode"] != "0000":                         # 4
+            raise ValueError("결제 실패: " + pg["resultMsg"])
+
+        conn.execute(
+            "UPDATE orders SET status = '결제완료', pg_tid = %s WHERE id = %s",  # 5
+            (pg["tid"], order_id),
+        )
+        tx.commit()                                            # 6
+    except Exception as e:
+        tx.rollback()                                          # 7
+        return JsonResponse({"error": str(e)}, status=400)
+
+    mailer.send(customer_id, "주문이 접수되었습니다", render_order_mail(order_id))   # 8
+    slack.notify("#창고", f"신규 주문 {order_id}")                 # 9
+    return JsonResponse({"order_id": order_id})
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">62~64행</span> 요구사항 5번입니다. <code>total</code>이라는
+    <b>변수 하나</b>가 계속 바뀌면서 금액 계산이 진행됩니다. 지금은 "라인 합계 → 배송비 추가"
+    두 단계뿐이라 읽기 쉽습니다. 화면 10에서 할인이 끼어들면 이 단순함이 깨집니다.</li>
+
+    <li><span class="ln">66행</span> 아까 <code>INSERT</code>로 만들어 둔 주문 행을
+    <code>UPDATE</code>로 고칩니다. 처음 넣을 때 총액을 <code>0</code>으로 넣었기 때문에
+    <b>계산이 끝난 뒤 다시 한 번 써주는</b> 구조입니다. 주문 행이 잠깐 "총액 0원" 상태로
+    존재한다는 뜻이기도 합니다.</li>
+
+    <li><span class="ln">68행</span> <b>외부 결제사(PG) 호출입니다. 그리고 이 함수에서
+    가장 위험한 줄입니다.</b> 아래 상자에서 따로 설명합니다.</li>
+
+    <li><span class="ln">69행</span> <code>resultCode</code>가 <code>"0000"</code>이면 성공.
+    <b>이런 게 PG사 문서에 적혀 있는 약속입니다.</b> 어떤 회사는 <code>"00"</code>,
+    어떤 회사는 <code>success: true</code>를 씁니다. 우리 업무와 아무 관계 없는 남의 규칙이
+    주문 처리 함수 한복판에 들어와 있습니다. <span class="later">10장 ACL에서 이걸 격리합니다</span></li>
+
+    <li><span class="ln">72~74행</span> 주문 상태를 <code>결제완료</code>로 바꾸고
+    PG사가 준 거래번호(<code>tid</code>)를 저장합니다. 나중에 환불할 때 이 번호가 필요합니다.</li>
+
+    <li><span class="ln">76행</span> <code>commit()</code> — 여기서야 <b>모든 변경이 확정</b>되고
+    다른 사용자에게 보이기 시작합니다. 주문 행, 주문 라인, 재고 예약이 <b>동시에</b> 나타납니다.</li>
+
+    <li><span class="ln">77~79행</span> 중간에 어떤 예외가 나든 <code>rollback()</code>으로
+    전부 되돌립니다. 요구사항 6번("결제 실패 시 재고도 원상복구")이 이 두 줄로 해결됩니다.
+    재고 되돌리기를 <b>트랜잭션이 대신 해주는 것</b>입니다.</p>
+    <p>다만 <code>except Exception</code>은 <b>모든 예외를 똑같이 취급</b>합니다.
+    재고 부족(고객에게 알려줄 상황)과 데이터베이스 접속 실패(우리가 고쳐야 할 장애)가
+    같은 400 응답으로 나갑니다.</li>
+
+    <li><span class="ln">81행</span> 메일 발송은 <b><code>try</code> 블록 밖</b>,
+    즉 커밋 뒤에 있습니다. 일부러 그렇게 둔 것입니다 — 메일 서버가 죽었다고 주문을 취소할 수는
+    없으니까요. 대신 <b>메일 발송이 실패하면 주문은 됐는데 고객은 모르는</b> 상태가 됩니다.
+    그리고 메일 서버가 느리면 <b>고객이 보는 응답도 그만큼 느려집니다.</b>
+    <span class="later">7장에서 이것을 이벤트로 떼어냅니다</span></li>
+
+    <li><span class="ln">82행</span> 창고 슬랙 알림도 마찬가지입니다.
+    <code>f"신규 주문 {order_id}"</code>는 f-string으로, 중괄호 안의 값을 문자열에 끼워 넣습니다.
+    (SQL에서는 이렇게 하면 안 되지만, 슬랙 메시지는 괜찮습니다.)</li>
+  </ol>
+
+  <div class="box warn">
+    <p class="box-t">68행이 왜 위험한가 — 트랜잭션 안의 외부 호출</p>
+    <p>PG 승인 호출이 <b>데이터베이스 트랜잭션 안에서</b> 일어납니다. 문제가 두 가지입니다.</p>
+    <p><b>1. 트랜잭션이 오래 열려 있습니다.</b> PG사 응답이 3초 걸리면 그 3초 동안
+    이 트랜잭션이 잡고 있는 재고 행들이 다른 주문을 기다리게 만듭니다.
+    주문이 몰리는 시간에는 이것만으로 서비스가 멈출 수 있습니다.</p>
+    <p><b>2. 되돌릴 수 없는 것을 되돌리려 합니다.</b> PG 승인이 <b>성공</b>한 직후
+    72행에서 데이터베이스 오류가 나면 어떻게 될까요? <code>rollback()</code>은 우리 데이터베이스만
+    되돌립니다. <b>고객 카드에서는 돈이 빠져나갔고, 우리 시스템에는 주문이 없습니다.</b>
+    트랜잭션은 우리 데이터베이스의 장치일 뿐, 남의 시스템까지 되돌려주지 않습니다.</p>
+    <p>이 문제에는 정답이 하나가 아닙니다. 5장에서 트랜잭션 경계를 어디에 둘지 이야기하고,
+    12장에서 "되돌릴 수 없는 작업"을 다루는 방법(보상 트랜잭션, 사가)을 봅니다.
+    지금 기억할 것은 <b>이 위험이 코드 어디에도 적혀 있지 않다</b>는 사실입니다.
+    68행은 다른 줄들과 똑같이 생겼습니다.</p>
+  </div>
+
+  <div class="box note">
+    <p class="box-t">해설을 마치고</p>
+    <p>83줄을 다 읽었습니다. 확인하고 싶은 것은 하나입니다 —
+    <b>이 코드를 읽고 "한빛몰이 주문을 어떻게 처리하는가"를 파악하기가 얼마나 힘들었는가.</b></p>
+    <p>SQL 문법, <code>.one()</code>과 <code>.scalar()</code>의 차이,
+    <code>COALESCE</code>가 필요한 이유, <code>RETURNING id</code>, PG 응답 코드 —
+    이런 것들을 계속 헤치고 나가야 비로소 "3만 원 미만이면 배송비 3,000원"이라는
+    업무 규칙 한 줄이 보입니다. <b>업무 규칙과 기술 세부사항이 같은 무게로 섞여 있기 때문</b>입니다.</p>
+    <p>DDD가 하려는 일의 절반은 이 둘을 갈라놓는 것입니다. 나머지 절반은 0장에서 봤듯이
+    업무 담당자와 같은 낱말을 쓰는 일입니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 9 -->
 <section class="screen" data-title="이 코드는 잘 돌아간다">
-  <p class="kicker">1장 · 화면 4</p>
+  <p class="kicker">1장 · 화면 9</p>
   <h2>이 코드는 잘 돌아간다</h2>
 
-  <p>이 대목을 건너뛰면 이 장을 잘못 읽게 됩니다. 위 코드의 <b>장점</b>을 먼저 인정하고 갑시다.</p>
+  <p>이 대목을 건너뛰면 이 장을 잘못 읽게 됩니다. 앞에서 읽은 코드의 <b>장점</b>을 먼저 인정하고 갑시다.</p>
 
   <div class="box good">
     <p class="box-t">이 코드가 좋은 이유</p>
@@ -211,9 +697,9 @@
   <p>세 개뿐입니다. 6개월에 세 개면 아주 조용한 프로젝트입니다.</p>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 5 -->
+<!-- ─────────────────────────────────────────── 화면 10 -->
 <section class="screen" data-title="변경 1 — 등급 할인">
-  <p class="kicker">1장 · 화면 5</p>
+  <p class="kicker">1장 · 화면 10</p>
   <h2>변경 1 — 회원 등급 할인</h2>
 
   <blockquote>
@@ -272,9 +758,9 @@
   변수 하나가 늘어납니다.</p>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 6 -->
+<!-- ─────────────────────────────────────────── 화면 11 -->
 <section class="screen" data-title="변경 2 — 유통기한">
-  <p class="kicker">1장 · 화면 6</p>
+  <p class="kicker">1장 · 화면 11</p>
   <h2>변경 2 — 유통기한 규칙</h2>
 
   <blockquote>
@@ -283,7 +769,7 @@
     포장하고 배송하는 데 이틀 걸리니까요.</p>
   </blockquote>
 
-  <p>여기서 개발팀은 기존 코드의 <b>버그</b>를 발견합니다. 화면 3의 코드를 다시 보세요.</p>
+  <p>여기서 개발팀은 기존 코드의 <b>버그</b>를 발견합니다. 화면 5의 코드를 다시 보세요.</p>
 
 <pre><span class="cap"># 재고 확인과 예약 — 원래 코드</span><code>            available = conn.execute(
                 "SELECT COALESCE(SUM(quantity - reserved), 0) FROM stock_batches "
@@ -355,9 +841,9 @@
   </div>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 7 -->
+<!-- ─────────────────────────────────────────── 화면 12 -->
 <section class="screen" data-title="변경 3 — 주문 취소">
-  <p class="kicker">1장 · 화면 7</p>
+  <p class="kicker">1장 · 화면 12</p>
   <h2>변경 3 — 주문 취소</h2>
 
   <blockquote>
@@ -439,9 +925,9 @@
   모바일팀이 조건을 조금만 바꾸면 언제든 같은 사고가 다시 납니다.</p>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 8 -->
+<!-- ─────────────────────────────────────────── 화면 13 -->
 <section class="screen" data-title="6개월 뒤: 무엇이 아픈가">
-  <p class="kicker">1장 · 화면 8</p>
+  <p class="kicker">1장 · 화면 13</p>
   <h2>6개월 뒤: 무엇이 아픈가</h2>
 
   <p>요구사항 세 개를 반영했을 뿐인데, 지금 코드의 상태를 정리하면 이렇습니다.
@@ -486,9 +972,9 @@
   </div>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 9 -->
+<!-- ─────────────────────────────────────────── 화면 14 -->
 <section class="screen" data-title="이 상태에 붙은 이름">
-  <p class="kicker">1장 · 화면 9</p>
+  <p class="kicker">1장 · 화면 14</p>
   <h2>이 상태에 붙은 이름</h2>
 
   <p>지금까지 본 코드 스타일에는 이름이 있습니다. 널리 쓰이는 이름이니 알아두면
@@ -559,9 +1045,9 @@ class OrderLine:
   </details>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 10 -->
+<!-- ─────────────────────────────────────────── 화면 15 -->
 <section class="screen" data-title="그런데 이게 정답인 경우">
-  <p class="kicker">1장 · 화면 10</p>
+  <p class="kicker">1장 · 화면 15</p>
   <h2>그런데 이게 정답인 경우</h2>
 
   <p>여기서 균형을 잡고 갑시다. 트랜잭션 스크립트는 안티패턴이 <b>아닙니다.</b>
@@ -614,9 +1100,9 @@ class OrderLine:
   </div>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 11 -->
+<!-- ─────────────────────────────────────────── 화면 16 -->
 <section class="screen" data-title="도메인·모델·로직">
-  <p class="kicker">1장 · 화면 11</p>
+  <p class="kicker">1장 · 화면 16</p>
   <h2>도메인, 도메인 모델, 도메인 로직</h2>
 
   <p>이 세 낱말은 앞으로 계속 나옵니다. 지금 정확히 구분해 둡시다.</p>
@@ -712,9 +1198,9 @@ class OrderLine:
   주문 상태를 바꿀 방법이 없어지기 때문입니다.</p>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 12 -->
+<!-- ─────────────────────────────────────────── 화면 17 -->
 <section class="screen" data-title="요약 · 퀴즈 · 과제">
-  <p class="kicker">1장 · 화면 12</p>
+  <p class="kicker">1장 · 화면 17</p>
   <h2>1장 마무리</h2>
 
   <div class="summary">
@@ -753,7 +1239,7 @@ class OrderLine:
   </div>
 
   <div class="quiz" data-answer="4">
-    <p class="q">화면 8의 통증 다섯 개 중, 저자가 <b>"구조적 결함"</b>이라고 따로 지목한 것은
+    <p class="q">화면 13의 통증 다섯 개 중, 저자가 <b>"구조적 결함"</b>이라고 따로 지목한 것은
     무엇이었나요? 그리고 그 이유는?</p>
     <ol class="options">
       <li data-why="불편하지만, 규칙을 한곳에 모으면 자연히 완화됩니다.">규칙이 여러 곳에 복사되는 것 — 유지보수 비용이 커지기 때문</li>
@@ -790,7 +1276,7 @@ class OrderLine:
 
   <div class="task">
     <h3>직접 해보기</h3>
-    <p>화면 7에서 본 "취소 가능 여부" 규칙이 네 곳에 흩어져 있고 조건이 모두 다릅니다.
+    <p>화면 12에서 본 "취소 가능 여부" 규칙이 네 곳에 흩어져 있고 조건이 모두 다릅니다.
     <b>지금 배운 것 없이</b>, 여러분이 아는 방법으로 이 문제를 고쳐 보세요.
     코드를 쓰지 않고 3~5줄로 설명해도 됩니다.</p>
     <p>그리고 여러분의 해법에 대해 이 질문에 답해 보세요 —

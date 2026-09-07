@@ -276,6 +276,27 @@ pre .cap {
 .tok-self { color: var(--c-self); }
 .hl { background: var(--hl-bg); border-radius: 3px; padding: .05em .2em; font-weight: 700; }
 
+/* 코드 해설: 번호 붙은 주석 목록 */
+ol.notes {
+  list-style: none; padding-left: 0; counter-reset: note; margin: 1rem 0 1.5rem;
+}
+ol.notes > li {
+  counter-increment: note; position: relative;
+  padding-left: 2.2rem; margin: .6rem 0; font-size: .95rem;
+}
+ol.notes > li::before {
+  content: counter(note); position: absolute; left: 0; top: .28rem;
+  width: 1.55rem; height: 1.55rem; border-radius: 50%;
+  background: var(--accent-bg); color: var(--accent); border: 1px solid var(--accent);
+  display: grid; place-items: center; font-size: .72rem; font-weight: 700;
+}
+ol.notes .ln {
+  display: inline-block; min-width: 3.6rem; font-weight: 700; color: var(--accent);
+  font-family: Consolas, "D2Coding", ui-monospace, monospace; font-size: .84rem;
+}
+ol.notes > li > p { margin: .2rem 0 0; }
+ol.notes > li > p:first-child { margin-top: 0; }
+
 figure.code-cap { margin: 1.3rem 0; }
 figure.code-cap pre { margin: 0 0 .4rem; }
 figure.code-cap figcaption { font-size: .82rem; color: var(--muted); text-align: left; }
