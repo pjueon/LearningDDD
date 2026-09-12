@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="ko" data-chapter="ch04">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>4장 · Repository: 도메인에서 DB를 밀어내기 — 도메인 주도 설계 첫걸음</title>
+<link rel="stylesheet" href="assets/book.css">
+</head>
+<body>
+
+<main id="book"><div class="inner">
+
+<!-- ─────────────────────────────────────────── 화면 1 -->
+<section class="screen" data-title="이 장에서 할 일">
+  <p class="kicker">4장 · 화면 1</p>
+  <h1>Repository<br>도메인에서 DB를 밀어내기</h1>
+
+  <p class="lead">3장에서 <code>Order</code>와 <code>InventoryItem</code>을 만들었습니다.
+  그런데 3장의 코드 어디에도 <code>INSERT</code>도 <code>SELECT</code>도 없었습니다.
+  지금까지 만든 애그리게이트는 <b>메모리에만</b> 있고, 프로세스가 끝나면 사라집니다.</p>
+
+  <p>이 장은 그 객체들을 저장하고 꺼내는 방법을 만듭니다. 그런데 목표는
+  "저장 코드를 짜는 것"이 아닙니다. <b>도메인 코드가 저장 방법을 몰라도 되게 만드는 것</b>입니다.</p>
+
+  <div class="box note">
+    <p class="box-t">이 장의 지도</p>
+    <ul>
+      <li><b>화면 2~4 · 문제와 원칙.</b> 도메인 안에 SQL이 들어가면 벌어지는 일,
+      <span class="term" data-term="persignorance">영속성 무지</span>와
+      <span class="term" data-term="dip">의존성 역전 원칙</span>, 그리고
+      <span class="term" data-term="repository">리포지토리</span> 인터페이스를 정의합니다.</li>
+      <li><b>화면 5~8 · 메모리 구현으로 규칙을 다진다.</b> 테스트가 쉬워지는 순간,
+      애그리게이트 단위로만 저장하는 규칙, 그리고 3장이 남긴 빚 —
+      <code>Allocation</code>을 어디에 보관하는가.</li>
+      <li><b>화면 9~10 · 진짜 저장소.</b> SQLAlchemy로 실제 구현을 만들고,
+      1장의 생 SQL이 매핑 코드로 어떻게 바뀌는지 나란히 봅니다.</li>
+      <li><b>화면 11~12 · 반대 의견과 마무리.</b> "ORM 세션이 이미 리포지토리 아닌가?"라는
+      질문에 답하고, 이 장이 다음 장들에 남기는 것을 정리합니다.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 2 -->
+<section class="screen" data-title="도메인 안에 SQL이 있으면">
+  <p class="kicker">4장 · 화면 2</p>
+  <h2>도메인 안에 SQL이 있으면 벌어지는 일</h2>
+
+  <p>3장에서 만든 <code>Order.cancel()</code>은 메모리 안의 <code>status</code>만 바꿉니다.
+  실제로 저장하려면 누군가 DB에 반영해야 합니다. 가장 빠른 방법은 이렇게 <b>메서드 안에</b>
+  저장 코드를 넣는 것입니다.</p>
+
+<pre><span class="cap"># domain/order.py — 하지 않는다</span><code>class Order:
+    def cancel(self) -&gt; None:
+        if self.status not in self.CANCELLABLE:
+            raise AlreadyShipped("이미 출고된 주문입니다")
+        self.status = OrderStatus.취소됨
+
+        conn = sqlite3.connect("hanbit.db")            # 1
+        conn.execute(
+            "UPDATE orders SET status = %s WHERE order_number = %s",
+            (self.status.name, self._order_number.value))
+        conn.commit()                                   # 2
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">7행</span> <code>sqlite3</code>는 표준 라이브러리라 정본의
+    "도메인은 표준 라이브러리만 쓴다"는 규칙을 <b>문법적으로는</b> 어기지 않습니다.
+    그런데도 문제입니다 — <code>Order</code>가 이제 <b>파일 경로, 테이블 이름, SQL 문법</b>을
+    알아야 합니다. 이것들은 업무 규칙이 아니라 <b>저장 방식에 대한 지식</b>입니다.</li>
+
+    <li><span class="ln">8~10행</span> 취소라는 업무 행위 하나가 <b>SQL 문자열과
+    엮였습니다.</b> 내일 누군가 "관리자 강제 취소" 배치를 만들면서 이 메서드를 부르지 않고
+    비슷한 SQL을 또 짜면, 두 코드가 <b>같은 규칙을 두 번 유지</b>하게 됩니다.
+    테이블 이름이 바뀌면 두 곳을 다 고쳐야 합니다.</li>
+
+    <li><span class="ln">11행</span> <code>conn.commit()</code>이 실패하면 어떻게 될까요?
+    <code>self.status</code>는 이미 <code>취소됨</code>인데 DB는 그대로입니다.
+    <b>객체의 상태와 저장된 값이 어긋날 수 있는 통로</b>가 하나 더 생겼습니다.
+    <span class="later">5장에서 다시 볼 문제</span></li>
+  </ol>
+
+  <div class="box bad">
+    <p class="box-t">이 코드로 테스트를 짜 보면</p>
+    <p><code>Order.cancel()</code>을 테스트하려면 이제 <code>hanbit.db</code> 파일이
+    있어야 하고, <code>orders</code> 테이블이 그 안에 있어야 하고, 테스트가 끝나면
+    지운 행을 되돌려야 합니다. <b>불변식 하나(I5)를 확인하려고 DB 전체가 필요</b>해졌습니다.
+    1장 화면 13의 통증 3번이 3장에서 사라졌다가 여기서 <b>도로 생깁니다.</b></p>
+  </div>
+
+  <p>그런데 애초에 <b>왜</b> 저장 코드가 도메인 메서드 안에 있으면 안 될까요?
+  다음 화면에서 이름을 붙여 봅니다.</p>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 3 -->
+<section class="screen" data-title="영속성 무지와 의존성 역전">
+  <p class="kicker">4장 · 화면 3</p>
+  <h2>영속성 무지, 그리고 의존성의 방향을 뒤집기</h2>
+
+  <p>화면 2의 문제를 한 문장으로 줄이면 — <b><code>Order</code>가 자신이 어떻게 저장되는지
+  알고 있다</b>는 것입니다. 이 앎을 없애는 성질에 이름이 있습니다.</p>
+
+  <div class="box note">
+    <p class="box-t"><span class="term" data-term="persignorance">영속성 무지</span>
+    (Persistence Ignorance)</p>
+    <p>도메인 객체는 자신이 <b>SQLite에 저장되는지, PostgreSQL에 저장되는지, 아니면
+    그냥 메모리에 있다가 사라지는지</b> 전혀 몰라야 합니다. <code>Order</code>는
+    <code>cancel()</code>이 호출되면 규칙을 검사하고 상태를 바꿀 뿐, <b>그 변화를
+    누가 어떻게 영구히 남기는지는 관심 밖</b>입니다.</p>
+  </div>
+
+  <p>그런데 저장은 누군가 해야 합니다. 그 "누군가"를 어디에 둘지가 문제입니다.
+  1장~3장의 코드는 전부 이런 그림이었습니다 — <b>도메인이 DB를 안다.</b></p>
+
+  <figure class="fig">
+    <svg viewBox="0 0 700 190" role="img" aria-label="도메인이 DB에 의존하는 기존 구조와, 의존을 뒤집은 구조의 비교">
+      <g text-anchor="middle" font-size="11.5" font-weight="700" class="svg-fg">
+        <text x="120" y="30">지금까지 (1~3장)</text>
+        <text x="560" y="30">뒤집은 뒤 (4장)</text>
+      </g>
+      <g class="svg-line" stroke-width="1.3">
+        <rect x="50"  y="50"  width="140" height="42" rx="9"/>
+        <rect x="50"  y="130" width="140" height="42" rx="9"/>
+        <rect x="420" y="50"  width="140" height="42" rx="9"/>
+        <rect x="420" y="130" width="140" height="42" rx="9"/>
+        <rect x="610" y="90"  width="80"  height="42" rx="9" stroke-dasharray="5 3"/>
+      </g>
+      <g text-anchor="middle" font-size="12" class="svg-fg">
+        <text x="120" y="75">도메인</text>
+        <text x="120" y="155">DB</text>
+        <text x="490" y="75">도메인</text>
+        <text x="490" y="155">인프라 구현</text>
+      </g>
+      <g text-anchor="middle" font-size="11" class="svg-fg">
+        <text x="650" y="115">DB</text>
+      </g>
+      <g class="svg-muted" stroke="currentColor" stroke-width="1.4" fill="none">
+        <path d="M120 92 V126"/>
+        <path d="M490 130 V96"/>
+        <path d="M560 130 H606"/>
+      </g>
+      <g class="svg-muted" stroke="none">
+        <path d="M116 122 l4 7 4 -7 z"/>
+        <path d="M486 100 l4 -7 4 7 z"/>
+        <path d="M602 126 l7 4 -7 4 z"/>
+      </g>
+      <g text-anchor="middle" font-size="9.5" class="svg-muted">
+        <text x="205" y="72">도메인이 DB를</text>
+        <text x="205" y="84">직접 부른다</text>
+        <text x="490" y="176">Protocol(포트)을 구현</text>
+      </g>
+    </svg>
+    <figcaption>왼쪽: 도메인이 DB에 의존합니다(화살표가 아래로). 오른쪽: 인프라 구현이
+    도메인이 정의한 인터페이스를 구현합니다(화살표가 도메인을 향합니다). 도메인 코드는
+    한 줄도 인프라를 import하지 않습니다.</figcaption>
+  </figure>
+
+  <p>오른쪽 그림에 붙은 이름이 <b><span class="term" data-term="dip">의존성 역전
+  원칙</span></b>(Dependency Inversion Principle)입니다. <b>인터페이스는 도메인이 정의</b>하고,
+  <b>구현은 인프라가 도메인 쪽을 보고</b> 만듭니다. 화살표의 방향이 뒤집혔다는 것이 핵심입니다 —
+  누가 어느 코드를 <code>import</code>하는지가 바뀝니다.</p>
+
+  <div class="box good">
+    <p class="box-t">이 인터페이스에 붙는 이름</p>
+    <p>도메인이 "나는 이런 모양의 저장소가 있으면 된다"고 정의해 두는 이 인터페이스가
+    <b><span class="term" data-term="repository">리포지토리</span>(Repository)</b>입니다.
+    다음 화면에서 정의합니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 4 -->
+<section class="screen" data-title="OrderRepository 정의하기">
+  <p class="kicker">4장 · 화면 4</p>
+  <h2>리포지토리 인터페이스 정의하기</h2>
+
+  <p>파이썬에는 자바의 <code>interface</code>가 없습니다. 대신 <code>typing.Protocol</code>을
+  씁니다 — <b>이 모양(메서드 이름과 시그니처)을 가진 것이면 무엇이든 통과</b>시키는 구조적 타입입니다.
+  명시적으로 상속받지 않아도 됩니다.</p>
+
+<pre><span class="cap"># domain/repository.py</span><code>class OrderRepository(Protocol):
+    def get(self, order_number: OrderNumber) -&gt; Order: ...   # 1
+    def add(self, order: Order) -&gt; None: ...                 # 2
+    def next_order_number(self, today: date) -&gt; OrderNumber: ...  # 3
+
+
+class InventoryRepository(Protocol):
+    def get(self, sku: str) -&gt; InventoryItem: ...
+    def get_many(self, skus: Sequence[str]) -&gt; dict[str, InventoryItem]: ...  # 4
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">2행</span> 없는 주문을 찾으면 <code>OrderNotFound</code>를 던집니다.
+    3장의 다섯 예외에 <b>여섯 번째 도메인 예외</b>가 추가됩니다 — 리포지토리도 도메인의
+    일부이므로(정의는 도메인 계층에 있습니다) 예외도 도메인 예외입니다.</li>
+
+    <li><span class="ln">3행</span> <b>새 주문 하나만</b> 받습니다. 이미 있는 주문을
+    바꾼 뒤 다시 "저장"하는 메서드가 없습니다. 왜 없는지는 화면 7의 주제입니다.</li>
+
+    <li><span class="ln">4행</span> <b>주문 번호 생성이 왜 리포지토리에 있을까요?</b>
+    번호는 "오늘 날짜 + 그날의 순번"이라 <b>동시에 여러 요청이 주문을 만들 때 순번이 겹치면
+    안 됩니다.</b> 겹치지 않게 보장하려면 결국 DB의 시퀀스나 잠금이 필요합니다 —
+    <b>이건 업무 규칙이 아니라 인프라의 문제</b>입니다. 그래서 번호의 <i>형식</i>
+    (<code>OrderNumber</code>, 2장)은 도메인이 정의하고, 번호를 <i>발급하는 행위</i>는
+    포트 뒤로 넘깁니다.</li>
+
+    <li><span class="ln">9행</span> <code>get_many</code>가 따로 있는 이유는
+    3장 화면 9의 그 문장 때문입니다 — "SKU마다 <code>allocate()</code>를 부르고, 가장 늦은
+    <code>ready_on</code>을 고른다." 라인이 5개인 주문은 SKU를 5번 조회해야 하는데,
+    <code>get</code>을 5번 부르면 <b>왕복이 5번</b>입니다. <code>get_many</code>는
+    <b>한 번의 왕복으로</b> 5개를 가져옵니다. 이런 문제를 흔히 <b>N+1 문제</b>라고 부릅니다.</li>
+  </ol>
+
+  <div class="box warn">
+    <p class="box-t">왜 <code>OrderLineRepository</code>는 없는가</p>
+    <p>지금 눈치채셨을 수 있습니다 — <code>OrderLine</code>에는 리포지토리가 없습니다.
+    <b>이건 실수가 아닙니다.</b> 화면 6에서 이유를 정면으로 다룹니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 5 -->
+<section class="screen" data-title="메모리 구현과 쉬워진 테스트">
+  <p class="kicker">4장 · 화면 5</p>
+  <h2>메모리 구현 — 그리고 갑자기 쉬워지는 테스트</h2>
+
+  <p>인터페이스를 만들었으니 가장 단순한 구현부터 봅니다. <b>딕셔너리 하나</b>면 됩니다.</p>
+
+<pre><span class="cap"># infra/memory_repository.py</span><code>class InMemoryOrderRepository:
+    def __init__(self) -&gt; None:
+        self._orders: dict[str, Order] = {}
+
+    def get(self, order_number: OrderNumber) -&gt; Order:
+        try:
+            return self._orders[order_number.value]        # 1
+        except KeyError:
+            raise OrderNotFound(order_number.value) from None
+
+    def add(self, order: Order) -&gt; None:
+        self._orders[order.order_number.value] = order      # 2
+
+    def next_order_number(self, today: date) -&gt; OrderNumber:
+        seq = sum(1 for k in self._orders if k.startswith(today.isoformat()))
+        return OrderNumber.issue(today, seq + 1)
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">7행</span> <b>키를 문자열로</b> 씁니다. <code>OrderNumber</code>는
+    2장에서 <code>frozen=True</code>로 만들었으니 <code>dict</code> 키로 직접 써도 되지만,
+    <code>.value</code>로 풀어 쓰면 나중에 SQLAlchemy 구현(화면 9)의 기본 키 컬럼과
+    모양이 맞습니다.</li>
+
+    <li><span class="ln">12행</span> <code>order.order_number</code>를 씁니다.
+    3장에서는 <code>self._order_number</code>로만 저장하고 밖으로 내주는 길이 없었습니다 —
+    3장까지는 그 값을 <b>읽을 일이 없었기 때문</b>입니다. 이제 리포지토리가 저장 키로 써야
+    하므로, <code>Order</code>에 읽기 전용 프로퍼티를 하나 추가합니다.</li>
+  </ol>
+
+<pre><span class="cap"># domain/order.py — Order 안에 추가</span><code>    @property
+    def order_number(self) -&gt; OrderNumber:
+        return self._order_number
+</code></pre>
+
+  <p>이제 이 리포지토리로 <code>Order</code>를 테스트합니다. <b>DB도, 세션도, 픽스처도
+  없습니다.</b></p>
+
+<pre><span class="cap"># tests/test_ordering.py</span><code>def test_저장한_주문을_다시_꺼내면_같은_객체다() -&gt; None:
+    repo = InMemoryOrderRepository()
+    order = Order(repo.next_order_number(date(2026, 9, 7)),
+                  customer_id=uuid4(), shipping_address=배송지())
+    order.add_line("SKU-001", "생수 2L", Money.won(1_000), Quantity(2))
+    repo.add(order)
+
+    again = repo.get(order.order_number)
+    again.cancel()
+
+    assert order.status is OrderStatus.취소됨    # 1
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">11행</span> <b>같은 객체이므로 이미 반영돼 있습니다.</b>
+    <code>again</code>과 <code>order</code>는 파이썬 메모리 안에서 <b>같은 객체를 가리키는
+    두 이름</b>입니다. <code>again.cancel()</code>이 바꾼 것은 <code>order</code>가
+    보는 것과 같은 상태입니다. <code>repo.add(order)</code> 뒤에 "다시 저장"하는 코드가
+    한 줄도 없다는 점에 주목하세요.</li>
+  </ol>
+
+  <div class="box good">
+    <p class="box-t">1장 화면 13의 통증 3번이 다시 사라졌습니다</p>
+    <p>이 테스트는 <b>1밀리초 안에 끝납니다.</b> DB 컨테이너를 띄울 필요도, 테스트 뒤
+    데이터를 정리할 필요도 없습니다. <code>Order</code>의 모든 불변식(I1~I5)을
+    이런 식으로 <b>빠르게, 격리된 채로</b> 테스트할 수 있습니다. 진짜 DB를 쓰는 테스트는
+    화면 9의 구현을 검증하는 <b>소수의 통합 테스트</b>로 남겨 둡니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 6 -->
+<section class="screen" data-title="애그리게이트 단위로만 저장한다">
+  <p class="kicker">4장 · 화면 6</p>
+  <h2>애그리게이트 단위로만 저장한다</h2>
+
+  <p>화면 4에서 미뤄둔 질문 — <b>왜 <code>OrderLineRepository</code>는 없어야 할까요?</b>
+  있다면 이런 모양일 것입니다.</p>
+
+<pre><span class="cap"># 만들지 않는다</span><code>class OrderLineRepository:
+    def update_quantity(self, line_id: UUID, quantity: Quantity) -&gt; None: ...
+</code></pre>
+
+  <p>이걸 만들면 이런 코드가 가능해집니다.</p>
+
+<pre><span class="cap"># 이 코드가 가능해진다면</span><code>line_repo.update_quantity(line_id, Quantity(5))
+</code></pre>
+
+  <p>낯익은 문제입니다. 3장 화면 5에서 정확히 같은 모양의 문제를 봤습니다 —
+  <code>order.lines[0].quantity = ...</code>가 <code>Order._ensure_modifiable()</code>를
+  건너뛰던 그 코드입니다. <code>OrderLineRepository</code>는 <b>그 우회로를 코드 수준에서
+  다시 열어 줍니다.</b> 결제완료된 주문의 라인 수량을 이 메서드로 바꾸면 I4를 확인하는
+  코드는 <b>아예 호출되지 않습니다.</b></p>
+
+  <div class="box note">
+    <p class="box-t">규칙 — 리포지토리는 애그리게이트 루트에만 만든다</p>
+    <p>3장의 규칙("바깥은 루트만 참조한다")이 저장 계층에도 그대로 적용됩니다.
+    <b>내부 엔티티로 가는 저장/조회 경로 자체를 만들지 않으면</b>, 그 경로를 통한 우회는
+    구조적으로 불가능해집니다. "리뷰에서 눈에 띄겠지"에 기대지 않아도 됩니다 —
+    애초에 그런 클래스가 없습니다.</p>
+  </div>
+
+  <h3>이제 3장의 마지막 질문에 답할 수 있습니다</h3>
+
+  <p>1장 화면 6과 3장 화면 2의 사고 2번을 기억하시나요 — 프로모션 배치가
+  <code>UPDATE orders SET discount = ...</code>만 실행하고 <code>total</code> 컬럼은
+  그대로 둬서 금액이 어긋난 사고입니다. 이 사고가 <b>4장 이후에는 구조적으로 불가능</b>합니다.
+  이유가 셋 겹쳐 있습니다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:10rem">막는 장치</th><th>어떻게 막는가</th></tr>
+      <tr><td><b>계산값은 컬럼이 아니다</b></td>
+        <td><code>total_amount</code>는 3장에서 이미 <code>@property</code>가 됐습니다
+        (저장되는 값이 아니라 계산되는 값). 화면 9에서 매핑할 때 <b>이 값은 테이블에
+        컬럼조차 없습니다.</b> 어긋날 곳 자체가 없습니다.</td></tr>
+      <tr><td><b>저장 경로가 하나뿐이다</b></td>
+        <td><code>OrderRepository</code>에는 <code>get</code>과 <code>add</code>만
+        있습니다. "컬럼 하나만 바꾸는" 메서드가 없으니, 프로모션 배치도 <b>주문 전체를
+        <code>get()</code>으로 꺼내 도메인 메서드를 부르는 것</b> 외에는 할 수 있는 일이
+        없습니다.</td></tr>
+      <tr><td><b>SQL을 쓸 길이 없다</b></td>
+        <td>배치 스크립트가 <code>OrderRepository</code>를 거치는 한, 원시 SQL을 쓸 일이
+        없습니다. 화면 2에서 본 것과 반대로, 이제는 <b>SQL을 쓰려면 일부러 리포지토리를
+        건너뛰어야</b> 합니다.</td></tr>
+    </table>
+  </div>
+
+  <div class="box good">
+    <p class="box-t">3장이 남긴 빚 — 갚았습니다</p>
+    <p>3장 화면 15의 "이 장이 남긴 빚" 표는 4장 몫으로 <b>"애그리게이트를 통째로 저장하고
+    꺼내는 방법"과 "<code>UPDATE orders SET ...</code>를 막는 마지막 통로"</b>를 남겼습니다.
+    위 표가 그 답입니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 7 -->
+<section class="screen" data-title="수정은 어떻게 반영되나">
+  <p class="kicker">4장 · 화면 7</p>
+  <h2>그런데 "저장"하는 메서드가 왜 없을까</h2>
+
+  <p>화면 5의 테스트를 다시 보면 이상한 점이 있습니다. <code>again.cancel()</code>을 부른 뒤
+  <b>"다시 저장해라"는 코드가 없습니다.</b> 그런데도 <code>order.status</code>가 바뀌어 있었습니다.
+  이유는 단순합니다 — <code>InMemoryOrderRepository</code>는 <b>객체를 직렬화하지 않습니다.</b>
+  파이썬 참조를 그대로 들고 있을 뿐이라, 객체를 바꾸면 "저장된 것"도 그냥 바뀝니다.</p>
+
+  <div class="box warn">
+    <p class="box-t">진짜 DB는 다릅니다</p>
+    <p>진짜 DB는 <b>객체가 아니라 행(row)</b>을 저장합니다. <code>Order</code> 객체를
+    바꾼다고 <code>orders</code> 테이블의 행이 저절로 바뀌지 않습니다. 객체와 행 사이에는
+    <b>직렬화 경계</b>가 있고, 그 경계를 넘는 순간이 명시적으로 필요합니다.</p>
+  </div>
+
+  <p>그렇다고 <code>OrderRepository</code>에 <code>update(order)</code>를 추가하지는
+  않습니다. 대신 5장에서 <b>Unit of Work</b>라는 것을 만듭니다. 미리 살짝 보면 이렇게
+  씁니다.</p>
+
+<pre><span class="cap"># 5장에서 만드는 것의 미리보기</span><code>order = uow.orders.get(order_number)     # 1
+order.cancel()                            # 2
+uow.commit()                              # 3
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">1행</span> <code>uow.orders</code>가 곧 <code>OrderRepository</code>입니다.</li>
+    <li><span class="ln">3행</span> <b><code>order.update()</code>나
+    <code>repo.save(order)</code>가 없습니다.</b> SQLAlchemy의 세션은 <code>get()</code>으로
+    꺼내 온 객체를 <b>추적</b>하고 있다가, <code>commit()</code> 시점에 바뀐 값을 찾아
+    스스로 <code>UPDATE</code> 문을 만듭니다(<b>Identity Map</b>이라는 장치입니다).
+    <span class="later">5장에서 다시 볼 문제</span></li>
+  </ol>
+
+  <div class="box note">
+    <p class="box-t">메모리 구현과 SQLAlchemy — "저장 코드가 안 보인다"는 같지만 이유는 다르다</p>
+    <p>둘 다 명시적인 "저장" 호출이 없다는 점은 같습니다. 그런데 <b>메커니즘은 전혀
+    다릅니다.</b> 메모리 구현은 애초에 <b>직렬화가 없어서</b> 저장이라는 개념 자체가
+    없습니다. SQLAlchemy는 <b>세션이 변경을 추적</b>했다가 커밋 시점에 실제로 SQL을
+    만들어 냅니다. 이 차이를 헷갈리면 5장의 Unit of Work가 왜 필요한지 이해하기 어렵습니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 8 -->
+<section class="screen" data-title="Allocation을 어디에 보관하는가">
+  <p class="kicker">4장 · 화면 8</p>
+  <h2>3장의 마지막 과제 — <code>Allocation</code>을 어디에 보관하는가</h2>
+
+  <p>3장 화면 16의 과제 답에 이런 문장이 있었습니다 — "<code>Allocation</code>을 어디에
+  보관해 뒀다가 취소 때 꺼내는지도 아직 정하지 않았습니다. 그건 4장의 문제입니다."
+  저장 단위를 정하고 나니 이제 답할 수 있습니다.</p>
+
+  <p><code>InventoryItem.allocate()</code>는 <code>Allocation</code>이라는 값을 돌려줍니다.
+  이 값에는 <b>어느 배치에서 몇 개를 가져왔는지</b>가 들어 있고, 나중에 주문이 취소되면
+  <code>release(allocation)</code>에 <b>그대로 돌려줘야</b> 합니다. 그런데 지금까지는
+  이 값이 응용 코드의 지역 변수로만 존재했습니다 — 요청이 끝나면 사라집니다.</p>
+
+  <div class="box warn">
+    <p class="box-t">재고 애그리게이트에 보관하면 안 되는 이유</p>
+    <p>"그럼 <code>InventoryItem</code>이 자기가 어느 주문에 할당했는지 기억하면 되지
+    않나요?" — 3장 화면 16의 모범답안이 이미 이 길을 막았습니다. 배치에
+    <code>{주문번호: 수량}</code>을 적어 두면 <b>재고가 주문의 생애주기를 알아야</b>
+    합니다("이 주문이 취소됐나, 아직 살아있나"). 재고의 관심사가 아닌 것이 재고 안으로
+    들어옵니다.</p>
+  </div>
+
+  <p>남은 자리는 하나뿐입니다. <b><code>Order</code>가 들고 있는 것</b>입니다.
+  3장에서 <code>Promise</code>를 이렇게 다뤘던 것과 <b>같은 논리</b>입니다 —
+  <code>Order</code>는 배치를 참조하지 않고, <code>Allocation</code>이라는
+  <b>불변 값</b>만 보관합니다.</p>
+
+<pre><span class="cap"># domain/order.py — Order에 4장에서 추가되는 필드</span><code>class Order:
+    # __init__ 에 self.allocation: Allocation | None = None 이 추가된다   # 1
+    ...
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">2행</span> <code>promise</code>와 나란히 놓이는 필드입니다.
+    <code>Allocation</code>은 <b>식별자가 없는 값 객체</b>이므로(3장 화면 13), 이걸
+    <code>Order</code>가 들고 있어도 재고를 바꿀 방법이 여전히 없습니다 — 3장의 규칙이
+    깨지지 않습니다.</li>
+  </ol>
+
+  <p>저장할 때는 <code>orders</code> 테이블 하나로 부족합니다. <code>Allocation</code>은
+  배치 여러 개에 걸친 목록(<code>AllocationLine</code>)이라, <b>자기 테이블이 필요</b>합니다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th colspan="3"><code>order_allocations</code></th></tr>
+      <tr><th>order_number</th><th>batch_id</th><th>quantity</th></tr>
+      <tr><td>20260907-000123</td><td>b1f0...</td><td>3</td></tr>
+      <tr><td>20260907-000123</td><td>b2e4...</td><td>3</td></tr>
+    </table>
+  </div>
+
+  <div class="box warn">
+    <p class="box-t">정직하게 남겨두는 것 — 이 매핑은 실제로 짜보면 까다롭습니다</p>
+    <p><code>Allocation.lines</code>는 <code>frozen</code> 데이터클래스의 <b>튜플</b>입니다.
+    SQLAlchemy의 클래식 매핑은 보통 "엔티티 하나 = 테이블 하나"를 가정하는데,
+    <code>AllocationLine</code>은 엔티티가 아니라 <b>식별자 없는 값</b>이 여러 개
+    모인 것이라 표준적인 관계 매핑과 잘 맞지 않습니다. 실전에서는 커스텀 컬렉션이나
+    <code>composite()</code>, 혹은 그냥 JSON 컬럼에 직렬화하는 방법을 씁니다.
+    여기서는 <b>스키마와 저장 위치까지만</b> 정하고, 매핑 코드의 세부 구현은 이 교재의
+    범위 밖으로 남겨 둡니다 — 어느 쪽을 고르든 화면 6의 규칙(애그리게이트 루트를 통해서만
+    접근)은 지켜집니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 9 -->
+<section class="screen" data-title="SQLAlchemy로 진짜 저장소 만들기">
+  <p class="kicker">4장 · 화면 9</p>
+  <h2>SQLAlchemy로 진짜 저장소 만들기</h2>
+
+  <p>메모리 구현과 <b>정확히 같은 인터페이스</b>를 진짜 DB로 구현합니다. 방법은
+  "<b>임퍼러티브 매핑</b>"(classical mapping)입니다 — 도메인 클래스에 SQLAlchemy 코드를
+  한 줄도 넣지 않고, <b>테이블과 클래스를 인프라 쪽에서 연결</b>합니다.</p>
+
+<pre><span class="cap"># infra/orm.py — 도메인 코드는 이 파일의 존재를 모른다</span><code>mapper_registry = registry()
+
+orders_table = Table(
+    "orders", mapper_registry.metadata,
+    Column("order_number", String(15), primary_key=True),   # 1
+    Column("customer_id", String(36)),
+    Column("status", Enum(OrderStatus)),
+    Column("discount_amount", Integer),
+    Column("shipping_fee_amount", Integer),
+    Column("zipcode", String(5)), Column("road", String),
+    Column("promise_ship_on", Date, nullable=True),          # 2
+)
+
+order_lines_table = Table(
+    "order_lines", mapper_registry.metadata,
+    Column("line_id", String(36), primary_key=True),
+    Column("order_number", ForeignKey("orders.order_number")),
+    Column("sku", String), Column("product_name", String),
+    Column("unit_price_amount", Integer), Column("qty", Integer),
+)
+
+def start_mappers() -&gt; None:
+    lines_mapper = mapper_registry.map_imperatively(
+        OrderLine, order_lines_table)
+    mapper_registry.map_imperatively(
+        Order, orders_table,                                 # 3
+        properties={"_lines": relationship(
+            lines_mapper, collection_class=list)})
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">5행</span> <code>orders</code> 테이블 정의는 <b>1장 화면 3에서
+    본 그 테이블</b>과 컬럼이 거의 같습니다 — <code>customer_id</code>,
+    <code>zipcode</code>·<code>road</code> 같은 배송지 컬럼들입니다. 다른 점은
+    기본 키가 정수 <code>id</code>가 아니라 <code>order_number</code> 문자열이라는 것,
+    그리고 <code>total</code> 컬럼이 <b>없다</b>는 것입니다.</li>
+
+    <li><span class="ln">11행</span> <code>promise_ship_on</code>처럼 3장에서 추가된
+    필드도 그냥 컬럼입니다. <code>Money</code>·<code>Address</code> 같은 값 객체는
+    <b>자기 테이블 없이 부모 테이블의 컬럼으로 펼쳐진다</b>고 2장 화면 13에서 이미
+    다뤘습니다. <code>discount_amount</code>가 그 예입니다 — <code>Money</code> 하나가
+    정수 컬럼 하나가 됩니다.</li>
+
+    <li><span class="ln">25~28행</span> <b>이것이 임퍼러티브 매핑의 핵심입니다.</b>
+    <code>Order</code> 클래스 정의에는 SQLAlchemy를 <code>import</code>하는 줄이
+    <b>단 한 줄도 없습니다</b>(2~3장을 다시 봐도 확인할 수 있습니다). 대신 이
+    <code>infra/orm.py</code> 파일이 <b>바깥에서</b> "이 클래스의 이 속성은 이 테이블의
+    이 컬럼과 대응한다"고 선언합니다. <code>_lines</code>라는 밑줄 이름 속성까지
+    지정할 수 있는 것도 이 방식의 특징입니다 — <code>Order</code>가 캡슐화를 위해 만든
+    "private처럼 보이는" 속성을 인프라가 그대로 씁니다.</li>
+  </ol>
+
+  <p>리포지토리 구현은 이제 짧습니다. 세션 하나만 감싸면 됩니다.</p>
+
+<pre><span class="cap"># infra/sqlalchemy_repository.py</span><code>class SqlAlchemyOrderRepository:
+    def __init__(self, session: Session) -&gt; None:
+        self._session = session
+
+    def get(self, order_number: OrderNumber) -&gt; Order:
+        order = self._session.get(Order, order_number.value)
+        if order is None:
+            raise OrderNotFound(order_number.value)
+        return order
+
+    def add(self, order: Order) -&gt; None:
+        self._session.add(order)
+</code></pre>
+
+  <p><code>InventoryRepository</code>의 SQLAlchemy 구현도 같은 방식입니다 —
+  <code>StockBatch</code>가 <code>Order</code>의 <code>_lines</code>와 똑같이
+  <code>InventoryItem</code>에 <code>relationship</code>으로 매달립니다.
+  코드가 거의 반복이라 여기서는 생략합니다.</p>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 10 -->
+<section class="screen" data-title="1장의 생 SQL이 매핑 코드로">
+  <p class="kicker">4장 · 화면 10</p>
+  <h2>1장의 생 SQL이 매핑 코드로 바뀌는 대응 관계</h2>
+
+  <p>1장 화면 5~7의 <code>place_order()</code>는 재고를 확인하고 주문을 저장하는 데
+  SQL을 <b>여섯 번</b> 직접 실행했습니다. 지금 이 코드가 최종적으로 어떻게 바뀌었는지
+  나란히 봅니다. (조립 코드 자체는 5장의 주제이므로, 여기서는 <b>저장 부분</b>만 봅니다.)</p>
+
+  <div class="tabs">
+    <div class="tab" data-label="1장 — 생 SQL">
+<pre><code>conn.execute(
+    "INSERT INTO orders (customer_id, status, zipcode, "
+    "road, detail, receiver, phone) VALUES (%s, %s, %s, "
+    "%s, %s, %s, %s)",
+    (customer_id, "결제대기", address["zipcode"], ...))
+order_id = cursor.lastrowid
+
+for item in items:
+    conn.execute(
+        "INSERT INTO order_lines (order_id, product_id, "
+        "product_name, unit_price, qty, line_total) "
+        "VALUES (%s, %s, %s, %s, %s, %s)",
+        (order_id, item["product_id"], ...))
+
+conn.execute(
+    "UPDATE stock_batches SET reserved = reserved + %s "
+    "WHERE id = %s", (take, batch_id))
+conn.commit()
+</code></pre>
+    </div>
+    <div class="tab" data-label="4장 — 매핑 코드">
+<pre><code>order = Order(repo.next_order_number(today),
+              customer_id, address)
+for item in items:
+    order.add_line(item.sku, item.name,
+                   item.price, item.qty)
+
+repo.add(order)        # INSERT 두 테이블 분량을
+                        # SQLAlchemy가 알아서 만든다
+session.commit()
+</code></pre>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:11rem">1장</th><th>4장</th></tr>
+      <tr><td>테이블 이름과 컬럼 이름을 <b>문자열로</b> 직접 씀</td>
+        <td><code>orders_table</code> 정의 <b>한 곳</b>에만 존재. 오타는 임포트 시점에
+        일부 드러남</td></tr>
+      <tr><td><code>order_id</code>를 <code>cursor.lastrowid</code>로 받아
+        <code>order_lines</code>에 <b>수동으로</b> 넘김</td>
+        <td><code>relationship</code>이 외래 키 연결을 <b>자동</b>으로 채움</td></tr>
+      <tr><td><code>INSERT</code> 문 <b>세 번</b>(주문 1 + 라인 N)을 개발자가 직접 순서대로 씀</td>
+        <td><code>repo.add(order)</code> 한 번. 몇 개의 <code>INSERT</code>가 나갈지는
+        <b>객체 그래프의 모양</b>이 결정</td></tr>
+      <tr><td><code>total</code> 컬럼을 <b>계산해서 직접 채워 넣어야</b> 함</td>
+        <td>애초에 그런 컬럼이 <b>없음</b>(화면 6)</td></tr>
+    </table>
+  </div>
+
+  <div class="box good">
+    <p class="box-t">바뀌지 않은 것</p>
+    <p>실행되는 SQL의 <b>본질은 같습니다</b> — 결국 <code>orders</code>와
+    <code>order_lines</code>에 각각 행이 들어갑니다. <b>바뀐 것은 그 SQL을 누가, 어디서,
+    무엇을 근거로 만드는가</b>입니다. 1장은 개발자가 매번 손으로 짰고, 4장은
+    <code>orders_table</code>의 정의와 <code>Order</code> 객체의 상태로부터
+    SQLAlchemy가 만들어 냅니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 11 -->
+<section class="screen" data-title="반대 의견과 남은 것">
+  <p class="kicker">4장 · 화면 11</p>
+  <h2>반대 의견 — "ORM 세션이 이미 리포지토리 아닌가?"</h2>
+
+  <div class="dialog">
+    <div class="line"><div class="who">시니어 개발자</div><div class="say">
+      <p>SQLAlchemy의 <code>Session</code>도 <code>session.get(Order, id)</code>,
+      <code>session.add(order)</code>를 이미 제공합니다. <code>OrderRepository</code>를
+      또 만드는 건 <b>같은 일을 두 번 감싸는 것</b> 아닌가요?</p></div></div>
+  </div>
+
+  <p>일리 있는 지적입니다. 실제로 <code>Session</code>은 Unit of Work와 Identity Map을
+  이미 구현하고 있어서, 화면 9의 <code>SqlAlchemyOrderRepository</code>는 <b>얇은
+  래퍼</b>에 가깝습니다. 그래서 이 추상화가 <b>정당화되는 경우</b>와 <b>과할 수 있는 경우</b>를
+  나눠 봅니다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:11.5rem">리포지토리가 갚는 것</th><th>대가로 치르는 것</th></tr>
+      <tr><td><b>테스트가 DB 없이 돈다</b>(화면 5)</td>
+        <td>인터페이스와 두 가지 구현(메모리·SQLAlchemy)을 유지해야 한다</td></tr>
+      <tr><td><b>ORM을 나중에 바꿔도 도메인이 안 바뀐다</b>
+        (예: SQLAlchemy → 원시 SQL, 또는 다른 ORM)</td>
+        <td>그런 교체가 실제로 일어날 일이 거의 없다면, 이 이득은 <b>실현되지 않는
+        보험료</b>다</td></tr>
+      <tr><td><b>도메인에 SQL/세션 코드가 새지 않는다</b>(화면 6)</td>
+        <td>작은 프로젝트에서는 <code>Session</code>을 응용 서비스에서 직접 써도
+        같은 규율을 지킬 수 있다</td></tr>
+    </table>
+  </div>
+
+  <div class="box note">
+    <p class="box-t">리포지토리를 만들지 않아도 되는 경우</p>
+    <ul>
+      <li><b>ORM을 바꿀 계획이 전혀 없고</b>, 팀 전체가 SQLAlchemy에 익숙하다.
+      추상화의 가장 큰 이득(교체 가능성)이 애초에 필요 없다.</li>
+      <li><b>애그리게이트가 단순하고 적다.</b> 조회 화면이 대부분이고 쓰기 규칙이
+      거의 없는 CRUD 근처 도메인이라면(1장 화면 16의 판단 기준과 같습니다),
+      <code>Session</code>을 바로 쓰는 편이 코드가 짧다.</li>
+      <li><b>혼자 또는 아주 작은 팀.</b> 인터페이스를 유지하는 비용을 나눠 낼 사람이
+      적으면 그 비용이 상대적으로 커진다.</li>
+    </ul>
+    <p>한빛몰은 <b>반대</b>입니다 — 애그리게이트가 계속 늘어나고(5장 이후로도 계속 나옵니다),
+    도메인 테스트를 빠르게 돌리는 것이 3장부터 계속 강조된 가치였습니다. 그래서 이 교재는
+    리포지토리를 만드는 쪽을 택합니다. <b>이것이 언제나 옳다는 뜻은 아닙니다.</b></p>
+  </div>
+
+  <h3>이 장이 만든 것, 그리고 남긴 것</h3>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:4rem">갚을 곳</th><th>미룬 것</th></tr>
+      <tr><td><b>5장</b></td><td>변경 사항을 실제로 반영하는 <code>commit()</code>의 정체 —
+        Unit of Work. 응용 서비스가 리포지토리들을 조립하는 자리</td></tr>
+      <tr><td><b>7장</b></td><td>재고가 "주문이 취소됐다"는 사실을 알아야
+        <code>release(order.allocation)</code>을 부를 수 있습니다. 그 전달 장치가
+        도메인 이벤트입니다</td></tr>
+      <tr><td><b>9장</b></td><td><code>InventoryRepository.get_many</code>가 SKU
+        문자열로 조회하는 전제("상품 1개 = SKU 1개")도 그때 깨집니다</td></tr>
+      <tr><td><b>12장</b></td><td><code>next_order_number</code>를 두 요청이 동시에
+        부르면? 화면 5의 메모리 구현은 이 경합을 막지 않습니다</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 12 -->
+<section class="screen" data-title="요약 · 퀴즈 · 과제">
+  <p class="kicker">4장 · 화면 12</p>
+  <h2>4장 마무리</h2>
+
+  <div class="summary">
+    <h3>핵심 요약</h3>
+    <ol>
+      <li><b><span class="term" data-term="persignorance">영속성 무지</span></b>는 도메인
+      객체가 자신이 어떻게 저장되는지 몰라야 한다는 성질입니다. <b>
+      <span class="term" data-term="dip">의존성 역전 원칙</span></b>으로 이걸 만듭니다 —
+      인터페이스는 도메인이 정의하고, 구현은 인프라가 그 인터페이스를 향해 만듭니다.</li>
+      <li><b><span class="term" data-term="repository">리포지토리</span></b>는 애그리게이트
+      단위로만 존재합니다. <code>OrderLineRepository</code>가 없는 이유는
+      "바깥은 루트만 참조한다"는 3장의 규칙을 저장 계층에서도 지키기 위해서입니다.</li>
+      <li>메모리 구현은 <b>테스트를 극적으로 빠르게</b> 만듭니다. 다만 "저장 호출이
+      안 보이는" 이유가 메모리와 진짜 DB(SQLAlchemy Identity Map)에서 <b>서로 다르다</b>는
+      점을 구분해야 합니다.</li>
+      <li><code>total_amount</code>가 계산값이라 <b>컬럼조차 없다</b>는 사실과, 저장
+      경로가 <code>get</code>/<code>add</code> 뿐이라는 사실이 겹쳐 1장의 "총액 불일치"
+      사고를 구조적으로 막습니다.</li>
+      <li>애그리게이트 경계를 넘어 나가는 값(<code>Allocation</code>)은, 저장 단위가
+      정해지자 <b>보관할 곳도 함께 정해집니다</b> — 값을 만든 애그리게이트가 아니라
+      <b>그 값을 나중에 다시 써야 하는 애그리게이트</b>가 보관합니다.</li>
+    </ol>
+  </div>
+
+  <div class="quiz" data-answer="2">
+    <p class="q">팀원이 "<code>InventoryItem</code>도 필요하니
+    <code>StockBatchRepository</code>를 따로 만들어 배치 하나만 빠르게 조회하자"고
+    제안합니다. 어떻게 답해야 할까요?</p>
+    <ol class="options">
+      <li data-why="조회 성능은 인덱스나 쿼리 최적화로 풀 문제입니다. 저장 계층에 새 인터페이스를 만드는 것으로 풀 문제가 아닙니다.">
+        조회가 빨라지므로 찬성한다</li>
+      <li data-why="맞습니다. StockBatch는 내부 엔티티입니다. 여기로 가는 저장 경로가 생기면 InventoryItem의 불변식(I7~I10)을 우회할 수 있게 됩니다.">
+        반대한다 — <code>StockBatch</code>는 내부 엔티티이고, 별도 리포지토리는
+        <code>InventoryItem</code>의 불변식을 우회하는 통로가 된다</li>
+      <li data-why="이름을 바꿔도 문제는 그대로입니다. 문제는 '무엇에 접근하는가'이지 이름이 아닙니다.">
+        이름만 <code>BatchQuery</code>로 바꾸면 괜찮다</li>
+      <li data-why="읽기 전용이라도, 그 조회 결과로 이후에 배치를 직접 조작하는 코드가 이어 붙기 쉽습니다. 일관되게 막는 것이 안전합니다.">
+        읽기 전용이라면 허용해도 된다</li>
+    </ol>
+    <div class="explain">
+      <p><b class="lbl">해설</b> "성능이 필요하다"는 요구는 정당하지만, 그 해법이
+      <b>애그리게이트 경계를 뚫는 것</b>이면 안 됩니다. 화면 6의 논리가 재고에도 그대로
+      적용됩니다.</p>
+      <p>정말 배치 단위 조회가 필요하다면(예: 창고 대시보드), 그건 <b>쓰기 모델을 위한
+      리포지토리가 아니라 읽기 전용 쿼리</b>로 풀어야 합니다. 3장 화면 16의 퀴즈에서 이미
+      나온 논리입니다 — 애그리게이트는 쓰기 단위이지 읽기 단위가 아닙니다. 13장에서
+      이 읽기 전용 경로를 정식으로 다룹니다.</p>
+    </div>
+  </div>
+
+  <div class="quiz" data-answer="3">
+    <p class="q"><code>InMemoryOrderRepository</code>로 테스트를 통과시킨 코드를 그대로
+    SQLAlchemy 구현으로 바꿨더니, <code>order.cancel()</code> 뒤에 DB를 확인해도
+    상태가 <code>결제완료</code> 그대로였습니다. 가장 가능성 높은 원인은?</p>
+    <ol class="options">
+      <li data-why="OrderRepository 인터페이스는 두 구현에서 동일합니다. 구현이 다르다고 인터페이스가 깨지지 않습니다.">
+        <code>OrderRepository</code> 인터페이스 자체가 잘못됐다</li>
+      <li data-why="cancel()의 상태 검사 로직은 3장 그대로이며 저장 방식과 무관합니다.">
+        <code>Order.cancel()</code>의 상태 검사 로직에 버그가 있다</li>
+      <li data-why="맞습니다. 화면 7에서 본 대로 SQLAlchemy는 세션 commit 시점에 변경을 반영합니다. commit을 부르지 않았다면 메모리 안 객체만 바뀌고 DB는 그대로입니다.">
+        <code>session.commit()</code>을 부르지 않았다</li>
+      <li data-why="order_number를 기본 키로 쓰는 것 자체는 문제가 아닙니다. 오히려 자연스러운 키입니다.">
+        <code>order_number</code>를 기본 키로 쓴 것이 문제다</li>
+    </ol>
+    <div class="explain">
+      <p><b class="lbl">해설</b> 이 문제가 바로 화면 7의 경고입니다 — 메모리 구현에서는
+      "저장을 잊는다"는 실수가 <b>애초에 존재하지 않습니다</b>(직렬화가 없으니까요).
+      SQLAlchemy로 바꾸는 순간 <b>새로운 실수 종류</b>가 생깁니다. 두 구현이
+      "저장 호출이 안 보인다"는 점에서 비슷해 보이지만, 그 이유가 다르다는 것을
+      몰랐다면 이 버그의 원인을 찾는 데 오래 걸렸을 것입니다.</p>
+      <p>이 실수를 막는 장치가 5장의 Unit of Work입니다 —
+      <code>with uow:</code> 블록이 끝날 때 <code>commit</code>을 잊으면 자동으로
+      <code>rollback</code>되게 만들어, "커밋을 깜빡했는데 알아채지 못하는" 상황
+      자체를 줄입니다.</p>
+    </div>
+  </div>
+
+  <div class="quiz" data-answer="1">
+    <p class="q">화면 11의 반대 의견 논의에서, <b>리포지토리를 만드는 비용이 이득보다 큰</b>
+    상황으로 가장 적절한 것은?</p>
+    <ol class="options">
+      <li data-why="맞습니다. 규칙이 거의 없고 ORM 교체 계획도 없다면 인터페이스와 구현 두 벌을 유지하는 비용이 그대로 남습니다.">
+        혼자 만드는 사내 재고 확인용 CRUD 도구. 화면 세 개, 규칙은 "로그인한 사람만
+        수정 가능"뿐</li>
+      <li data-why="애그리게이트가 여럿이고 계속 늘어나는 상황은 오히려 리포지토리의 이득(테스트 속도, 일관된 저장 규칙)이 커지는 경우입니다.">
+        한빛몰처럼 애그리게이트가 여러 개이고 팀이 계속 기능을 추가하는 상황</li>
+      <li data-why="도메인 규칙이 복잡할수록 메모리 구현으로 빠르게 테스트하는 이득이 커집니다. 리포지토리를 포기할 이유가 아닙니다.">
+        도메인 규칙이 복잡해서 테스트를 자주 돌려야 하는 상황</li>
+      <li data-why="ORM 교체 계획이 있다면 오히려 리포지토리의 핵심 이득(교체 가능성)이 실현되는 상황입니다.">
+        2년 안에 다른 데이터베이스로 옮길 계획이 있는 상황</li>
+    </ol>
+    <div class="explain">
+      <p><b class="lbl">해설</b> 리포지토리의 비용은 <b>고정적</b>입니다(인터페이스 +
+      구현 최소 두 벌). 이득은 <b>규칙의 복잡도와 애그리게이트 수에 비례</b>해서 커집니다.
+      규칙이 "로그인만 확인"뿐인 도구는 이득이 거의 0에 가까운데 비용은 그대로 남으니
+      배보다 배꼽이 커집니다.</p>
+      <p>이 판단은 14장에서 다시 전체적으로 다룹니다 — DDD의 패턴 하나하나가 전부
+      "규칙의 복잡도 대비 이득"이라는 같은 저울 위에 있습니다.</p>
+    </div>
+  </div>
+
+  <div class="task">
+    <h3>직접 해보기</h3>
+    <p><code>InMemoryInventoryRepository</code>를 직접 짜 보세요. 힌트: 화면 5의
+    <code>InMemoryOrderRepository</code>와 거의 같은 모양이지만, 키가
+    <code>OrderNumber</code>가 아니라 <b>SKU 문자열</b>입니다.</p>
+    <ul>
+      <li><code>get(sku)</code>는 없는 SKU면 무엇을 해야 할까요? 화면 4의
+      <code>OrderNotFound</code>와 같은 패턴을 SKU에도 적용해 보세요.</li>
+      <li><code>get_many(skus)</code>를 <code>get</code> 여러 번으로 구현하고 싶어질
+      것입니다. <b>메모리 구현에서는 그래도 괜찮을까요?</b> SQLAlchemy 구현이라면
+      어떨까요?</li>
+    </ul>
+  </div>
+
+  <details class="fold answer">
+    <summary>모범답안</summary>
+    <div class="fold-body">
+<pre><code>class InventoryNotFound(DomainError): ...
+
+
+class InMemoryInventoryRepository:
+    def __init__(self) -&gt; None:
+        self._items: dict[str, InventoryItem] = {}
+
+    def get(self, sku: str) -&gt; InventoryItem:      # 1
+        try:
+            return self._items[sku]
+        except KeyError:
+            raise InventoryNotFound(sku) from None
+
+    def get_many(
+        self, skus: Sequence[str],
+    ) -&gt; dict[str, InventoryItem]:                   # 2
+        return {sku: self.get(sku) for sku in skus}
+
+    def add(self, item: InventoryItem) -&gt; None:
+        self._items[item.sku] = item
+</code></pre>
+      <ol class="notes">
+        <li><span class="ln">8행</span> <code>OrderRepository.get</code>과 같은 패턴을
+        그대로 재사용했습니다. 두 리포지토리가 <b>같은 실패 방식</b>을 쓰면, 응용
+        서비스(5장)에서 예외 처리 코드를 공통으로 쓸 수 있습니다.</li>
+        <li><span class="ln">14~17행</span> <b>메모리 구현에서는 <code>get</code>을
+        여러 번 불러도 실질적인 비용 차이가 없습니다</b> — 딕셔너리 조회는 어차피
+        빠릅니다. 하지만 이렇게 짜 두면 <b>SQLAlchemy 구현으로 바꿀 때 그대로
+        복사하면 N+1 문제가 재발합니다.</b> 진짜 구현에서는
+        <code>session.query(InventoryItem).filter(sku.in_(skus))</code>처럼
+        <b>한 번의 쿼리</b>로 바꿔야 합니다. 인터페이스가 같다고 구현 전략까지
+        그대로 옮겨도 되는 것은 아닙니다 — 이것이 화면 4에서
+        <code>get_many</code>를 <b>처음부터 별도 메서드로</b> 정의해 둔 이유이기도
+        합니다. 시그니처를 미리 분리해 두면, 나중에 최적화할 때 호출하는
+        쪽의 코드를 바꿀 필요가 없습니다.</li>
+      </ol>
+    </div>
+  </details>
+
+  <div class="box note">
+    <p class="box-t">다음 장 예고</p>
+    <p>리포지토리로 애그리게이트를 저장하고 꺼낼 수 있게 됐습니다. 그런데 아직
+    아무도 <code>OrderRepository</code>와 <code>InventoryRepository</code>를
+    <b>동시에</b> 다루지 않습니다. 주문을 만들려면 재고를 할당해야 하고, 그러려면
+    두 리포지토리를 같이 열어 트랜잭션 하나로 묶어야 합니다.</p>
+    <p>5장에서 <b>응용 서비스</b>와 <b>Unit of Work</b>를 만듭니다. 화면 7에서 미리 본
+    <code>uow.commit()</code>의 정체가 거기서 밝혀집니다.</p>
+  </div>
+
+  <div class="chapter-end">
+    <a href="ch03.html#last"><span>이전 장</span>3장 — Aggregate: 불변식을 지키는 경계</a>
+    <a href="index.html"><span>5장은 아직 집필 전입니다</span>표지와 목차로</a>
+  </div>
+</section>
+
+</div></main>
+
+<script src="assets/book.js"></script>
+</body>
+</html>

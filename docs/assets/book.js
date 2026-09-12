@@ -11,7 +11,7 @@
     { id: 'ch01', num: '1장', title: '왜 DDD인가: 잘 돌아가는 나쁜 코드', part: '입문', screens: 17, hours: 3.0, ready: true },
     { id: 'ch02', num: '2장', title: '도메인 모델의 최소 단위: Entity와 Value Object', part: '전술적 설계', screens: 14, hours: 2.5, ready: true },
     { id: 'ch03', num: '3장', title: 'Aggregate: 불변식을 지키는 경계', part: '전술적 설계', screens: 16, hours: 3.0, ready: true },
-    { id: 'ch04', num: '4장', title: 'Repository: 도메인에서 DB를 밀어내기', part: '전술적 설계', screens: 12, hours: 2.5 },
+    { id: 'ch04', num: '4장', title: 'Repository: 도메인에서 DB를 밀어내기', part: '전술적 설계', screens: 12, hours: 2.5, ready: true },
     { id: 'ch05', num: '5장', title: 'Application Service와 계층 구조', part: '전술적 설계', screens: 13, hours: 2.5 },
     { id: 'ch06', num: '6장', title: 'Domain Service, Factory, 그리고 스냅샷', part: '전술적 설계', screens: 12, hours: 2.5 },
     { id: 'ch07', num: '7장', title: 'Domain Event: 애그리게이트 사이를 잇기', part: '전술적 설계', screens: 13, hours: 2.5 },
@@ -51,7 +51,10 @@
     orderline: '주문 라인 — 주문서의 한 줄. 상품 하나에 대해 "무엇을·몇 개·단가 얼마·소계 얼마"를 적은 항목이다. 같은 상품을 3개 사면 라인은 1개(qty=3)다.',
     vo: '값 객체 — 불변이고, 내용이 같으면 같은 것으로 보고, 바꿀 때는 새로 만들어 교체하는 객체. 금액·주소·수량처럼 "숫자처럼 다뤄도 되는" 도메인 개념이다.',
     entity: '엔티티 — 식별자로 같음을 판단하는 객체. 내용이 다 바뀌어도 식별자가 같으면 같은 것이고, 생애 주기를 추적한다.',
-    invariantset: '불변식 — 언제 확인해도 참이어야 하는 규칙. 이 교재는 기획 단계에서 번호를 붙여 I1~I22로 관리한다.'
+    invariantset: '불변식 — 언제 확인해도 참이어야 하는 규칙. 이 교재는 기획 단계에서 번호를 붙여 I1~I22로 관리한다.',
+    repository: '리포지토리 — 애그리게이트를 저장하고 꺼내는 인터페이스. 도메인은 이 인터페이스만 알고, 실제 DB 접근 코드는 이 인터페이스를 구현한 클래스 안에 있다.',
+    persignorance: '영속성 무지 — 도메인 객체가 자신이 어떻게 저장되는지(DB인지 메모리인지) 전혀 모르는 상태. 리포지토리 패턴이 만들어 주는 성질이다.',
+    dip: '의존성 역전 원칙(DIP) — 도메인(상위 정책)이 인프라(하위 구현)에 의존하는 대신, 인프라가 도메인이 정의한 인터페이스를 향해 의존하도록 방향을 뒤집는 원칙.'
   };
 
   var STORE_KEY = 'ddd-book:progress';
