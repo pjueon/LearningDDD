@@ -55,11 +55,11 @@
             raise AlreadyShipped("이미 출고된 주문입니다")
         self.status = OrderStatus.취소됨
 
-        conn = sqlite3.connect("hanbit.db")            # 1
-        conn.execute(
-            "UPDATE orders SET status = %s WHERE order_number = %s",
+        conn = sqlite3.connect("hanbit.db")             # 1
+        conn.execute(                                   # 2
+            "UPDATE orders SET status = ? WHERE order_number = ?",
             (self.status.name, self._order_number.value))
-        conn.commit()                                   # 2
+        conn.commit()                                   # 3
 </code></pre>
 
   <ol class="notes">
@@ -237,7 +237,8 @@ class InventoryRepository(Protocol):
         self._orders[order.order_number.value] = order      # 2
 
     def next_order_number(self, today: date) -&gt; OrderNumber:
-        seq = sum(1 for k in self._orders if k.startswith(today.isoformat()))
+        seq = sum(1 for k in self._orders
+                  if k.startswith(today.strftime("%Y%m%d")))
         return OrderNumber.issue(today, seq + 1)
 </code></pre>
 
@@ -377,9 +378,9 @@ class InventoryRepository(Protocol):
   않습니다. 대신 5장에서 <b>Unit of Work</b>라는 것을 만듭니다. 미리 살짝 보면 이렇게
   씁니다.</p>
 
-<pre><span class="cap"># 5장에서 만드는 것의 미리보기</span><code>order = uow.orders.get(order_number)     # 1
-order.cancel()                            # 2
-uow.commit()                              # 3
+<pre><span class="cap"># 5장에서 만드는 것의 미리보기</span><code>order = uow.orders.get(order_number)      # 1
+order.cancel()
+uow.commit()                              # 2
 </code></pre>
 
   <ol class="notes">
@@ -435,7 +436,7 @@ uow.commit()                              # 3
 
   <ol class="notes">
     <li><span class="ln">2행</span> <code>promise</code>와 나란히 놓이는 필드입니다.
-    <code>Allocation</code>은 <b>식별자가 없는 값 객체</b>이므로(3장 화면 13), 이걸
+    <code>Allocation</code>은 <b>식별자가 없는 값 객체</b>이므로(3장 화면 14), 이걸
     <code>Order</code>가 들고 있어도 재고를 바꿀 방법이 여전히 없습니다 — 3장의 규칙이
     깨지지 않습니다.</li>
   </ol>
@@ -500,8 +501,9 @@ def start_mappers() -&gt; None:
         OrderLine, order_lines_table)
     mapper_registry.map_imperatively(
         Order, orders_table,                                 # 3
-        properties={"_lines": relationship(
-            lines_mapper, collection_class=list)})
+        properties={"_order_number": orders_table.c.order_number,
+                    "_lines": relationship(
+                        lines_mapper, collection_class=list)})
 </code></pre>
 
   <ol class="notes">
@@ -517,13 +519,15 @@ def start_mappers() -&gt; None:
     다뤘습니다. <code>discount_amount</code>가 그 예입니다 — <code>Money</code> 하나가
     정수 컬럼 하나가 됩니다.</li>
 
-    <li><span class="ln">25~28행</span> <b>이것이 임퍼러티브 매핑의 핵심입니다.</b>
+    <li><span class="ln">25~29행</span> <b>이것이 임퍼러티브 매핑의 핵심입니다.</b>
     <code>Order</code> 클래스 정의에는 SQLAlchemy를 <code>import</code>하는 줄이
     <b>단 한 줄도 없습니다</b>(2~3장을 다시 봐도 확인할 수 있습니다). 대신 이
     <code>infra/orm.py</code> 파일이 <b>바깥에서</b> "이 클래스의 이 속성은 이 테이블의
     이 컬럼과 대응한다"고 선언합니다. <code>_lines</code>라는 밑줄 이름 속성까지
     지정할 수 있는 것도 이 방식의 특징입니다 — <code>Order</code>가 캡슐화를 위해 만든
-    "private처럼 보이는" 속성을 인프라가 그대로 씁니다.</li>
+    "private처럼 보이는" 속성을 인프라가 그대로 씁니다. <code>_order_number</code>도
+    같은 이유로 명시합니다 — 이렇게 두지 않으면 SQLAlchemy 가 읽기 전용 프로퍼티
+    <code>order_number</code> 자리를 덮으려 들기 때문입니다.</li>
   </ol>
 
   <p>리포지토리 구현은 이제 짧습니다. 세션 하나만 감싸면 됩니다.</p>

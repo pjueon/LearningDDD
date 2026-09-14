@@ -498,7 +498,7 @@ class Address:
 
 <pre><code>&gt;&gt;&gt; from dataclasses import replace
 &gt;&gt;&gt; fixed = replace(home, detail="경비실 앞")     # 새 Address 가 나온다
-&gt;&gt;&gt; order_b.change_shipping_address(fixed)        # 주문 B 만 갈아끼운다
+&gt;&gt;&gt; order_b.shipping_address = fixed              # 주문 B 만 갈아끼운다
 &gt;&gt;&gt; order_a.shipping_address.detail
 '3층'                                             # 주문 A 는 안전하다
 </code></pre>

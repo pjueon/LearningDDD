@@ -303,7 +303,7 @@ class InsufficientStock(DomainError): ...       # 화면 9에서 쓴다
 
 <pre><span class="cap"># domain/order.py — Order 안에 이어서</span><code>    MODIFIABLE = (OrderStatus.생성됨, OrderStatus.결제대기)      # 1
     CANCELLABLE = (OrderStatus.생성됨, OrderStatus.결제대기,
-                   OrderStatus.결제완료, OrderStatus.출고준비)
+                   OrderStatus.결제완료)
 
     def _ensure_modifiable(self) -&gt; None:                     # 2
         if self.status not in self.MODIFIABLE:
@@ -361,8 +361,10 @@ class InsufficientStock(DomainError): ...       # 화면 9에서 쓴다
     <br>"그럼 주문 전체를 없애고 싶을 때는?" — 그건 <b>취소</b>라는 다른 행위입니다.
     업무에서 다른 일이면 코드에서도 다른 메서드여야 합니다.</li>
 
-    <li><span class="ln">26~30행</span> I5입니다. <code>출고됨</code>·<code>배송완료</code>는
-    목록에 없으므로 취소가 막힙니다. 예외 이름과 메시지가 <b>대안을 알려줍니다</b> —
+    <li><span class="ln">26~30행</span> I5입니다. <code>출고준비</code>부터는 목록에 없으므로
+    취소가 막힙니다. <code>출고준비</code>는 창고 직원이 <b>이미 피킹을 시작한</b> 상태이고,
+    1장 화면 12에서 도현이 겪은 사고("피킹까지 다 끝내고 포장하려는데 주문이 취소됐다")가
+    정확히 이 상태의 주문을 취소한 것이었습니다. 예외 이름과 메시지가 <b>대안을 알려줍니다</b> —
     "이건 취소가 아니라 반품이다". 좋은 도메인 예외는 무엇이 틀렸는지만 말하지 않고
     <b>업무적으로 무엇을 해야 하는지</b>를 말합니다.</li>
 
@@ -910,6 +912,11 @@ class OrderLine:
       재고에서 없애는 업무 절차가 이미 있습니다. 그래서 만료 배치는 <b>애초에 오래 남아 있지
       않습니다.</b> <code>allocate()</code>의 만료 검사는 그 절차가 늦어진 하루치를
       막는 안전망입니다.</p>
+      <p>1장 화면 11에서 도현이 요청한 <b>여유 규칙</b>(신선식품은 유통기한 3일 전,
+      가공식품은 1일 전부터 주문에 잡지 않는다)도 아직 <code>allocate()</code>에 없습니다.
+      여유 일수가 <b>상품 분류마다 다른데</b>, 분류는 재고가 아니라 카탈로그가 아는 값입니다.
+      재고 안에 상수로 넣으면 화면 7의 규칙이 깨지므로 밖에서 정책으로 받아야 하고,
+      그 방법은 6장에서 배웁니다.</p>
       <p><b>여기서 얻을 것</b>: 코드로 완벽하게 막는 것만이 답이 아닙니다.
       업무 절차가 이미 막고 있는 것을 코드가 또 막으면, 코드는 복잡해지는데 얻는 것은 없습니다.
       <b>"이 규칙은 누가 지키고 있나"를 먼저 묻는 것</b>이 DDD에서 도메인 전문가와
@@ -1630,7 +1637,8 @@ datetime.date(2026, 9, 15)
         <code>UPDATE orders SET ...</code>를 막는 마지막 통로</td></tr>
       <tr><td><b>5장</b></td><td>화면 14의 조립 코드가 살 곳. 트랜잭션 경계</td></tr>
       <tr><td><b>6장</b></td><td>라인이 바뀌어도 할인액이 안 따라오는 문제(화면 3).
-        상품명·가격을 왜 복사하는가(I6)</td></tr>
+        상품명·가격을 왜 복사하는가(I6).
+        유통기한 여유 규칙을 정책으로 받기(화면 9)</td></tr>
       <tr><td><b>7장</b></td><td><code>delay()</code>가 이미 약속한 주문들에게 어떻게 전해지나.
         <code>repromise()</code></td></tr>
       <tr><td><b>9장</b></td><td>"상품 1개 = SKU 1개" 전제(화면 3·7·8).
