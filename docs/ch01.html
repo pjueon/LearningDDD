@@ -1193,7 +1193,8 @@ class OrderLine:
                 customer_id=cmd.customer_id,
                 address=cmd.shipping_address,
                 items=items,
-                shipping_fee=self.fee_policy.calculate(items, cmd.shipping_address),
+                shipping_fee=self.fee_policy.calculate(
+                    items, cmd.shipping_address, grade),
                 discount=self.discount_policy.calculate(items, grade),
             )
             self.uow.orders.add(order)
