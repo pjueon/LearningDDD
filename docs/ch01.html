@@ -608,7 +608,7 @@
     어떤 회사는 <code>success: true</code>를 씁니다. 우리 업무와 아무 관계 없는 남의 규칙이
     주문 처리 함수 한복판에 들어와 있습니다. <span class="later">10장 ACL에서 이걸 격리합니다</span></li>
 
-    <li><span class="ln">72~74행</span> 주문 상태를 <code>결제완료</code>로 바꾸고
+    <li><span class="ln">72~75행</span> 주문 상태를 <code>결제완료</code>로 바꾸고
     PG사가 준 거래번호(<code>tid</code>)를 저장합니다. 나중에 환불할 때 이 번호가 필요합니다.</li>
 
     <li><span class="ln">76행</span> <code>commit()</code> — 여기서야 <b>모든 변경이 확정</b>되고
@@ -1330,9 +1330,10 @@ class OrderLine:
             raise AlreadyShipped("출고가 시작된 주문은 취소할 수 없습니다")
         self.status = OrderStatus.취소됨
 </code></pre>
-      <p>그리고 4장에서 <code>status</code>를 <b>밖에서 대입할 수 없게</b> 만듭니다.
-      주문 상태를 바꾸는 유일한 방법이 <code>order.cancel()</code>이 되면,
-      규칙을 우회하려면 <b>일부러 노력해야</b> 합니다. 잊어서 우회하는 일은 없어집니다.</p>
+      <p>그리고 3장부터는 상태를 바꾸는 유일한 통로를 <code>order.cancel()</code>
+      하나로 좁힙니다. 파이썬이 물리적으로 막아주지는 않지만(진짜 <code>private</code>은
+      없습니다), 바꿀 수 있는 곳이 한 곳뿐이면 규칙을 우회하려면 <b>일부러 노력해야</b> 합니다.
+      잊어서 우회하는 일은 없어집니다.</p>
       <p>핵심은 함수로 뽑는 것과 객체 안에 넣는 것의 차이입니다.
       함수는 <b>부를 수도 있고 안 부를 수도</b> 있고, 객체의 메서드는
       <b>그 객체를 쓰는 한 반드시 거쳐야</b> 합니다.</p>

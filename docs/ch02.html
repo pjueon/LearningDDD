@@ -496,7 +496,11 @@ class Address:
             raise DomainError(f"우편번호 형식이 아닙니다: {self.zipcode}")
 </code></pre>
 
-<pre><code>&gt;&gt;&gt; from dataclasses import replace
+<pre><code>&gt;&gt;&gt; home = Address("13529", "성남대로 100", "3층", "김은수", "010-0000-0000")
+&gt;&gt;&gt; order_a = place_order(customer_id=7, address=home, ...)
+&gt;&gt;&gt; order_b = place_order(customer_id=7, address=home, ...)
+
+&gt;&gt;&gt; from dataclasses import replace
 &gt;&gt;&gt; fixed = replace(home, detail="경비실 앞")     # 새 Address 가 나온다
 &gt;&gt;&gt; order_b.shipping_address = fixed              # 주문 B 만 갈아끼운다
 &gt;&gt;&gt; order_a.shipping_address.detail
@@ -764,16 +768,12 @@ False        # 같은 주문인데 다르다고 한다
         self.shipping_address = shipping_address
         self.status = OrderStatus.생성됨
 
-    @property
-    def order_number(self) -&gt; OrderNumber:                # 2
-        return self._order_number
-
-    def __eq__(self, other: object) -&gt; bool:              # 3
+    def __eq__(self, other: object) -&gt; bool:              # 2
         if not isinstance(other, Order):
             return NotImplemented
         return self._order_number == other._order_number
 
-    def __hash__(self) -&gt; int:                            # 4
+    def __hash__(self) -&gt; int:                            # 3
         return hash(self._order_number)
 
     def __repr__(self) -&gt; str:
@@ -781,19 +781,15 @@ False        # 같은 주문인데 다르다고 한다
 </code></pre>
 
   <ol class="notes">
-    <li><span class="ln">4행</span> 식별자를 <code>_</code>로 시작하는 이름에 넣고
-    <code>@property</code>로만 읽게 합니다. <b>식별자는 바뀌면 안 되기 때문</b>입니다.
-    주문번호가 바뀌는 순간 그것은 다른 주문이 되고, 이미 그 번호로 처리된 결제·배송·정산이
-    전부 미아가 됩니다.</li>
+    <li><span class="ln">4행</span> 식별자를 <code>_</code>로 시작하는 이름에 넣어 숨깁니다.
+    <b>식별자는 바뀌면 안 되기 때문</b>입니다. 주문번호가 바뀌는 순간 그것은 다른 주문이 되고,
+    이미 그 번호로 처리된 결제·배송·정산이 전부 미아가 됩니다. 지금은 밖에서 이 값을 읽을 일이
+    없어 그대로 둡니다 — 읽어야 할 일이 생기면(4장) 읽기 전용 프로퍼티로 노출합니다.</li>
 
-    <li><span class="ln">9~11행</span> 읽기 전용으로만 노출합니다. 파이썬에는 진짜
-    <code>private</code>이 없으므로 <code>order._order_number = ...</code>를 물리적으로 막을 수는
-    없습니다. <b>"이건 만지면 안 되는 것"이라는 의사 표시</b>이고, 파이썬에서는 이 정도가 관례입니다.</li>
-
-    <li><span class="ln">13~16행</span> 식별자만 비교합니다. 배송지가 바뀌어도, 상태가 바뀌어도
+    <li><span class="ln">9~12행</span> 식별자만 비교합니다. 배송지가 바뀌어도, 상태가 바뀌어도
     <b>같은 주문</b>입니다. 이게 엔티티의 정의를 코드로 옮긴 것입니다.</li>
 
-    <li><span class="ln">18~19행</span> 파이썬에서 <code>__eq__</code>를 직접 정의하면
+    <li><span class="ln">14~15행</span> 파이썬에서 <code>__eq__</code>를 직접 정의하면
     <code>__hash__</code>가 <b>자동으로 <code>None</code>이 되어</b> 그 객체는
     해시할 수 없게 됩니다(<code>set</code>·딕셔너리 키로 못 씀).
     그래서 짝으로 함께 정의합니다. <b><code>__eq__</code>와 같은 기준</b>을 써야 합니다 —

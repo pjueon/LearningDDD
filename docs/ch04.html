@@ -325,7 +325,7 @@ class InventoryRepository(Protocol):
 
   <h3>이제 3장의 마지막 질문에 답할 수 있습니다</h3>
 
-  <p>1장 화면 6과 3장 화면 2의 사고 2번을 기억하시나요 — 프로모션 배치가
+  <p>3장 화면 2의 사고 2번을 기억하시나요 — 프로모션 배치가
   <code>UPDATE orders SET discount = ...</code>만 실행하고 <code>total</code> 컬럼은
   그대로 둬서 금액이 어긋난 사고입니다. 이 사고가 <b>4장 이후에는 구조적으로 불가능</b>합니다.
   이유가 셋 겹쳐 있습니다.</p>
@@ -606,7 +606,7 @@ session.commit()
       <tr><td><code>order_id</code>를 <code>cursor.lastrowid</code>로 받아
         <code>order_lines</code>에 <b>수동으로</b> 넘김</td>
         <td><code>relationship</code>이 외래 키 연결을 <b>자동</b>으로 채움</td></tr>
-      <tr><td><code>INSERT</code> 문 <b>세 번</b>(주문 1 + 라인 N)을 개발자가 직접 순서대로 씀</td>
+      <tr><td><code>INSERT</code> 문 <b>여러 번</b>(주문 1 + 라인 N)을 개발자가 직접 순서대로 씀</td>
         <td><code>repo.add(order)</code> 한 번. 몇 개의 <code>INSERT</code>가 나갈지는
         <b>객체 그래프의 모양</b>이 결정</td></tr>
       <tr><td><code>total</code> 컬럼을 <b>계산해서 직접 채워 넣어야</b> 함</td>

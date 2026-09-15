@@ -311,7 +311,7 @@
     값은 롤백을 호출해도 그대로 남습니다. 진짜 DB에서는 세션이 커밋 전까지의 변경을 붙잡고
     있다가 롤백 시 통째로 버리지만, 파이썬 객체 참조에는 그런 장치가 없습니다.</p>
     <p>그래서 "부분 실패 시 정말 롤백되는가"를 검증하는 테스트는 메모리 구현으로 쓸 수
-    없습니다. 화면 9의 <code>SqlAlchemyUnitOfWork</code>를 쓰는 소수의 통합 테스트로
+    없습니다. 위의 <code>SqlAlchemyUnitOfWork</code>를 쓰는 소수의 통합 테스트로
     남겨 둡니다(4장 화면 5의 원칙과 같습니다).</p>
   </div>
 </section>
@@ -457,7 +457,7 @@ class PlaceOrderCommand:
       <li><code>Order.lines</code>는 내부 엔티티 <code>OrderLine</code>의 튜플입니다.
       이걸 JSON으로 직렬화하려는 순간, <b>표현 계층이 도메인 내부 구조를 알아야</b>
       합니다.</li>
-      <li>3장에서 <code>Order</code>에 필드를 하나 추가하면(예: 6장의 <code>events</code>)
+      <li>3장에서 <code>Order</code>에 필드를 하나 추가하면(예: 7장의 <code>events</code>)
       직렬화 코드가 <b>덩달아 깨집니다.</b> 도메인 모델과 API 응답 형식이 같은 속도로
       바뀔 이유가 없습니다.</li>
       <li>3장 화면 5가 이미 경고했습니다 — "화면에 뿌릴 데이터는 4장의 리포지토리와
@@ -497,15 +497,21 @@ def to_summary(order: Order) -&gt; OrderSummary:
   리포지토리에서 각각 읽어 DTO로 조립한다."</b></p>
 
 <pre><span class="cap"># 3장 화면 16의 요구를 실제로 풀면</span><code>def get_order_detail(self, order_number: OrderNumber) -&gt; "OrderDetail":
-    order = self._uow.orders.get(order_number)            # 1  주문 컨텍스트
-    name = self._members.name_of(order.customer_id)        # 2  회원 컨텍스트
+    with self._uow as uow:                                  # 1
+        order = uow.orders.get(order_number)                # 2  주문 컨텍스트
+    name = self._members.name_of(order.customer_id)         # 3  회원 컨텍스트
     return OrderDetail(order_number=order.order_number.value,
                         customer_name=name,
                         total_amount=int(order.total_amount.amount))
 </code></pre>
 
   <ol class="notes">
-    <li><span class="ln">2~3행</span> 두 컨텍스트에서 각각 읽어 <b>DTO 하나로 합칩니다.</b>
+    <li><span class="ln">1~2행</span> 읽기만 하는데도 <code>with self._uow:</code>로
+    감쌌습니다. <b>트랜잭션 경계가 필요해서가 아니라</b>, 화면 5의 <code>SqlAlchemyUnitOfWork</code>가
+    세션을 <code>__enter__</code> 안에서만 만들기 때문입니다 — 세션을 얻으려면 이 블록을
+    거쳐야 합니다. <code>commit()</code>을 부르지 않으므로 아무것도 확정되지 않습니다.</li>
+
+    <li><span class="ln">3~4행</span> 두 컨텍스트에서 각각 읽어 <b>DTO 하나로 합칩니다.</b>
     <code>Order</code>는 여전히 회원 이름을 모릅니다 — 그 값은 DTO를 조립하는 이
     코드만 압니다. 애그리게이트의 경계는 그대로 지켜지면서, 화면이 필요로 하는 모양은
     자유롭게 만들 수 있습니다.</li>
@@ -835,8 +841,8 @@ class ShippingPolicy(Protocol):
     <ol class="options">
       <li data-why="등급별 할인율을 결정하는 것은 업무 규칙입니다. 도메인 서비스로 가야 합니다(6장).">
         회원 등급에 따라 할인율을 0%·3%·5%로 나누는 계산</li>
-      <li data-why="배송비를 얼마로 매길지는 업무 규칙입니다. 무료배송 기준이 바뀌면 이 코드도 바뀌어야 하므로 도메인 서비스로 가야 합니다.">
-        주문 금액이 3만 원 미만이면 배송비 3,000원을 매기는 계산</li>
+      <li data-why="배송비를 얼마로 매길지는 업무 규칙입니다. 무료배송 대상 등급이 바뀌면 이 코드도 바뀌어야 하므로 도메인 서비스로 가야 합니다.">
+        골드 등급이 아니면 배송비 3,000원을 매기는 계산</li>
       <li data-why="맞습니다. '누구를 몇 번째로 부르고 결과를 어떻게 모을지'는 업무 규칙이 아니라 조립 순서입니다. 응용 계층의 일입니다.">
         <code>get_many</code>로 재고를 한 번에 조회하고, SKU별 <code>allocate()</code>
         결과를 <code>dict</code>에 모으는 코드</li>
@@ -909,9 +915,9 @@ class ShippingPolicy(Protocol):
     OrderSummary</code> 메서드를 추가해 보세요. 화면 8의 <code>to_summary()</code>
     함수를 재사용하면 됩니다.</p>
     <ul>
-      <li>이 메서드는 무엇을 바꾸나요, 아니면 아무것도 바꾸지 않나요? 그렇다면
-      <code>with self._uow:</code>로 감쌀 필요가 있을까요, 아니면
-      <code>uow.orders.get()</code>만 불러도 될까요?</li>
+      <li>이 메서드는 무엇을 바꾸나요, 아니면 아무것도 바꾸지 않나요? 그런데도
+      <code>with self._uow:</code>가 필요하다면, 그 이유는 트랜잭션 때문일까요
+      아니면 다른 이유일까요?</li>
       <li>주문이 없는 <code>order_number</code>가 들어오면 무슨 일이 일어나야 할까요?
       4장에서 만든 어떤 예외가 이미 이 상황을 처리하고 있나요?</li>
     </ul>
@@ -923,18 +929,21 @@ class ShippingPolicy(Protocol):
 <pre><code>class OrderingService:
     ...
     def get_order_summary(self, order_number: OrderNumber) -&gt; OrderSummary:
-        order = self._uow.orders.get(order_number)     # 1
+        with self._uow as uow:                          # 1
+            order = uow.orders.get(order_number)         # 2
         return to_summary(order)
 </code></pre>
       <ol class="notes">
-        <li><span class="ln">3~4행</span> <b><code>with self._uow:</code>로 감싸지
-        않아도 됩니다.</b> 이 메서드는 아무것도 바꾸지 않는 <b>읽기 전용</b> 조회입니다
-        — 트랜잭션 경계는 "변경을 한 단위로 묶기" 위한 것이지, 읽기에는 필요 없습니다.
-        (다만 리포지토리 구현이 세션을 통해서만 <code>get()</code>할 수 있다면, 세션을
-        얻기 위해 <code>with</code>를 쓰는 것 자체는 무방합니다 — 그 안에서
-        <code>commit()</code>을 부르지만 않으면 됩니다.)</li>
+        <li><span class="ln">4~5행</span> <b>트랜잭션 경계가 필요해서
+        <code>with self._uow:</code>로 감싼 것이 아닙니다.</b> 이 메서드는 아무것도
+        바꾸지 않는 <b>읽기 전용</b> 조회입니다 — 트랜잭션 경계는 "변경을 한 단위로
+        묶기" 위한 것이지 읽기에는 필요 없습니다. 그런데도 <code>with</code>가 필요한
+        것은, 화면 5의 <code>SqlAlchemyUnitOfWork</code>가 <code>orders</code>·
+        <code>inventory</code> 속성을 <code>__enter__</code> 안에서만 만들기
+        때문입니다 — 세션을 얻으려면 이 블록을 거쳐야 합니다. <code>commit()</code>을
+        부르지 않으므로 아무것도 확정되지 않습니다.</li>
 
-        <li><span class="ln">4행</span> 없는 <code>order_number</code>가 들어오면
+        <li><span class="ln">5행</span> 없는 <code>order_number</code>가 들어오면
         <code>uow.orders.get()</code>이 4장에서 만든 <code>OrderNotFound</code>를
         던집니다. 이 메서드가 별도로 처리할 필요가 없습니다 — 표현 계층의
         <code>except DomainError</code>가 이미 잡습니다(화면 12).</li>

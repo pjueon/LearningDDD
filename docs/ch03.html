@@ -734,7 +734,7 @@ class OrderLine:
   <div class="table-wrap">
     <table>
       <tr><th style="width:3rem">번호</th><th>불변식</th></tr>
-      <tr><td><b>I7</b></td><td>가용수량 = 실물수량 − 예약수량. 항상 성립한다</td></tr>
+      <tr><td><b>I7</b></td><td>가용재고 = 실물재고 − 예약수량. 항상 성립한다</td></tr>
       <tr><td><b>I8</b></td><td>예약수량 ≤ 해당 배치의 수량 (초과 예약 불가)</td></tr>
       <tr><td><b>I9</b></td><td>어떤 수량도 음수가 될 수 없다</td></tr>
       <tr><td><b>I10</b></td><td>할당은 유통기한이 이른 배치부터(FEFO).
@@ -751,7 +751,7 @@ class OrderLine:
         self.batch_id = uuid4()
         self.received_on = received_on       # 언제 창고에 들어왔나
         self.expires_on = expires_on         # 유통기한. 없는 상품도 있다
-        self.quantity = quantity             # 실물수량
+        self.quantity = quantity             # 실물재고
         self.reserved = 0                    # 예약수량
 
     @property
@@ -766,12 +766,12 @@ class OrderLine:
 </code></pre>
 
   <ol class="notes">
-    <li><span class="ln">10~12행</span> 가용수량도 <b>저장하지 않고 계산합니다.</b>
-    I7이 "항상 성립한다"고 했는데, 저장하면 실물수량을 고칠 때 가용수량을 같이 고쳐야 하고
+    <li><span class="ln">10~12행</span> 가용재고도 <b>저장하지 않고 계산합니다.</b>
+    I7이 "항상 성립한다"고 했는데, 저장하면 실물재고을 고칠 때 가용재고을 같이 고쳐야 하고
     언젠가 잊습니다. <b>계산값으로 두면 어긋날 수가 없습니다.</b></li>
 
     <li><span class="ln">14~17행</span> I8과 I9를 <b>같은 한 줄이 지킵니다.</b>
-    <code>count</code>가 가용수량을 넘지 않으면 <code>reserved</code>는 <code>quantity</code>를
+    <code>count</code>가 가용재고을 넘지 않으면 <code>reserved</code>는 <code>quantity</code>를
     넘을 수 없고(I8), 따라서 <code>available</code>도 음수가 될 수 없습니다(I9).</li>
 
     <li><span class="ln">18행</span> <code>self.reserved += count</code>는
@@ -819,7 +819,7 @@ class OrderLine:
     <b>배치를 루트가 만듭니다.</b> 밖에서 <code>StockBatch(...)</code>를 만들어 리스트에
     끼워 넣는 길은 없습니다.</li>
 
-    <li><span class="ln">15~17행</span> SKU 전체의 가용수량. 배치별 가용수량의 합입니다.
+    <li><span class="ln">15~17행</span> SKU 전체의 가용재고. 배치별 가용재고의 합입니다.
     <b>이 프로퍼티는 화면 13에서 다시 고칩니다.</b> 지금은 배치가 한 종류뿐이라
     이걸로 충분합니다.</li>
 
@@ -900,11 +900,11 @@ class OrderLine:
   <b>연간 폐기 손실</b>을 좌우합니다. 도메인 규칙이 돈이 되는 전형적인 예입니다.</p>
 
   <details class="fold">
-    <summary>더 깊이 — 유통기한 지난 재고는 왜 가용수량에서 안 빠지나</summary>
+    <summary>더 깊이 — 유통기한 지난 재고는 왜 가용재고에서 안 빠지나</summary>
     <div class="fold-body">
       <p>날카로운 독자라면 눈치챘을 것입니다. <code>allocate()</code>는 만료 배치를 빼는데
       <code>available_quantity</code>는 <b>안 뺍니다.</b> 만료된 배치가 10개 남아 있으면
-      가용수량은 10인데 할당은 실패합니다.</p>
+      가용재고은 10인데 할당은 실패합니다.</p>
       <p>이유는 단순합니다. <code>available_quantity</code>는 프로퍼티라
       <b>기준일을 받을 수 없습니다.</b> <code>available_quantity(as_of)</code>처럼
       메서드로 바꾸면 해결되지만, 그러면 이 값을 읽는 모든 곳이 날짜를 알아야 합니다.</p>
@@ -916,7 +916,7 @@ class OrderLine:
       가공식품은 1일 전부터 주문에 잡지 않는다)도 아직 <code>allocate()</code>에 없습니다.
       여유 일수가 <b>상품 분류마다 다른데</b>, 분류는 재고가 아니라 카탈로그가 아는 값입니다.
       재고 안에 상수로 넣으면 화면 7의 규칙이 깨지므로 밖에서 정책으로 받아야 하고,
-      그 방법은 6장에서 배웁니다.</p>
+      그 방법은 7장에서 배웁니다.</p>
       <p><b>여기서 얻을 것</b>: 코드로 완벽하게 막는 것만이 답이 아닙니다.
       업무 절차가 이미 막고 있는 것을 코드가 또 막으면, 코드는 복잡해지는데 얻는 것은 없습니다.
       <b>"이 규칙은 누가 지키고 있나"를 먼저 묻는 것</b>이 DDD에서 도메인 전문가와
@@ -1267,7 +1267,7 @@ datetime.date(2026, 9, 15)                 # 2개를 기다려야 하므로
   <p class="kicker">3장 · 화면 13</p>
   <h2>"재고"라는 낱말이 셋으로 갈라졌다</h2>
 
-  <p>화면 8의 <code>available_quantity</code>는 배치 전체의 가용수량을 더했습니다.
+  <p>화면 8의 <code>available_quantity</code>는 배치 전체의 가용재고을 더했습니다.
   이제 배치가 두 종류이므로 <b>이 값이 무엇을 뜻하는지가 모호해졌습니다.</b></p>
 
   <div class="dialog">
@@ -1310,8 +1310,8 @@ datetime.date(2026, 9, 15)                 # 2개를 기다려야 하므로
   </div>
 
   <blockquote>
-    <p><b>I20.</b> 판매가능수량(ATP) = 가용수량 + 입고예정 잔량.
-    <b>가용수량과 다른 개념이며 혼용하지 않는다.</b></p>
+    <p><b>I20.</b> 판매가능수량(ATP) = 가용재고 + 입고예정 잔량.
+    <b>가용재고과 다른 개념이며 혼용하지 않는다.</b></p>
   </blockquote>
 
   <p>세 낱말이 코드에서도 셋이어야 합니다.</p>
@@ -1561,7 +1561,7 @@ datetime.date(2026, 9, 15)
         <text x="598" y="115">StockBatch</text>
       </g>
       <g text-anchor="middle" font-size="10" class="svg-muted">
-        <text x="164" y="146">I1 · I2 · I4 · I5</text>
+        <text x="164" y="146">I1 · I2 · I4 · I5 · I22</text>
         <text x="536" y="146">I7~I10 · I18 · I19 · I20</text>
         <text x="101" y="30">주문 애그리게이트</text>
         <text x="490" y="30">재고 애그리게이트</text>
@@ -1637,10 +1637,9 @@ datetime.date(2026, 9, 15)
         <code>UPDATE orders SET ...</code>를 막는 마지막 통로</td></tr>
       <tr><td><b>5장</b></td><td>화면 14의 조립 코드가 살 곳. 트랜잭션 경계</td></tr>
       <tr><td><b>6장</b></td><td>라인이 바뀌어도 할인액이 안 따라오는 문제(화면 3).
-        상품명·가격을 왜 복사하는가(I6).
-        유통기한 여유 규칙을 정책으로 받기(화면 9)</td></tr>
+        상품명·가격을 왜 복사하는가(I6).</td></tr>
       <tr><td><b>7장</b></td><td><code>delay()</code>가 이미 약속한 주문들에게 어떻게 전해지나.
-        <code>repromise()</code></td></tr>
+        <code>repromise()</code>. 유통기한 여유 규칙을 정책으로 받기(화면 9)</td></tr>
       <tr><td><b>9장</b></td><td>"상품 1개 = SKU 1개" 전제(화면 3·7·8).
         "재고"가 셋으로 갈라진 것의 진짜 의미(화면 13)</td></tr>
       <tr><td><b>12장</b></td><td>두 주문이 동시에 같은 배치를 예약할 때(화면 8).
@@ -1714,7 +1713,7 @@ datetime.date(2026, 9, 15)
         입고예정 배치에서 6개. <code>ready_on</code>은 09-20</li>
       <li data-why="맞습니다. 창고 가용 3개(5−2)를 먼저 쓰고 모자란 3개를 입고예정에서 채웁니다. 전량이 모이는 날은 09-20입니다.">
         창고 3개 + 입고예정 3개. <code>ready_on</code>은 09-20</li>
-      <li data-why="창고 배치의 가용수량은 5가 아니라 3입니다. 이미 2개가 예약되어 있습니다(I7).">
+      <li data-why="창고 배치의 가용재고은 5가 아니라 3입니다. 이미 2개가 예약되어 있습니다(I7).">
         창고 5개 + 입고예정 1개. <code>ready_on</code>은 09-20</li>
       <li data-why="판매가능수량(ATP)은 3 + 10 = 13이므로 6개 요청은 충분히 가능합니다. 실패하지 않습니다.">
         <code>InsufficientStock</code> 예외. 창고 가용이 3개뿐이므로</li>
