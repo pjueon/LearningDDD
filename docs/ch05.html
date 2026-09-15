@@ -50,17 +50,17 @@
 
 <pre><span class="cap"># web/views.py — 하지 않는다</span><code>def place_order_view(request):
     session = Session()
-    order_repo = SqlAlchemyOrderRepository(session)
+    order_repo = SqlAlchemyOrderRepository(session)                # 1
     inventory_repo = SqlAlchemyInventoryRepository(session)
 
     data = json.loads(request.body)
     order = Order(order_repo.next_order_number(date.today()),
                   request.user.id, Address(**data["address"]))
     for item in data["items"]:
-        product = CatalogModel.objects.get(sku=item["sku"])        # 1
+        product = CatalogModel.objects.get(sku=item["sku"])        # 2
         order.add_line(item["sku"], product.name,
                        Money.won(product.price), Quantity(item["qty"]))
-        inventory_repo.get(item["sku"]).allocate(item["qty"], date.today())   # 2
+        inventory_repo.get(item["sku"]).allocate(item["qty"], date.today())
 
     order_repo.add(order)
     session.commit()                                                # 3
@@ -68,14 +68,14 @@
 </code></pre>
 
   <ol class="notes">
-    <li><span class="ln">10행</span> 뷰 함수가 카탈로그 조회 방법을 <b>직접</b> 압니다.
-    <code>CatalogModel</code>이 우리 DB의 테이블인지, 다른 팀의 서비스인지도 여기서만
-    알 수 있습니다.</li>
-
-    <li><span class="ln">13행</span> <code>SqlAlchemyOrderRepository</code>와
+    <li><span class="ln">3~4행</span> <code>SqlAlchemyOrderRepository</code>와
     <code>SqlAlchemyInventoryRepository</code>를 <b>표현 계층이 직접 조립</b>합니다.
     4장에서 도메인 밖으로 밀어낸 인프라 지식(세션, 구체적인 구현 클래스 이름)이
     한 층 위에서 그대로 새어 들어왔습니다.</li>
+
+    <li><span class="ln">10행</span> 뷰 함수가 카탈로그 조회 방법을 <b>직접</b> 압니다.
+    <code>CatalogModel</code>이 우리 DB의 테이블인지, 다른 팀의 서비스인지도 여기서만
+    알 수 있습니다.</li>
 
     <li><span class="ln">16행</span> 이 커밋이 실패하면 무슨 일이 일어날까요?
     <code>inventory_repo.get(...).allocate(...)</code>는 이미 실행돼 배치의
@@ -537,10 +537,11 @@ class CatalogPort(Protocol):
 
 class MembershipPort(Protocol):
     def grade_of(self, customer_id: UUID) -&gt; MemberGrade: ...
+    def name_of(self, customer_id: UUID) -&gt; str: ...  # 2  화면 8의 DTO 조립에 쓴다
 
 
 class ShippingPolicy(Protocol):
-    lead_time: timedelta                              # 2
+    lead_time: timedelta                              # 3
 </code></pre>
 
   <ol class="notes">
@@ -548,7 +549,12 @@ class ShippingPolicy(Protocol):
     <code>InventoryRepository.get_many</code>를 만든 이유와 같습니다 — 라인이 5개인
     주문이 카탈로그를 5번 왕복하면 안 됩니다.</li>
 
-    <li><span class="ln">20행</span> 3장 화면 14가 못박은 값입니다 — "배송 리드타임은
+    <li><span class="ln">16~17행</span> 화면 8에서 이미 썼던 그 메서드입니다.
+    <code>grade_of()</code>는 주문에 필요하고, <code>name_of()</code>는 화면 표시에만
+    필요합니다 — 응용 서비스가 목적에 따라 <b>같은 포트의 다른 메서드</b>를 골라
+    씁니다.</li>
+
+    <li><span class="ln">21행</span> 3장 화면 14가 못박은 값입니다 — "배송 리드타임은
     배송 컨텍스트의 것이므로 상수로 박지 않고 정책 객체로 받는다." 지금 이 값을 쓰는 곳은
     <code>lead_time</code> 하나뿐이라 어색해 보일 수 있지만, 상수 하나를 하드코딩하는
     순간 배송 정책이 바뀔 때마다 <code>domain/</code>이나 <code>application/</code>
@@ -601,12 +607,13 @@ class ShippingPolicy(Protocol):
                                    else Money.won(3_000))            # 3
 
             items = uow.inventory.get_many([l.sku for l in order.lines])  # 4
-            allocations = [items[l.sku].allocate(l.quantity.value, date.today())
-                           for l in order.lines]
-            order.allocation = _merge(allocations)                  # 5
+            order.allocation = {                                    # 5
+                l.sku: items[l.sku].allocate(l.quantity.value, date.today())
+                for l in order.lines}
+            ready_on = max(a.ready_on for a in order.allocation.values())  # 6
             order.promise_delivery(Promise(
-                ship_on=order.allocation.ready_on,
-                arrive_by=order.allocation.ready_on + self._shipping.lead_time,
+                ship_on=ready_on,
+                arrive_by=ready_on + self._shipping.lead_time,
                 promised_at=datetime.now()))
 
             uow.orders.add(order)
@@ -627,26 +634,32 @@ class ShippingPolicy(Protocol):
     재고 애그리게이트를 가져옵니다(4장 화면 4). 라인마다 <code>get()</code>을 부르지
     않습니다.</li>
 
-    <li><span class="ln">27행</span> <code>allocate()</code>는 SKU 하나(=재고 애그리게이트
-    하나)에 대한 결과만 돌려줍니다. 라인이 여러 SKU에 걸치면 <code>Allocation</code>이
-    여러 개 나오는데, <code>Order.allocation</code>은 하나뿐입니다. 이걸 합치는 함수가
-    필요합니다.</li>
+    <li><span class="ln">25~27행</span> <code>allocate()</code>는 SKU 하나(=재고
+    애그리게이트 하나)에 대한 결과만 돌려줍니다. 라인이 여러 SKU에 걸치면
+    <code>Allocation</code>이 여러 개 나오는데, <b>SKU를 키로 하는 <code>dict</code>에
+    담습니다.</b> 여러 <code>Allocation</code>을 하나로 합치고 싶어질 수 있지만, 하면
+    안 됩니다 — 3장 화면 16 모범답안의 <code>InventoryItem.release()</code>는
+    <code>allocation.lines</code>의 <code>batch_id</code>를 <code>_find()</code>로
+    찾다가 <b>자기 배치가 아니면 <code>DomainError</code>를 던집니다.</b> 합친 값을
+    다른 SKU의 <code>release()</code>에 넘기면 그대로 예외가 납니다. SKU별로 쪼개
+    둬야 화면 12에서 각 <code>InventoryItem</code>에 <b>자기 몫만</b> 건넬 수
+    있습니다.</li>
+
+    <li><span class="ln">28행</span> I21 — 분할 출고를 하지 않으므로, 가장 늦게
+    준비되는 SKU의 날짜가 <b>주문 전체의 출고일</b>입니다.</li>
   </ol>
 
-<pre><span class="cap"># application/ordering.py — 여러 SKU의 할당을 하나로</span><code>def _merge(allocations: Sequence[Allocation]) -&gt; Allocation:
-    lines = tuple(l for a in allocations for l in a.lines)      # 1
-    ready_on = max(a.ready_on for a in allocations)              # 2
-    return Allocation(lines=lines, ready_on=ready_on)
-</code></pre>
-
-  <ol class="notes">
-    <li><span class="ln">2행</span> <code>AllocationLine</code>은 3장 화면 14의
-    불변 값 객체입니다. 여러 <code>Allocation</code>에서 나온 라인을 <b>이어붙이기만
-    해도</b> 안전합니다 — 값 객체는 조합해도 값 객체입니다.</li>
-
-    <li><span class="ln">3행</span> I21 — 분할 출고를 하지 않으므로, 가장 늦게 준비되는
-    SKU의 날짜가 <b>주문 전체의 출고일</b>입니다.</li>
-  </ol>
+  <div class="box warn">
+    <p class="box-t">같은 SKU가 두 라인에 나뉘어 있다면</p>
+    <p><code>Order.add_line()</code>은 3장에서 항상 <b>새 라인을 추가</b>할 뿐, 같은
+    SKU를 합치지 않습니다(3장 화면 3). 그런데 위 코드는 <code>{sku: ...}</code>로
+    담으므로, 라인 두 개가 같은 SKU라면 <b>나중 라인의 <code>Allocation</code>이
+    앞 라인의 것을 덮어씁니다.</b> 지금은 "같은 상품은 라인 하나로 합쳐 수량만
+    늘린다"는 관례(용어집의 '주문 라인' 정의)에 기대 이 경우를 다루지 않습니다.
+    표현 계층이 이 관례를 지키지 않으면 조용히 재고가 어긋납니다 — 굳이 강제하려면
+    <code>place_order()</code> 앞단에서 같은 SKU 라인을 합치는 검증을 추가해야
+    합니다.</p>
+  </div>
 
   <div class="box good">
     <p class="box-t">3장이 남긴 두 개의 빚 — 갚았습니다</p>
@@ -664,7 +677,7 @@ class ShippingPolicy(Protocol):
   <div class="dialog">
     <div class="line"><div class="who">팀원</div><div class="say">
       <p><code>place_order()</code>가 30줄이 넘습니다. 할인 계산, 배송비 계산, 할당
-      루프, 병합, 약속일 계산까지 — 이거 1장에서 본 그 뚱뚱한 함수 아닌가요?</p></div></div>
+      루프, 약속일 계산까지 — 이거 1장에서 본 그 뚱뚱한 함수 아닌가요?</p></div></div>
   </div>
 
   <p>날카로운 지적입니다. 다만 <b>모든 줄이 같은 이유로 문제인 것은 아닙니다.</b> 판별
@@ -678,8 +691,8 @@ class ShippingPolicy(Protocol):
         <td>업무 규칙(등급별 할인율)</td><td>도메인 서비스(6장)</td></tr>
       <tr><td><code>order.shipping_fee = 0 또는 3,000원</code></td>
         <td>업무 규칙(배송비 산정)</td><td>도메인 서비스(6장)</td></tr>
-      <tr><td><code>get_many</code> → <code>allocate</code> 반복 → <code>_merge</code></td>
-        <td>순서 조합(누구를 부르고 결과를 어떻게 합칠지)</td><td>응용 계층(그대로)</td></tr>
+      <tr><td><code>get_many</code> → SKU별 <code>allocate</code> → <code>dict</code>에 담기</td>
+        <td>순서 조합(누구를 부르고 결과를 어떻게 모을지)</td><td>응용 계층(그대로)</td></tr>
       <tr><td><code>with uow: ... uow.commit()</code></td>
         <td>트랜잭션 경계</td><td>응용 계층(그대로)</td></tr>
     </table>
@@ -732,9 +745,8 @@ class ShippingPolicy(Protocol):
         with self._uow as uow:
             order = uow.orders.get(order_number)
             order.cancel()                                    # 1  I5 확인
-            if order.allocation is not None:                   # 2
-                for sku in {l.sku for l in order.lines}:
-                    uow.inventory.get(sku).release(order.allocation)
+            for sku, allocation in order.allocation.items():   # 2
+                uow.inventory.get(sku).release(allocation)
             uow.commit()
 </code></pre>
 
@@ -743,11 +755,13 @@ class ShippingPolicy(Protocol):
     출고된 주문은 취소 불가)을 확인합니다. 여기 실패하면 <code>AlreadyShipped</code>가
     나고, <code>uow.commit()</code>까지 가지 않습니다.</li>
 
-    <li><span class="ln">5~7행</span> 재고를 되돌립니다. <code>{l.sku for l in
-    order.lines}</code>로 <b>중복 없이</b> 라인을 돕니다 — 같은 SKU에 두 번
-    <code>release()</code>를 부르면 예약 수량이 실제보다 더 풀립니다. <code>release()</code>는
-    <code>order.allocation</code>(여러 SKU가 합쳐진 값) 전체를 받아, <b>자기 배치에
-    속한 라인만</b> 찾아 되돌립니다 — 나머지는 조용히 무시합니다.</li>
+    <li><span class="ln">5~6행</span> <code>order.allocation</code>은 화면 10에서
+    SKU를 키로 담아 뒀습니다. <code>.items()</code>로 <b>각 SKU에 그 SKU 몫의
+    <code>Allocation</code>만</b> 정확히 짝지어 넘깁니다 — 다른 SKU의
+    <code>batch_id</code>가 섞여 들어갈 일이 없으므로 화면 10에서 본
+    <code>DomainError</code>가 나지 않습니다. 아직 할당이 없는 주문(이론상으로는
+    항상 있지만)이라도 <code>order.allocation</code>의 기본값이 <code>{}</code>라서
+    <code>None</code> 검사 없이 <code>for</code> 문이 그냥 0번 돕니다.</li>
   </ol>
 
   <div class="box note">
@@ -823,9 +837,9 @@ class ShippingPolicy(Protocol):
         회원 등급에 따라 할인율을 0%·3%·5%로 나누는 계산</li>
       <li data-why="배송비를 얼마로 매길지는 업무 규칙입니다. 무료배송 기준이 바뀌면 이 코드도 바뀌어야 하므로 도메인 서비스로 가야 합니다.">
         주문 금액이 3만 원 미만이면 배송비 3,000원을 매기는 계산</li>
-      <li data-why="맞습니다. '누구를 몇 번째로 부르고 결과를 어떻게 합칠지'는 업무 규칙이 아니라 조립 순서입니다. 응용 계층의 일입니다.">
+      <li data-why="맞습니다. '누구를 몇 번째로 부르고 결과를 어떻게 모을지'는 업무 규칙이 아니라 조립 순서입니다. 응용 계층의 일입니다.">
         <code>get_many</code>로 재고를 한 번에 조회하고, SKU별 <code>allocate()</code>
-        결과를 하나로 합치는 코드</li>
+        결과를 <code>dict</code>에 모으는 코드</li>
       <li data-why="유통기한이 임박한 배치를 먼저 빼는 FEFO는 3장에서 이미 InventoryItem 안으로 들어간 업무 규칙입니다. 응용 서비스가 다시 판단하면 안 됩니다.">
         유통기한이 3일 미만 남은 배치는 할당에서 제외하는 판단</li>
     </ol>
