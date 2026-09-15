@@ -506,7 +506,7 @@ order.shipping_fee = ...                              # 3단계: 금액
     하나입니다: <b>"이 값이 바뀌면, 이미 확정된 과거 주문도 따라 바뀌어야
     하는가?"</b></p>
     <p>아니라면(가격, 할인액, 배송비 — 전부 "그 순간 그렇게 계산됐다"는 사실)
-    <b>스냅샷</b>입니다. 그렇다면(예: 회원 이름 — 3장 화면 14 퀴즈에서 이미
+    <b>스냅샷</b>입니다. 그렇다면(예: 회원 이름 — 3장 화면 16 퀴즈에서 이미
     확인했듯, 개명하면 주문 내역도 최신 이름으로 보여도 무방한 값) <b>스냅샷하지
     않고 그때그때 조회</b>합니다. 5장 화면 9의 <code>MembershipPort.name_of()</code>가
     그 조회 창구입니다.</p>
@@ -683,29 +683,35 @@ order.shipping_fee = ...                              # 3단계: 금액
     <summary>모범답안</summary>
     <div class="fold-body">
 <pre><code>class SummerFreeShippingPolicy:            # ShippingFeePolicy 구현
-    def __init__(self, base: ShippingFeePolicy) -&gt; None:
+    def __init__(self, base: ShippingFeePolicy,
+                 today_source: Callable[[], date] = date.today) -&gt; None:
         self._base = base                                     # 1
+        self._today_source = today_source
 
     def calculate(self, items: Sequence[OrderItemSnapshot],
-                  address: Address, grade: MemberGrade,
-                  today: date) -&gt; Money:                        # 2
-        if today.month in (6, 7, 8):
+                  address: Address, grade: MemberGrade) -&gt; Money:  # 2
+        if self._today_source().month in (6, 7, 8):             # 3
             return Money.ZERO
         return self._base.calculate(items, address, grade)
 </code></pre>
       <ol class="notes">
-        <li><span class="ln">2~3행</span> 새 규칙을 처음부터 다시 쓰지 않고,
+        <li><span class="ln">1~5행</span> 새 규칙을 처음부터 다시 쓰지 않고,
         기존 <code>GradeShippingFeePolicy</code>를 <b>감쌉니다.</b> 여름이
         아니면 그대로 위임합니다.</li>
 
-        <li><span class="ln">5~7행</span> <code>today</code>를 <b>인자로
-        받습니다.</b> 이 클래스 안에서 <code>datetime.now()</code>를 직접
-        부르면, 테스트가 "오늘이 몇 월인지"에 따라 통과하거나 실패합니다 —
-        7월에 짠 테스트가 1월에는 다르게 동작합니다. 도메인 서비스는
-        <b>같은 입력이면 항상 같은 출력</b>이어야 합니다(화면 6의 판별
-        질문 ③). 시각을 직접 묻지 않고 인자로 받는 것은 <code>Money</code>가
-        반올림 방식을 자기 안에 감추지 않고 명시적으로 노출했던 2장의
-        원칙과 같은 맥락입니다.</li>
+        <li><span class="ln">7~9행</span> <code>calculate()</code>는 여전히
+        <code>ShippingFeePolicy</code> 프로토콜(화면 4)과 똑같이
+        <code>items</code>·<code>address</code>·<code>grade</code> 세 인자만
+        받습니다 — <code>today</code>를 여기에 추가하면 화면 5의
+        <code>place_order()</code>가 부르는
+        <code>self._fee_policy.calculate(snapshots, address, grade)</code>와
+        더 이상 맞지 않습니다. 대신 "지금이 몇 월인가"를 알아내는 방법
+        (<code>today_source</code>, "인자 없이 <code>date</code> 하나를
+        돌려주는 함수")을 <b>생성자가 주입받습니다.</b> <code>calculate()</code>
+        안에서 <code>date.today()</code>를 직접 부르면, 테스트가 실행되는
+        <b>그날그날</b>에 따라 통과하거나 실패합니다 — 7월에 짠 테스트가
+        1월에는 다르게 동작합니다. 도메인 서비스는 <b>같은 입력이면 항상
+        같은 출력</b>이어야 합니다(화면 6의 판별 질문 ③).</li>
       </ol>
       <p><b>흔히 이렇게도 풀지만 — </b> 이 클래스 안에 직접
       <code>if grade.free_shipping or date.today().month in (6,7,8):</code>처럼
