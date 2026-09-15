@@ -12,7 +12,7 @@
     { id: 'ch02', num: '2장', title: '도메인 모델의 최소 단위: Entity와 Value Object', part: '전술적 설계', screens: 14, hours: 2.5, ready: true },
     { id: 'ch03', num: '3장', title: 'Aggregate: 불변식을 지키는 경계', part: '전술적 설계', screens: 16, hours: 3.0, ready: true },
     { id: 'ch04', num: '4장', title: 'Repository: 도메인에서 DB를 밀어내기', part: '전술적 설계', screens: 12, hours: 2.5, ready: true },
-    { id: 'ch05', num: '5장', title: 'Application Service와 계층 구조', part: '전술적 설계', screens: 13, hours: 2.5 },
+    { id: 'ch05', num: '5장', title: 'Application Service와 계층 구조', part: '전술적 설계', screens: 13, hours: 2.5, ready: true },
     { id: 'ch06', num: '6장', title: 'Domain Service, Factory, 그리고 스냅샷', part: '전술적 설계', screens: 12, hours: 2.5 },
     { id: 'ch07', num: '7장', title: 'Domain Event: 애그리게이트 사이를 잇기', part: '전술적 설계', screens: 13, hours: 2.5 },
     { id: 'ch08', num: '8장', title: '유비쿼터스 언어: 코드와 대화가 같은 말을 쓸 때', part: '전략적 설계', screens: 9, hours: 1.5 },
@@ -54,7 +54,9 @@
     invariantset: '불변식 — 언제 확인해도 참이어야 하는 규칙. 이 교재는 기획 단계에서 번호를 붙여 I1~I22로 관리한다.',
     repository: '리포지토리 — 애그리게이트를 저장하고 꺼내는 인터페이스. 도메인은 이 인터페이스만 알고, 실제 DB 접근 코드는 이 인터페이스를 구현한 클래스 안에 있다.',
     persignorance: '영속성 무지 — 도메인 객체가 자신이 어떻게 저장되는지(DB인지 메모리인지) 전혀 모르는 상태. 리포지토리 패턴이 만들어 주는 성질이다.',
-    dip: '의존성 역전 원칙(DIP) — 도메인(상위 정책)이 인프라(하위 구현)에 의존하는 대신, 인프라가 도메인이 정의한 인터페이스를 향해 의존하도록 방향을 뒤집는 원칙.'
+    dip: '의존성 역전 원칙(DIP) — 도메인(상위 정책)이 인프라(하위 구현)에 의존하는 대신, 인프라가 도메인이 정의한 인터페이스를 향해 의존하도록 방향을 뒤집는 원칙.',
+    uow: 'Unit of Work — 한 유스케이스 안에서 여러 애그리게이트에 걸친 변경을 하나의 트랜잭션으로 묶어, 전부 반영되거나 전부 반영되지 않게 만드는 장치.',
+    dto: 'DTO(Data Transfer Object) — 행동이 없는, 계층 경계를 넘나들 때 쓰는 데이터 뭉치. 도메인 객체를 그대로 내보내지 않기 위해 쓴다.'
   };
 
   var STORE_KEY = 'ddd-book:progress';

@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="ko" data-chapter="ch05">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>5장 · Application Service와 계층 구조 — 도메인 주도 설계 첫걸음</title>
+<link rel="stylesheet" href="assets/book.css">
+</head>
+<body>
+
+<main id="book"><div class="inner">
+
+<!-- ─────────────────────────────────────────── 화면 1 -->
+<section class="screen" data-title="이 장에서 할 일">
+  <p class="kicker">5장 · 화면 1</p>
+  <h1>Application Service<br>계층 구조와 유스케이스 조립</h1>
+
+  <p class="lead">4장에서 <code>OrderRepository</code>와 <code>InventoryRepository</code>를
+  만들었습니다. 그런데 아직 아무도 이 둘을 <b>동시에</b> 열지 않습니다. 주문 하나를 만들려면
+  카탈로그에서 가격을 묻고, 회원 등급을 묻고, 재고를 할당하고, 두 애그리게이트를 저장한 뒤
+  트랜잭션을 커밋해야 합니다. 이 장은 그 <b>조립</b>을 맡을 자리를 만듭니다.</p>
+
+  <p>3장 화면 14가 남긴 질문 — "이 조립 코드는 지금 어느 클래스에도 들어 있지 않다.
+  그럼 누가 하나?" — 에 이 장이 답합니다.</p>
+
+  <div class="box note">
+    <p class="box-t">이 장의 지도</p>
+    <ul>
+      <li><b>화면 2~3 · 문제와 계층.</b> 표현 계층이 조립까지 떠맡을 때 벌어지는 일,
+      그리고 도메인·응용·인프라·표현 네 계층과 의존 방향의 규칙.</li>
+      <li><b>화면 4~6 · 트랜잭션 경계.</b>
+      <span class="term" data-term="uow">Unit of Work</span>를 정의하고 구현하고,
+      커밋을 잊거나 중간에 실패하면 무슨 일이 일어나는지 봅니다.</li>
+      <li><b>화면 7~9 · 경계 넘기.</b> 커맨드로 입력을 받고
+      <span class="term" data-term="dto">DTO</span>로 출력을 내보내고, 카탈로그·회원·배송
+      컨텍스트에 값을 묻습니다.</li>
+      <li><b>화면 10~12 · 조립과 한계.</b> <code>place_order()</code>를 완성하고,
+      이 설계의 약점과 <code>cancel_order()</code>·표현 계층 연결까지 봅니다.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 2 -->
+<section class="screen" data-title="누가 두 리포지토리를 여는가">
+  <p class="kicker">5장 · 화면 2</p>
+  <h2>표현 계층이 조립까지 떠맡으면</h2>
+
+  <p>4장에서 만든 리포지토리를 실제로 써야 합니다. 가장 빠른 방법은 HTTP 요청을 받는
+  함수 안에서 바로 쓰는 것입니다.</p>
+
+<pre><span class="cap"># web/views.py — 하지 않는다</span><code>def place_order_view(request):
+    session = Session()
+    order_repo = SqlAlchemyOrderRepository(session)
+    inventory_repo = SqlAlchemyInventoryRepository(session)
+
+    data = json.loads(request.body)
+    order = Order(order_repo.next_order_number(date.today()),
+                  request.user.id, Address(**data["address"]))
+    for item in data["items"]:
+        product = CatalogModel.objects.get(sku=item["sku"])        # 1
+        order.add_line(item["sku"], product.name,
+                       Money.won(product.price), Quantity(item["qty"]))
+        inventory_repo.get(item["sku"]).allocate(item["qty"], date.today())   # 2
+
+    order_repo.add(order)
+    session.commit()                                                # 3
+    return JsonResponse({"order_number": order.order_number.value})
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">10행</span> 뷰 함수가 카탈로그 조회 방법을 <b>직접</b> 압니다.
+    <code>CatalogModel</code>이 우리 DB의 테이블인지, 다른 팀의 서비스인지도 여기서만
+    알 수 있습니다.</li>
+
+    <li><span class="ln">13행</span> <code>SqlAlchemyOrderRepository</code>와
+    <code>SqlAlchemyInventoryRepository</code>를 <b>표현 계층이 직접 조립</b>합니다.
+    4장에서 도메인 밖으로 밀어낸 인프라 지식(세션, 구체적인 구현 클래스 이름)이
+    한 층 위에서 그대로 새어 들어왔습니다.</li>
+
+    <li><span class="ln">16행</span> 이 커밋이 실패하면 무슨 일이 일어날까요?
+    <code>inventory_repo.get(...).allocate(...)</code>는 이미 실행돼 배치의
+    <code>reserved</code>가 늘어난 채입니다. 4장 화면 2가 경고한 문제 —
+    "상태와 저장된 값이 어긋날 수 있다" — 가 두 애그리게이트로 규모만 커져 돌아왔습니다.
+    이 문제는 화면 6에서 정면으로 다룹니다.</li>
+  </ol>
+
+  <div class="box bad">
+    <p class="box-t">이 함수를 테스트하려면</p>
+    <p><code>request</code> 객체 전체, JSON 본문 형식, 진짜 DB 세션,
+    <code>CatalogModel</code>이 어디서 응답하는지까지 다 갖춰야 합니다.
+    <b>1장 화면 13의 통증 3번이 형태를 바꿔 다시 나타났습니다.</b> 4장이 리포지토리로
+    한 번 없앤 문제인데, 이번엔 리포지토리 <i>자체</i>가 아니라 그것을 조립하는 코드가
+    문제입니다.</p>
+  </div>
+
+  <p>더 근본적인 문제는 <b>이름</b>입니다. <code>place_order_view</code>가 실제로 하는 일은
+  "HTTP 요청을 처리하는 것"이 아니라 "<b>주문하기 유스케이스를 조립하는 것</b>"입니다.
+  서로 다른 두 책임이 한 함수 안에 있습니다. 이 둘을 가르는 것이 <b>계층</b>입니다.</p>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 3 -->
+<section class="screen" data-title="계층 구조와 의존 방향">
+  <p class="kicker">5장 · 화면 3</p>
+  <h2>네 계층과 의존 방향</h2>
+
+  <p>1장 화면 17의 마지막 퀴즈 해설이 이미 이 문장을 예고했습니다 — "계층 구조(5장)는
+  규칙을 지키는 통로가 기술 코드에 오염되지 않게 지킨다." 그 계층을 지금 정의합니다.</p>
+
+  <figure class="fig">
+    <svg viewBox="0 0 700 200" role="img" aria-label="표현, 응용, 도메인, 인프라 네 계층과 의존 방향">
+      <g class="svg-line" stroke-width="1.3">
+        <rect x="20"  y="50"  width="150" height="46" rx="9"/>
+        <rect x="230" y="50"  width="150" height="46" rx="9"/>
+        <rect x="440" y="50"  width="150" height="46" rx="9"/>
+        <rect x="440" y="140" width="150" height="46" rx="9" stroke-dasharray="5 3"/>
+      </g>
+      <g text-anchor="middle" font-size="12" font-weight="700" class="svg-fg">
+        <text x="95"  y="78">표현</text>
+        <text x="305" y="78">응용</text>
+        <text x="515" y="78">도메인</text>
+      </g>
+      <g text-anchor="middle" font-size="12" class="svg-fg">
+        <text x="515" y="168">인프라</text>
+      </g>
+      <g class="svg-muted" stroke="currentColor" stroke-width="1.4" fill="none">
+        <path d="M170 73 H226"/>
+        <path d="M380 73 H436"/>
+        <path d="M515 140 V100"/>
+      </g>
+      <g class="svg-muted" stroke="none">
+        <path d="M222 69 l4 4 -4 4 z"/>
+        <path d="M432 69 l4 4 -4 4 z"/>
+        <path d="M511 104 l4 -7 4 7 z"/>
+      </g>
+      <g text-anchor="middle" font-size="9.5" class="svg-muted">
+        <text x="198" y="65">의존</text>
+        <text x="408" y="65">의존</text>
+        <text x="560" y="120">Protocol 구현</text>
+      </g>
+    </svg>
+    <figcaption>표현은 응용을, 응용은 도메인을 의존합니다(화살표 = 의존 방향). 인프라는
+    반대로 도메인이 정의한 인터페이스를 구현합니다(4장의 의존성 역전) — 그래서 화살표가
+    아래에서 위로 향합니다. 도메인은 어느 쪽도 의존하지 않습니다.</figcaption>
+  </figure>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:5rem">계층</th><th>책임</th><th>이 장 기준 담당 클래스</th></tr>
+      <tr><td><b>표현</b></td><td>요청 파싱, 인증, 커맨드로 변환, 응답 직렬화</td>
+        <td><code>place_order_view</code>(얇아야 한다)</td></tr>
+      <tr><td><b>응용</b></td><td>유스케이스 조합, 트랜잭션 경계, 포트 호출 순서 결정</td>
+        <td><code>OrderingService</code></td></tr>
+      <tr><td><b>도메인</b></td><td>업무 규칙(불변식)</td>
+        <td><code>Order</code>, <code>InventoryItem</code></td></tr>
+      <tr><td><b>인프라</b></td><td>DB·외부 컨텍스트 접근, 포트 구현</td>
+        <td><code>SqlAlchemyOrderRepository</code></td></tr>
+    </table>
+  </div>
+
+  <div class="box note">
+    <p class="box-t">응용 서비스는 규칙을 갖지 않는다</p>
+    <p>1장 화면 16에서 이미 이 문장을 스쳐 지나갔습니다 — <i>"응용 서비스 — 유스케이스를
+    조립할 뿐, 규칙은 갖지 않는다."</i> 화면 2의 코드가 문제였던 이유를 이 문장으로
+    다시 말할 수 있습니다: <b>규칙(카탈로그 조회 방법, 커밋 시점)이 응용도 아니고 도메인도
+    아닌, 표현 계층에 있었습니다.</b> 이 장에서 그 문장의 의미를 실제 코드로 만듭니다.</p>
+  </div>
+
+  <p>화면 2의 문제를 이 표로 다시 보면, 문제는 명확합니다 — <b>모든 코드가 표현 계층
+  하나에 있었습니다.</b> <code>Order.add_line()</code>과
+  <code>InventoryItem.allocate()</code>만 제자리(도메인)에 있었고, 나머지 전부가
+  뷰 함수 안에 뒤섞여 있었습니다.</p>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 4 -->
+<section class="screen" data-title="트랜잭션 경계와 Unit of Work">
+  <p class="kicker">5장 · 화면 4</p>
+  <h2>트랜잭션 경계는 응용 계층에</h2>
+
+  <p>유스케이스 하나는 <b>트랜잭션 하나</b>여야 합니다. 주문 저장과 재고 할당은 둘 다
+  성공하거나 둘 다 실패해야지, 하나만 반영되면 안 됩니다. 그런데 이 "하나로 묶기"는
+  누구의 일일까요?</p>
+
+  <ul>
+    <li><b>도메인이 할 수 없습니다.</b> <code>Order</code>는 <code>InventoryItem</code>의
+    존재조차 모릅니다(3장의 규칙입니다).</li>
+    <li><b>리포지토리도 할 수 없습니다.</b> <code>OrderRepository</code>는 주문만,
+    <code>InventoryRepository</code>는 재고만 압니다. 4장의 인터페이스 어디에도
+    "둘을 묶어라"는 메서드가 없습니다.</li>
+  </ul>
+
+  <p>남는 곳은 <b>응용 계층</b>뿐입니다. 이 경계를 표현하는 장치에 이름이 있습니다 —
+  <b><span class="term" data-term="uow">Unit of Work</span></b>(UoW)입니다.</p>
+
+<pre><span class="cap"># application/unit_of_work.py</span><code>class UnitOfWork(Protocol):
+    orders: OrderRepository
+    inventory: InventoryRepository
+
+    def __enter__(self) -&gt; "UnitOfWork": ...
+    def __exit__(self, *args: object) -&gt; None: ...   # 1
+    def commit(self) -&gt; None: ...
+    def rollback(self) -&gt; None: ...
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">2~3행</span> 화면 2의 코드가 흩어놓았던 두 리포지토리가
+    <b>한 객체 안에</b> 모입니다. 응용 서비스는 이제 <code>uow.orders</code>와
+    <code>uow.inventory</code>로 <b>같은 트랜잭션 안에서</b> 두 애그리게이트에
+    접근합니다.</li>
+
+    <li><span class="ln">6행</span> <code>__enter__</code>/<code>__exit__</code>는 파이썬의
+    <b>컨텍스트 매니저</b> 프로토콜입니다. 이 둘을 구현하면 <code>with uow:</code> 문을
+    쓸 수 있습니다. <code>__exit__</code>가 받는 세 인자(예외 타입·값·트레이스백)는
+    블록 안에서 <b>예외가 났는지</b> 알려 줍니다. 화면 6에서 이 값을 씁니다.</li>
+  </ol>
+
+  <div class="box warn">
+    <p class="box-t">경계 안에는 무엇을 두는가 — 1장 화면 8을 기억하시나요</p>
+    <p>1장 화면 8에서 본 사고를 떠올려 보세요 — PG 승인 호출이 DB 트랜잭션 <b>안에서</b>
+    일어나서, 트랜잭션이 3초 동안 붙잡혀 있었고, 승인이 성공한 뒤 우리 DB가 실패하면
+    <b>롤백이 카드 결제까지 되돌리지 못했습니다.</b></p>
+    <p>같은 원리로 규칙을 하나 세웁니다 — <b><code>with uow:</code> 블록 안에는 우리 DB에
+    대한 작업만 둔다.</b> 카탈로그·회원처럼 다른 컨텍스트에 값을 묻는 호출은 트랜잭션을
+    <b>열기 전에</b> 끝냅니다. 오래 걸리거나 실패해도, 아직 시작하지 않은 트랜잭션은
+    되돌릴 것이 없습니다. 화면 10에서 이 규칙을 실제 코드로 지킵니다.</p>
+  </div>
+
+  <p>이 <code>Protocol</code>은 도메인이 아니라 <b>응용 계층</b>에 둡니다. 트랜잭션이라는
+  개념 자체가 업무 규칙이 아니라, 화면 3에서 정한 응용 계층의 책임이기 때문입니다.</p>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 5 -->
+<section class="screen" data-title="Unit of Work 구현하기">
+  <p class="kicker">5장 · 화면 5</p>
+  <h2>Unit of Work 구현하기</h2>
+
+  <p>인터페이스를 두 가지로 구현합니다. 4장과 같은 순서입니다 — 메모리로 규칙을 익히고,
+  SQLAlchemy로 진짜 트랜잭션을 겁니다.</p>
+
+  <div class="tabs">
+    <div class="tab" data-label="메모리 구현">
+<pre><span class="cap"># infra/memory_uow.py</span><code>class InMemoryUnitOfWork:
+    def __init__(self) -&gt; None:
+        self.orders = InMemoryOrderRepository()
+        self.inventory = InMemoryInventoryRepository()
+        self.committed = False
+
+    def __enter__(self) -&gt; "InMemoryUnitOfWork":
+        return self
+
+    def __exit__(self, *args: object) -&gt; None:
+        pass
+
+    def commit(self) -&gt; None:
+        self.committed = True
+
+    def rollback(self) -&gt; None:
+        pass
+</code></pre>
+    </div>
+    <div class="tab" data-label="SQLAlchemy 구현">
+<pre><span class="cap"># infra/sqlalchemy_uow.py</span><code>class SqlAlchemyUnitOfWork:
+    def __init__(self, session_factory: Callable[[], Session]) -&gt; None:
+        self._session_factory = session_factory
+
+    def __enter__(self) -&gt; "SqlAlchemyUnitOfWork":
+        self.session = self._session_factory()               # 1
+        self.orders = SqlAlchemyOrderRepository(self.session)
+        self.inventory = SqlAlchemyInventoryRepository(self.session)
+        return self
+
+    def __exit__(self, *args: object) -&gt; None:
+        self.rollback()                                       # 2
+        self.session.close()
+
+    def commit(self) -&gt; None:
+        self.session.commit()                                 # 3
+
+    def rollback(self) -&gt; None:
+        self.session.rollback()
+</code></pre>
+    </div>
+  </div>
+
+  <ol class="notes">
+    <li><span class="ln">(메모리) 5행</span> <code>committed</code> 플래그는 테스트에서
+    "커밋을 실제로 불렀는지" 확인하는 용도입니다. 메모리 저장소는 4장 화면 7에서 봤듯
+    직렬화가 없어서, <code>commit()</code> 자체는 상태에 아무 영향을 주지 않습니다.</li>
+
+    <li><span class="ln">(SQLAlchemy) 6행</span> 세션은 <code>with</code> 블록에 들어갈
+    때마다 새로 만듭니다. 여러 요청이 세션 하나를 공유하면 안 됩니다 — 요청마다
+    독립된 트랜잭션이어야 합니다.</li>
+
+    <li><span class="ln">(SQLAlchemy) 12행</span> <b>블록을 나갈 때 기본값은
+    롤백입니다.</b> 커밋을 명시적으로 부르지 않았다면 아무것도 저장되지 않습니다.
+    화면 6에서 이 한 줄이 왜 안전장치인지 봅니다.</li>
+
+    <li><span class="ln">(SQLAlchemy) 16행</span> 4장 화면 7의
+    <span class="later">5장에서 다시 볼 문제</span>가 바로 이것입니다 — <b>Identity
+    Map</b>입니다. <code>session.get()</code>으로 꺼내 온 <code>Order</code>나
+    <code>InventoryItem</code>을 세션이 계속 추적하다가, <code>commit()</code>이 불리는
+    순간 <b>바뀐 속성을 스스로 찾아</b> <code>UPDATE</code> 문을 만듭니다. 이미 있는
+    애그리게이트를 다시 <code>add()</code>할 필요가 없는 이유가 이것입니다 — 세션이
+    이미 그 객체를 알고 있습니다.</li>
+  </ol>
+
+  <div class="box warn">
+    <p class="box-t">정직하게 남겨두는 것 — 메모리 구현의 <code>rollback()</code>은 빈 껍데기다</p>
+    <p><code>InMemoryUnitOfWork.rollback()</code>은 아무것도 되돌리지 못합니다.
+    <code>InMemoryInventoryRepository.get()</code>이 애그리게이트를 <b>직접 참조</b>로
+    돌려주기 때문에(4장 화면 5), <code>allocate()</code>가 이미 바꾼 <code>reserved</code>
+    값은 롤백을 호출해도 그대로 남습니다. 진짜 DB에서는 세션이 커밋 전까지의 변경을 붙잡고
+    있다가 롤백 시 통째로 버리지만, 파이썬 객체 참조에는 그런 장치가 없습니다.</p>
+    <p>그래서 "부분 실패 시 정말 롤백되는가"를 검증하는 테스트는 메모리 구현으로 쓸 수
+    없습니다. 화면 9의 <code>SqlAlchemyUnitOfWork</code>를 쓰는 소수의 통합 테스트로
+    남겨 둡니다(4장 화면 5의 원칙과 같습니다).</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 6 -->
+<section class="screen" data-title="커밋을 잊으면">
+  <p class="kicker">5장 · 화면 6</p>
+  <h2>커밋을 잊으면, 또는 중간에 실패하면</h2>
+
+  <p>4장 화면 2는 원시 <code>sqlite3</code> 코드로 이 문제를 처음 보였습니다 —
+  "<code>conn.commit()</code>이 실패하면 <code>self.status</code>는 이미 바뀌었는데
+  DB는 그대로다." <code>with uow:</code>가 이 문제를 어떻게 다루는지 두 시나리오로
+  확인합니다.</p>
+
+  <h3>시나리오 1 — 취소 도중 커밋이 실패한다면</h3>
+
+<pre><span class="cap"># application/ordering.py — cancel_order() 의 뼈대</span><code>def cancel_order(self, order_number: OrderNumber) -&gt; None:
+    with self._uow as uow:
+        order = uow.orders.get(order_number)
+        order.cancel()                     # 1  메모리 안의 self.status 를 바꾼다
+        uow.commit()                       # 2
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">4행</span> <code>order.cancel()</code>이 <b>메모리 안의</b>
+    <code>status</code>를 바꿉니다. 3장의 <code>Order</code>는 저장 방법을 모르므로
+    이 시점엔 DB가 전혀 바뀌지 않았습니다.</li>
+
+    <li><span class="ln">5행</span> <code>commit()</code>이 실패하면(DB 오류 등)
+    예외가 <code>__exit__</code>로 전달되고 <code>rollback()</code>이 불립니다. DB는
+    안전합니다. <b>다만 이 특정 <code>order</code> 객체는</b> 메모리 안에서 이미
+    <code>취소됨</code> 상태로 남은 채 함수가 예외로 끝납니다.</li>
+  </ol>
+
+  <div class="box good">
+    <p class="box-t">4장의 사고와 다른 점</p>
+    <p>4장 화면 2의 사고는 <b>같은 객체가 다음 요청에서도 계속 쓰였기 때문에</b> 위험했습니다.
+    여기서는 다릅니다 — 이 <code>order</code> 인스턴스는 함수가 끝나면 버려지고,
+    다음 요청은 <code>uow.orders.get()</code>으로 <b>DB에서 다시 읽어옵니다.</b> DB가
+    진실을 담고 있는 한, 메모리에 잠깐 남은 어긋남은 아무에게도 보이지 않습니다.
+    "저장되지 않은 변경은 다음 요청에 영향을 주지 않는다"가 4장 화면 2의 문제에 대한
+    실질적인 답입니다.</p>
+  </div>
+
+  <h3>시나리오 2 — 여러 애그리게이트 중 하나가 실패한다면</h3>
+
+  <p>더 중요한 경우는 <b>주문 한 건이 SKU 두 개를 담고 있을 때</b>입니다.</p>
+
+<pre><span class="cap"># 두 번째 SKU에서 재고가 모자란 경우</span><code>with self._uow as uow:
+    items = uow.inventory.get_many(["SKU-001", "SKU-002"])
+    items["SKU-001"].allocate(3, today)      # 1  성공 — 배치의 reserved 가 늘어난다
+    items["SKU-002"].allocate(100, today)    # 2  InsufficientStock 발생
+    uow.commit()                              # 여기 도달하지 못한다
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">3행</span> <code>SKU-001</code>의 할당은 <b>성공</b>합니다.
+    세션은 이 변경을 추적하기 시작합니다(화면 5의 Identity Map).</li>
+
+    <li><span class="ln">4행</span> <code>SKU-002</code>에서 <code>InsufficientStock</code>이
+    납니다. 예외가 <code>with</code> 블록을 빠져나가며 <code>__exit__</code>를 부르고,
+    <code>rollback()</code>이 실행됩니다. <b>3행에서 이미 성공한
+    <code>SKU-001</code>의 변경까지 함께 버려집니다</b> — <code>commit()</code>을 한
+    번도 부르지 않았으므로 세션에는 아직 아무것도 확정되지 않은 상태였기 때문입니다.</li>
+  </ol>
+
+  <div class="box good">
+    <p class="box-t">이것이 Unit of Work 가 사는 이유</p>
+    <p>두 애그리게이트에 걸친 변경이 <b>전부 반영되거나, 전부 반영되지 않거나</b> 둘 중
+    하나입니다. "SKU-001은 반영됐는데 SKU-002는 실패한" 어중간한 상태는 나오지 않습니다.
+    4장 화면 2가 하나의 애그리게이트로 보여준 문제를, 여기서는 <b>두 애그리게이트로
+    일반화해서 해결</b>했습니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 7 -->
+<section class="screen" data-title="커맨드로 입력 경계 정하기">
+  <p class="kicker">5장 · 화면 7</p>
+  <h2>커맨드로 입력 경계 정하기</h2>
+
+  <p>표현 계층은 원시 데이터(JSON, 폼 값)를 받습니다. 응용 서비스는 이 원시 데이터를
+  그대로 받지 않습니다 — <b>커맨드</b>라는 값 객체로 바꿔서 받습니다.</p>
+
+<pre><span class="cap"># application/commands.py</span><code>@dataclass(frozen=True)
+class OrderItemInput:
+    sku: str
+    quantity: int
+
+
+@dataclass(frozen=True)
+class PlaceOrderCommand:
+    customer_id: UUID
+    items: tuple[OrderItemInput, ...]
+    shipping_address: Address
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">11행</span> <code>Address</code>는 2장에서 만든 값 객체입니다.
+    <code>zipcode</code> 형식 검증이 <b>생성자 안에서 이미 끝났습니다.</b>
+    <code>PlaceOrderCommand</code>가 존재한다는 사실 자체가 "이 주소는 형식을 통과했다"는
+    증명서입니다 — 2장 화면 8에서 본 그 원리 그대로입니다.</li>
+  </ol>
+
+  <p>이 커맨드는 표현 계층이 만듭니다. 원시 JSON을 값 객체로 바꾸는 지점이 바로
+  <b>2장 화면 8이 예고한 "시스템 경계 한 곳"</b>입니다.</p>
+
+<pre><span class="cap"># web/parsing.py</span><code>def parse_place_order_command(data: dict) -&gt; PlaceOrderCommand:
+    return PlaceOrderCommand(
+        customer_id=UUID(data["customer_id"]),
+        items=tuple(OrderItemInput(i["sku"], i["quantity"])
+                    for i in data["items"]),
+        shipping_address=Address(**data["address"]))   # 1
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">6행</span> <code>Address(**data["address"])</code>가
+    실패하면(예: <code>zipcode</code>가 5자리가 아니면) <b>여기서 바로</b> 예외가 납니다.
+    표현 계층이 이 예외를 잡아 "잘못된 요청"으로 응답하면, 그 뒤(응용·도메인) 코드는
+    <b>항상 유효한 값만 받는다고 믿고</b> 짤 수 있습니다. 방어적 검사를 응용 서비스
+    안에서 반복할 필요가 없습니다.</li>
+  </ol>
+
+  <div class="box note">
+    <p class="box-t">왜 등급을 커맨드에 넣지 않는가</p>
+    <p><code>PlaceOrderCommand</code>에 <code>grade</code> 필드가 없습니다. 등급은
+    클라이언트가 "저는 골드 회원입니다"라고 <b>주장할 값이 아니라</b>, 회원 컨텍스트에
+    <b>물어봐야 할</b> 값이기 때문입니다. 화면 9에서 <code>MembershipPort</code>로
+    묻습니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 8 -->
+<section class="screen" data-title="DTO로 출력 경계 정하기">
+  <p class="kicker">5장 · 화면 8</p>
+  <h2>DTO로 출력 경계 정하기</h2>
+
+  <p>반대 방향도 있습니다. 응용 서비스가 <code>Order</code> 객체를 <b>그대로</b> 표현
+  계층에 돌려주면 어떻게 될까요?</p>
+
+  <div class="box warn">
+    <p class="box-t"><code>Order</code>를 그대로 내보내면 안 되는 이유</p>
+    <ul>
+      <li><code>Order.lines</code>는 내부 엔티티 <code>OrderLine</code>의 튜플입니다.
+      이걸 JSON으로 직렬화하려는 순간, <b>표현 계층이 도메인 내부 구조를 알아야</b>
+      합니다.</li>
+      <li>3장에서 <code>Order</code>에 필드를 하나 추가하면(예: 6장의 <code>events</code>)
+      직렬화 코드가 <b>덩달아 깨집니다.</b> 도메인 모델과 API 응답 형식이 같은 속도로
+      바뀔 이유가 없습니다.</li>
+      <li>3장 화면 5가 이미 경고했습니다 — "화면에 뿌릴 데이터는 4장의 리포지토리와
+      5장의 DTO가 따로 담당합니다." 애그리게이트는 <b>쓰기 단위</b>이지 <b>화면 단위</b>가
+      아닙니다.</li>
+    </ul>
+  </div>
+
+  <p>그래서 응용 서비스는 <b><span class="term" data-term="dto">DTO</span></b>(Data
+  Transfer Object) — 행동이 없는, 화면이 필요로 하는 모양 그대로의 데이터 뭉치 — 를
+  따로 만들어 돌려줍니다.</p>
+
+<pre><span class="cap"># application/dto.py</span><code>@dataclass(frozen=True)
+class OrderSummary:
+    order_number: str
+    status: str
+    total_amount: int
+    line_count: int
+
+
+def to_summary(order: Order) -&gt; OrderSummary:
+    return OrderSummary(
+        order_number=order.order_number.value,
+        status=order.status.name,                  # 1
+        total_amount=int(order.total_amount.amount),
+        line_count=len(order.lines))
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">12행</span> <code>OrderStatus</code>는 <code>Enum</code>이라
+    JSON으로 직렬화할 수 없습니다. <code>.name</code>으로 문자열("결제완료")로 바꿔서
+    내보냅니다 — 이 변환이 일어나는 곳이 DTO 조립 지점입니다.</li>
+  </ol>
+
+  <p>3장 화면 16의 마지막 퀴즈를 기억하시나요 — "주문 화면에 회원 이름을 보여줘야 한다"는
+  요구였습니다. 그 해설이 예고한 첫 번째 방법이 바로 이것입니다 — <b>"응용 서비스가 두
+  리포지토리에서 각각 읽어 DTO로 조립한다."</b></p>
+
+<pre><span class="cap"># 3장 화면 16의 요구를 실제로 풀면</span><code>def get_order_detail(self, order_number: OrderNumber) -&gt; "OrderDetail":
+    order = self._uow.orders.get(order_number)            # 1  주문 컨텍스트
+    name = self._members.name_of(order.customer_id)        # 2  회원 컨텍스트
+    return OrderDetail(order_number=order.order_number.value,
+                        customer_name=name,
+                        total_amount=int(order.total_amount.amount))
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">2~3행</span> 두 컨텍스트에서 각각 읽어 <b>DTO 하나로 합칩니다.</b>
+    <code>Order</code>는 여전히 회원 이름을 모릅니다 — 그 값은 DTO를 조립하는 이
+    코드만 압니다. 애그리게이트의 경계는 그대로 지켜지면서, 화면이 필요로 하는 모양은
+    자유롭게 만들 수 있습니다.</li>
+  </ol>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 9 -->
+<section class="screen" data-title="다른 컨텍스트에 묻기">
+  <p class="kicker">5장 · 화면 9</p>
+  <h2>다른 컨텍스트에 묻기 — 포트 세 개</h2>
+
+  <p>4장에서 리포지토리를 만들 때 쓴 논리를 그대로 씁니다 — <b>인터페이스는 그것을
+  쓰는 쪽(도메인·응용)이 정의</b>하고, 구현은 인프라가 그 인터페이스를 향해 만듭니다.
+  차이는 이번엔 반대편이 DB가 아니라 <b>다른 컨텍스트</b>라는 것입니다.</p>
+
+<pre><span class="cap"># application/ports.py</span><code>@dataclass(frozen=True)
+class OrderItemSnapshot:            # 카탈로그에서 복사해 온 값 (I6)
+    sku: str
+    product_name: str
+    unit_price: Money
+    quantity: Quantity
+
+
+class CatalogPort(Protocol):
+    def snapshot(
+        self, items: Sequence[OrderItemInput],
+    ) -&gt; Sequence[OrderItemSnapshot]: ...            # 1
+
+
+class MembershipPort(Protocol):
+    def grade_of(self, customer_id: UUID) -&gt; MemberGrade: ...
+
+
+class ShippingPolicy(Protocol):
+    lead_time: timedelta                              # 2
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">9~12행</span> <b>목록 단위</b>입니다. 4장 화면 4에서
+    <code>InventoryRepository.get_many</code>를 만든 이유와 같습니다 — 라인이 5개인
+    주문이 카탈로그를 5번 왕복하면 안 됩니다.</li>
+
+    <li><span class="ln">20행</span> 3장 화면 14가 못박은 값입니다 — "배송 리드타임은
+    배송 컨텍스트의 것이므로 상수로 박지 않고 정책 객체로 받는다." 지금 이 값을 쓰는 곳은
+    <code>lead_time</code> 하나뿐이라 어색해 보일 수 있지만, 상수 하나를 하드코딩하는
+    순간 배송 정책이 바뀔 때마다 <code>domain/</code>이나 <code>application/</code>
+    코드를 고쳐야 합니다.</li>
+  </ol>
+
+  <div class="box note">
+    <p class="box-t">이 포트는 5장에서만 이 모양이다</p>
+    <p><code>ShippingPolicy</code>는 지금 <code>OrderingService</code>의 생성자로
+    직접 주입됩니다. 7장에서 재고 할당이 이벤트 핸들러로 옮겨가면, <code>lead_time</code>이
+    필요한 코드도 함께 옮겨가면서 이 의존성은 <code>OrderingService</code>에서
+    빠집니다. 지금은 아직 이벤트가 없으므로(7장의 주제) 응용 서비스가 직접 갖고
+    있습니다.</p>
+  </div>
+
+  <p>세 포트 모두 지금은 우리 코드베이스 안의 클래스가 구현합니다. 10장에서 카탈로그가
+  진짜 다른 프로세스로 분리되면, 이 인터페이스는 그대로 두고 구현만 HTTP 클라이언트로
+  바뀝니다(<b>ACL</b> — 부패 방지 계층 — 로 확장됩니다).</p>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 10 -->
+<section class="screen" data-title="place_order() 조립하기">
+  <p class="kicker">5장 · 화면 10</p>
+  <h2><code>place_order()</code> 조립하기</h2>
+
+  <p>3장 화면 14가 남긴 그 조립 코드입니다 — 재고를 할당하고, 그 결과를 주문에 약속으로
+  적어 넣는 코드입니다. 그때는 REPL에 친 예시였고, 이제 진짜 자리를 찾습니다.</p>
+
+<pre><span class="cap"># application/ordering.py</span><code>class OrderingService:
+    def __init__(self, uow: UnitOfWork, catalog: CatalogPort,
+                 members: MembershipPort, shipping: ShippingPolicy) -&gt; None:
+        self._uow = uow
+        self._catalog = catalog
+        self._members = members
+        self._shipping = shipping
+
+    def place_order(self, cmd: PlaceOrderCommand) -&gt; OrderNumber:
+        snapshots = self._catalog.snapshot(cmd.items)              # 1
+        grade = self._members.grade_of(cmd.customer_id)
+
+        with self._uow as uow:
+            order = Order(uow.orders.next_order_number(date.today()),
+                          cmd.customer_id, cmd.shipping_address)
+            for s in snapshots:
+                order.add_line(s.sku, s.product_name, s.unit_price, s.quantity)
+
+            order.discount = order.amounts.subtotal.percent(        # 2
+                grade.discount_rate)
+            order.shipping_fee = (Money.won(0) if grade.free_shipping
+                                   else Money.won(3_000))            # 3
+
+            items = uow.inventory.get_many([l.sku for l in order.lines])  # 4
+            allocations = [items[l.sku].allocate(l.quantity.value, date.today())
+                           for l in order.lines]
+            order.allocation = _merge(allocations)                  # 5
+            order.promise_delivery(Promise(
+                ship_on=order.allocation.ready_on,
+                arrive_by=order.allocation.ready_on + self._shipping.lead_time,
+                promised_at=datetime.now()))
+
+            uow.orders.add(order)
+            uow.commit()
+            return order.order_number
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">10~11행</span> <b>트랜잭션을 열기 전에</b> 다른 컨텍스트에
+    묻습니다. 화면 4의 규칙 그대로입니다 — 카탈로그나 회원 컨텍스트가 느리거나 실패해도,
+    아직 시작하지 않은 <code>uow</code> 블록은 되돌릴 것이 없습니다.</li>
+
+    <li><span class="ln">19~22행</span> 등급별 할인율과 배송비를 <b>응용 서비스가
+    직접 계산합니다.</b> 지금은 동작하지만, 이건 업무 규칙입니다 — 화면 11에서 이
+    문제로 다시 돌아옵니다. <span class="later">6장에서 다시 볼 문제</span></li>
+
+    <li><span class="ln">24행</span> <code>get_many</code>로 <b>한 번에</b> 필요한
+    재고 애그리게이트를 가져옵니다(4장 화면 4). 라인마다 <code>get()</code>을 부르지
+    않습니다.</li>
+
+    <li><span class="ln">27행</span> <code>allocate()</code>는 SKU 하나(=재고 애그리게이트
+    하나)에 대한 결과만 돌려줍니다. 라인이 여러 SKU에 걸치면 <code>Allocation</code>이
+    여러 개 나오는데, <code>Order.allocation</code>은 하나뿐입니다. 이걸 합치는 함수가
+    필요합니다.</li>
+  </ol>
+
+<pre><span class="cap"># application/ordering.py — 여러 SKU의 할당을 하나로</span><code>def _merge(allocations: Sequence[Allocation]) -&gt; Allocation:
+    lines = tuple(l for a in allocations for l in a.lines)      # 1
+    ready_on = max(a.ready_on for a in allocations)              # 2
+    return Allocation(lines=lines, ready_on=ready_on)
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">2행</span> <code>AllocationLine</code>은 3장 화면 14의
+    불변 값 객체입니다. 여러 <code>Allocation</code>에서 나온 라인을 <b>이어붙이기만
+    해도</b> 안전합니다 — 값 객체는 조합해도 값 객체입니다.</li>
+
+    <li><span class="ln">3행</span> I21 — 분할 출고를 하지 않으므로, 가장 늦게 준비되는
+    SKU의 날짜가 <b>주문 전체의 출고일</b>입니다.</li>
+  </ol>
+
+  <div class="box good">
+    <p class="box-t">3장이 남긴 두 개의 빚 — 갚았습니다</p>
+    <p>3장 화면 14: "이 조립 코드는 지금 어느 클래스에도 없다." — <code>place_order()</code>가
+    그 자리입니다. 3장 화면 15의 표: "5장 — 화면 14의 조립 코드가 살 곳. 트랜잭션 경계."
+    — 위 코드와 <code>with self._uow:</code>가 그 답입니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 11 -->
+<section class="screen" data-title="다시 뚱뚱해지는 응용 서비스">
+  <p class="kicker">5장 · 화면 11</p>
+  <h2>반대 의견 — "이거 1장에서 본 그 함수 아닌가요?"</h2>
+
+  <div class="dialog">
+    <div class="line"><div class="who">팀원</div><div class="say">
+      <p><code>place_order()</code>가 30줄이 넘습니다. 할인 계산, 배송비 계산, 할당
+      루프, 병합, 약속일 계산까지 — 이거 1장에서 본 그 뚱뚱한 함수 아닌가요?</p></div></div>
+  </div>
+
+  <p>날카로운 지적입니다. 다만 <b>모든 줄이 같은 이유로 문제인 것은 아닙니다.</b> 판별
+  질문은 하나입니다 — <b>이 코드가 업무 규칙을 담고 있는가, 아니면 순서를 정할 뿐인가?</b></p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:16rem"><code>place_order()</code> 안의 코드</th>
+        <th>성격</th><th>있어야 할 곳</th></tr>
+      <tr><td><code>order.discount = ...percent(grade.discount_rate)</code></td>
+        <td>업무 규칙(등급별 할인율)</td><td>도메인 서비스(6장)</td></tr>
+      <tr><td><code>order.shipping_fee = 0 또는 3,000원</code></td>
+        <td>업무 규칙(배송비 산정)</td><td>도메인 서비스(6장)</td></tr>
+      <tr><td><code>get_many</code> → <code>allocate</code> 반복 → <code>_merge</code></td>
+        <td>순서 조합(누구를 부르고 결과를 어떻게 합칠지)</td><td>응용 계층(그대로)</td></tr>
+      <tr><td><code>with uow: ... uow.commit()</code></td>
+        <td>트랜잭션 경계</td><td>응용 계층(그대로)</td></tr>
+    </table>
+  </div>
+
+  <div class="box note">
+    <p class="box-t">판별 기준</p>
+    <p>규칙이 <code>if</code>/<code>else</code>로 "얼마를 할인할지, 얼마를 받을지"를
+    <b>결정</b>하면 업무 규칙입니다 — 은수가 "골드는 배송비 무료"를 바꾸면 이 코드도
+    바뀌어야 합니다. 반면 "무엇을 몇 번째로 부르고 결과를 어떻게 조립할지"는 업무
+    규칙이 아니라 <b>조립 방법</b>입니다. 은수는 <code>get_many</code>를 쓰는지
+    <code>get</code>을 5번 부르는지 관심이 없습니다.</p>
+  </div>
+
+  <p>지금 할인·배송비 계산이 응용 서비스 안에 있는 것 자체가 <b>"규칙이 잘못된 층에
+  있다"는 신호</b>입니다. 1장의 <code>place_order()</code>와 다른 점은, 그때는 <i>모든
+  것</i>이 이 신호를 보이고 있었고, 지금은 <i>두 줄</i>만 그렇다는 것뿐입니다. 6장에서
+  이 두 줄을 <code>ShippingFeePolicy</code>·<code>DiscountPolicy</code>라는 도메인
+  서비스로 뽑아냅니다.</p>
+
+  <h3>이 장이 만든 것, 그리고 남긴 것</h3>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:4rem">갚을 곳</th><th>미룬 것</th></tr>
+      <tr><td><b>6장</b></td><td>할인·배송비 계산이 응용 서비스 안에 있습니다. 어느
+        엔티티에도 넣기 애매한 이 규칙을 도메인 서비스로 뽑아냅니다</td></tr>
+      <tr><td><b>7장</b></td><td>재고 할당이 <code>place_order</code>와 <b>같은
+        트랜잭션</b> 안에 있습니다. 이게 항상 옳은 선택인지, 도메인 이벤트로 쪼개면
+        무엇이 달라지는지</td></tr>
+      <tr><td><b>9장</b></td><td><code>CatalogPort.snapshot</code>이 돌려주는
+        <code>sku</code>가 <code>Product.id</code>와 같다는 전제가 여기서도 그대로
+        쓰입니다</td></tr>
+      <tr><td><b>12장</b></td><td><code>next_order_number</code>의 동시성(4장 화면 11),
+        그리고 <code>with uow:</code> 하나로 항상 충분한지 — 여러 트랜잭션에 걸친
+        작업(사가)이 필요한 경우</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 12 -->
+<section class="screen" data-title="취소하기와 표현 계층">
+  <p class="kicker">5장 · 화면 12</p>
+  <h2>취소하기, 그리고 표현 계층에서 부르기</h2>
+
+  <p><code>cancel_order()</code>는 <code>place_order()</code>보다 짧습니다 — 두
+  애그리게이트를 <b>새로 만들지</b> 않고, 이미 있는 것을 되돌리기만 하면 됩니다.</p>
+
+<pre><span class="cap"># application/ordering.py — OrderingService에 이어서</span><code>    def cancel_order(self, order_number: OrderNumber) -&gt; None:
+        with self._uow as uow:
+            order = uow.orders.get(order_number)
+            order.cancel()                                    # 1  I5 확인
+            if order.allocation is not None:                   # 2
+                for sku in {l.sku for l in order.lines}:
+                    uow.inventory.get(sku).release(order.allocation)
+            uow.commit()
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">4행</span> <code>Order.cancel()</code>이 3장의 규칙(I5 —
+    출고된 주문은 취소 불가)을 확인합니다. 여기 실패하면 <code>AlreadyShipped</code>가
+    나고, <code>uow.commit()</code>까지 가지 않습니다.</li>
+
+    <li><span class="ln">5~7행</span> 재고를 되돌립니다. <code>{l.sku for l in
+    order.lines}</code>로 <b>중복 없이</b> 라인을 돕니다 — 같은 SKU에 두 번
+    <code>release()</code>를 부르면 예약 수량이 실제보다 더 풀립니다. <code>release()</code>는
+    <code>order.allocation</code>(여러 SKU가 합쳐진 값) 전체를 받아, <b>자기 배치에
+    속한 라인만</b> 찾아 되돌립니다 — 나머지는 조용히 무시합니다.</li>
+  </ol>
+
+  <div class="box note">
+    <p class="box-t">7장을 미리 보면 — 지금은 왜 이벤트가 필요 없나</p>
+    <p>4장 화면 11은 "재고가 '주문이 취소됐다'는 사실을 알아야 <code>release()</code>를
+    부를 수 있고, 그 전달 장치가 도메인 이벤트"라고 남겼습니다. 그런데 위 코드는 이벤트
+    없이도 동작합니다 — <code>OrderingService</code>가 <code>uow</code> 하나로 두
+    리포지토리에 <b>이미</b> 접근하고 있기 때문입니다. 7장의 이벤트는 <b>이 방향</b>이
+    아니라 <b>반대 방향</b>의 문제를 풉니다 — "입고가 지연됐다"는 재고 쪽 사건이,
+    이미 약속을 받은 <b>여러 주문</b>에 영향을 줄 때입니다. 재고 애그리게이트는 어느
+    주문이 자기를 기다리는지 모르므로, 그때는 직접 부르기가 불가능합니다.</p>
+  </div>
+
+  <p>이제 표현 계층을 다시 봅니다. 화면 2의 17줄짜리 뷰가 이렇게 줄어듭니다.</p>
+
+<pre><span class="cap"># web/views.py</span><code>def place_order_view(request) -&gt; JsonResponse:
+    cmd = parse_place_order_command(json.loads(request.body))   # 1
+    try:
+        order_number = ordering_service.place_order(cmd)         # 2
+    except DomainError as e:                                     # 3
+        return JsonResponse({"error": str(e)}, status=400)
+    return JsonResponse({"order_number": order_number.value}, status=201)
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">2행</span> 화면 7의 <code>parse_place_order_command</code>가
+    검증까지 끝낸 커맨드를 돌려줍니다.</li>
+
+    <li><span class="ln">4행</span> 응용 서비스 호출 <b>한 줄</b>입니다. 화면 2의
+    나쁜 예는 세션과 두 리포지토리를 직접 만들고 조립까지 했습니다 — 지금은 표현
+    계층이 <code>OrderingService</code>의 존재 말고는 아무것도 모릅니다.</li>
+
+    <li><span class="ln">5행</span> 3장 화면 4가 예고한 그 경계입니다 —
+    <code>except DomainError</code> 한 줄로 "고객에게 사유를 보여줄 오류"를 잡고,
+    나머지(버그, 인프라 장애)는 여기서 잡지 않고 그대로 올려 보냅니다(프레임워크가
+    500으로 처리합니다).</li>
+  </ol>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 13 -->
+<section class="screen" data-title="요약 · 퀴즈 · 과제">
+  <p class="kicker">5장 · 화면 13</p>
+  <h2>5장 마무리</h2>
+
+  <div class="summary">
+    <h3>핵심 요약</h3>
+    <ol>
+      <li>애플리케이션은 <b>표현·응용·도메인·인프라</b> 네 계층으로 나뉩니다.
+      표현→응용→도메인은 의존 방향대로, 인프라는 의존성 역전으로 도메인을 향해
+      의존합니다. <b>응용 서비스는 유스케이스를 조립할 뿐, 업무 규칙을 갖지 않습니다.</b></li>
+      <li><b><span class="term" data-term="uow">Unit of Work</span></b>는 여러
+      애그리게이트에 걸친 변경을 하나의 트랜잭션으로 묶습니다. <code>with uow:</code>
+      블록을 나갈 때 기본값은 롤백이라, 커밋을 잊거나 중간에 실패해도 <b>전부 반영되거나
+      전부 반영되지 않거나</b> 둘 중 하나입니다.</li>
+      <li><b>커맨드</b>는 표현 계층에서 응용 계층으로 들어가는 입력 경계,
+      <b><span class="term" data-term="dto">DTO</span></b>는 응용 계층에서 표현
+      계층으로 나가는 출력 경계입니다. 둘 다 도메인 객체를 그대로 노출하지 않습니다.</li>
+      <li><b>포트</b>(<code>CatalogPort</code>·<code>MembershipPort</code>·
+      <code>ShippingPolicy</code>)는 다른 컨텍스트에 값을 묻는 인터페이스입니다.
+      리포지토리와 같은 원리(인터페이스는 쓰는 쪽이 정의)를 DB가 아니라 다른
+      컨텍스트에 적용한 것입니다.</li>
+      <li>코드가 응용 서비스 안에 있어도 되는지는 <b>"업무 규칙을 담고 있는가, 순서만
+      정하는가"</b>로 판별합니다. 규칙이면 도메인이나 도메인 서비스로 — 지금 응용
+      서비스에 남아 있는 할인·배송비 계산이 6장에서 그렇게 옮겨갑니다.</li>
+    </ol>
+  </div>
+
+  <div class="quiz" data-answer="3">
+    <p class="q">다음 중 <code>OrderingService.place_order()</code> 안에 있어도
+    <b>괜찮은</b> 코드는 무엇일까요?</p>
+    <ol class="options">
+      <li data-why="등급별 할인율을 결정하는 것은 업무 규칙입니다. 도메인 서비스로 가야 합니다(6장).">
+        회원 등급에 따라 할인율을 0%·3%·5%로 나누는 계산</li>
+      <li data-why="배송비를 얼마로 매길지는 업무 규칙입니다. 무료배송 기준이 바뀌면 이 코드도 바뀌어야 하므로 도메인 서비스로 가야 합니다.">
+        주문 금액이 3만 원 미만이면 배송비 3,000원을 매기는 계산</li>
+      <li data-why="맞습니다. '누구를 몇 번째로 부르고 결과를 어떻게 합칠지'는 업무 규칙이 아니라 조립 순서입니다. 응용 계층의 일입니다.">
+        <code>get_many</code>로 재고를 한 번에 조회하고, SKU별 <code>allocate()</code>
+        결과를 하나로 합치는 코드</li>
+      <li data-why="유통기한이 임박한 배치를 먼저 빼는 FEFO는 3장에서 이미 InventoryItem 안으로 들어간 업무 규칙입니다. 응용 서비스가 다시 판단하면 안 됩니다.">
+        유통기한이 3일 미만 남은 배치는 할당에서 제외하는 판단</li>
+    </ol>
+    <div class="explain">
+      <p><b class="lbl">해설</b> 판별 질문은 화면 11과 같습니다 — "업무 담당자가 바꿀
+      수 있는 규칙인가, 아니면 개발자만 아는 조립 순서인가?" 3번만 후자입니다.</p>
+      <p>흥미로운 점은, 이 넷 다 <b>지금 실제로 어딘가에 있다</b>는 것입니다. 1·2번은
+      지금 <code>place_order()</code> 안에 있고(화면 11에서 문제로 짚었습니다), 4번은
+      이미 3장에서 <code>InventoryItem</code> 안에 있습니다. 코드가 도는 것과 코드가
+      제자리에 있는 것은 다른 문제입니다.</p>
+    </div>
+  </div>
+
+  <div class="quiz" data-answer="2">
+    <p class="q"><code>with self._uow as uow:</code> 블록 안에서 SKU 두 개를 차례로
+    할당하다가, 두 번째 SKU에서 <code>InsufficientStock</code>이 났습니다. 첫 번째
+    SKU의 할당(<code>reserved</code> 증가)은 최종적으로 어떻게 될까요? (SQLAlchemy
+    구현 기준)</p>
+    <ol class="options">
+      <li data-why="세션이 아직 commit()되지 않았으므로 DB에는 애초에 반영되지 않았습니다. '반영된 채 남는다'가 아닙니다.">
+        이미 실행됐으므로 DB에 반영된 채로 남는다</li>
+      <li data-why="맞습니다. 예외로 with 블록을 빠져나가면 __exit__가 rollback()을 부르고, commit() 이전의 모든 변경(첫 번째 SKU 포함)이 함께 버려집니다.">
+        예외로 블록을 빠져나가며 <code>rollback()</code>이 호출돼, 첫 번째 SKU의
+        변경까지 함께 버려진다</li>
+      <li data-why="두 번째 SKU만 선택적으로 되돌리는 장치는 없습니다. 트랜잭션은 전부 아니면 전무입니다.">
+        첫 번째 SKU만 반영되고 두 번째 SKU만 취소된다</li>
+      <li data-why="InMemoryUnitOfWork라면 맞는 말이지만(화면 5의 한계), 이 문제는 SQLAlchemy 구현 기준입니다.">
+        메모리 구현과 마찬가지로 아무것도 되돌려지지 않는다</li>
+    </ol>
+    <div class="explain">
+      <p><b class="lbl">해설</b> 이것이 화면 6의 시나리오 2입니다. Unit of Work의
+      핵심 가치는 <b>"몇 개가 성공했든" 커밋 이전에는 전부 임시 상태</b>라는 것입니다.
+      4번 선택지가 함정인 이유는, <b>메모리 구현이었다면 실제로 맞는 말이기 때문</b>입니다
+      — 화면 5의 경고를 놓치면 이 둘을 헷갈리기 쉽습니다.</p>
+    </div>
+  </div>
+
+  <div class="quiz" data-answer="4">
+    <p class="q"><code>place_order_view</code>가 <code>except Exception</code>으로
+    모든 예외를 잡아 <code>{"error": str(e)}</code>로 응답하도록 바꾸자는 제안이
+    나왔습니다. 무엇이 문제일까요?</p>
+    <ol class="options">
+      <li data-why="반대로, 사용자에게 보여줄 오류를 놓치지 않는 것이 아니라 보여주면 안 되는 오류까지 보여주게 됩니다.">
+        문제없다 — 오히려 사용자에게 보여줄 오류를 놓치지 않는다</li>
+      <li data-why="성능과는 관련이 없습니다.">
+        예외 처리 비용이 커져서 성능이 나빠진다</li>
+      <li data-why="DomainError도 파이썬 예외이므로 여전히 잡힙니다. 그건 문제가 아닙니다.">
+        <code>DomainError</code>가 더 이상 잡히지 않게 된다</li>
+      <li data-why="맞습니다. DB 연결 실패나 코드 버그 같은 프로그램 오류까지 '고객에게 보여줄 사유'처럼 그대로 응답에 노출됩니다. 3장 화면 4의 구분이 무너집니다.">
+        DB 연결 실패나 버그로 인한 예외까지 "정상적인 업무 응답"처럼 그대로
+        노출된다</li>
+    </ol>
+    <div class="explain">
+      <p><b class="lbl">해설</b> 3장 화면 4가 <code>DomainError</code>를 만든 이유가
+      정확히 이것입니다 — <b>업무 규칙 위반과 프로그램 버그를 구분</b>하기 위해서였습니다.
+      <code>except Exception</code>은 이 구분을 지워 버립니다. 스택 트레이스나 내부
+      오류 메시지가 그대로 API 응답에 실리면, 보안 문제로도 이어질 수 있습니다.</p>
+      <p>규칙은 간단합니다 — <b>도메인이 이름 붙인 예외만 골라 잡고, 나머지는 그대로
+      올려 보낸다.</b> 무엇을 잡을지 화이트리스트로 정하는 것이, 무엇을 잡을지 모른 채
+      전부 잡는 것보다 안전합니다.</p>
+    </div>
+  </div>
+
+  <div class="task">
+    <h3>직접 해보기</h3>
+    <p><code>OrderingService</code>에 <code>get_order_summary(order_number) -&gt;
+    OrderSummary</code> 메서드를 추가해 보세요. 화면 8의 <code>to_summary()</code>
+    함수를 재사용하면 됩니다.</p>
+    <ul>
+      <li>이 메서드는 무엇을 바꾸나요, 아니면 아무것도 바꾸지 않나요? 그렇다면
+      <code>with self._uow:</code>로 감쌀 필요가 있을까요, 아니면
+      <code>uow.orders.get()</code>만 불러도 될까요?</li>
+      <li>주문이 없는 <code>order_number</code>가 들어오면 무슨 일이 일어나야 할까요?
+      4장에서 만든 어떤 예외가 이미 이 상황을 처리하고 있나요?</li>
+    </ul>
+  </div>
+
+  <details class="fold answer">
+    <summary>모범답안</summary>
+    <div class="fold-body">
+<pre><code>class OrderingService:
+    ...
+    def get_order_summary(self, order_number: OrderNumber) -&gt; OrderSummary:
+        order = self._uow.orders.get(order_number)     # 1
+        return to_summary(order)
+</code></pre>
+      <ol class="notes">
+        <li><span class="ln">3~4행</span> <b><code>with self._uow:</code>로 감싸지
+        않아도 됩니다.</b> 이 메서드는 아무것도 바꾸지 않는 <b>읽기 전용</b> 조회입니다
+        — 트랜잭션 경계는 "변경을 한 단위로 묶기" 위한 것이지, 읽기에는 필요 없습니다.
+        (다만 리포지토리 구현이 세션을 통해서만 <code>get()</code>할 수 있다면, 세션을
+        얻기 위해 <code>with</code>를 쓰는 것 자체는 무방합니다 — 그 안에서
+        <code>commit()</code>을 부르지만 않으면 됩니다.)</li>
+
+        <li><span class="ln">4행</span> 없는 <code>order_number</code>가 들어오면
+        <code>uow.orders.get()</code>이 4장에서 만든 <code>OrderNotFound</code>를
+        던집니다. 이 메서드가 별도로 처리할 필요가 없습니다 — 표현 계층의
+        <code>except DomainError</code>가 이미 잡습니다(화면 12).</li>
+      </ol>
+    </div>
+  </details>
+
+  <div class="box note">
+    <p class="box-t">다음 장 예고</p>
+    <p>화면 11에서 짚은 문제가 남아 있습니다 — 등급별 할인율과 배송비 계산이 아직
+    응용 서비스 안에 있습니다. <code>Order.add_line()</code>이나
+    <code>InventoryItem.allocate()</code>처럼 특정 엔티티 하나에 넣기는 애매하고,
+    그렇다고 응용 서비스에 두면 업무 규칙이 잘못된 층에 남습니다.</p>
+    <p>6장에서 이런 규칙을 위한 자리 — <b>도메인 서비스</b> — 를 만듭니다.
+    <code>Order.place()</code> 팩토리로 생성 로직을 정리하고, "주문은 왜
+    <code>Product</code>를 참조하지 않고 이름·가격을 복사하는가"(스냅샷)도 함께
+    다룹니다.</p>
+  </div>
+
+  <div class="chapter-end">
+    <a href="ch04.html#last"><span>이전 장</span>4장 — Repository: 도메인에서 DB를 밀어내기</a>
+    <a href="index.html"><span>6장은 아직 집필 전입니다</span>표지와 목차로</a>
+  </div>
+</section>
+
+</div></main>
+
+<script src="assets/book.js"></script>
+</body>
+</html>
