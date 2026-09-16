@@ -14,7 +14,7 @@
     { id: 'ch04', num: '4장', title: 'Repository: 도메인에서 DB를 밀어내기', part: '전술적 설계', screens: 12, hours: 2.5, ready: true },
     { id: 'ch05', num: '5장', title: 'Application Service와 계층 구조', part: '전술적 설계', screens: 13, hours: 2.5, ready: true },
     { id: 'ch06', num: '6장', title: 'Domain Service, Factory, 그리고 스냅샷', part: '전술적 설계', screens: 12, hours: 2.5, ready: true },
-    { id: 'ch07', num: '7장', title: 'Domain Event: 애그리게이트 사이를 잇기', part: '전술적 설계', screens: 13, hours: 2.5 },
+    { id: 'ch07', num: '7장', title: 'Domain Event: 애그리게이트 사이를 잇기', part: '전술적 설계', screens: 13, hours: 2.5, ready: true },
     { id: 'ch08', num: '8장', title: '유비쿼터스 언어: 코드와 대화가 같은 말을 쓸 때', part: '전략적 설계', screens: 9, hours: 1.5 },
     { id: 'ch09', num: '9장', title: 'Bounded Context: 하나의 모델은 어디까지 유효한가', part: '전략적 설계', screens: 13, hours: 2.5 },
     { id: 'ch10', num: '10장', title: 'Context Map과 통합 패턴', part: '전략적 설계', screens: 13, hours: 2.5 },
@@ -59,7 +59,9 @@
     dto: 'DTO(Data Transfer Object) — 행동이 없는, 계층 경계를 넘나들 때 쓰는 데이터 뭉치. 도메인 객체를 그대로 내보내지 않기 위해 쓴다.',
     domainservice: '도메인 서비스 — 특정 엔티티나 값 객체 하나에 속한다고 보기 어려운 업무 규칙을 담는, 상태 없는 도메인 계층의 자리. 응용 서비스와 달리 트랜잭션을 열거나 다른 컨텍스트를 조율하지 않는다.',
     factory: '팩토리 — 여러 단계를 거쳐야 완성되는 객체를 한 번의 호출로 항상 유효한 상태로 만들어 돌려주는 생성 지점.',
-    reconstitution: '재구성(reconstitution) — 이미 존재하는 애그리게이트를 저장소에서 그대로 복원하는 것. 새로 만드는 생성과 달리, 생성 시점에만 강제하는 규칙을 다시 적용하지 않는다.'
+    reconstitution: '재구성(reconstitution) — 이미 존재하는 애그리게이트를 저장소에서 그대로 복원하는 것. 새로 만드는 생성과 달리, 생성 시점에만 강제하는 규칙을 다시 적용하지 않는다.',
+    domainevent: '도메인 이벤트 — 애그리게이트 안에서 일어난, 이미 확정된 업무적 사실. 이름은 과거형이고, 구독자는 그 사실을 되돌릴 수 없다.',
+    messagebus: 'MessageBus — 도메인 이벤트를 구독·발행하는 장치. 이벤트 타입마다 여러 핸들러가 붙을 수 있고, 발행하는 쪽은 누가 구독하는지 몰라도 된다.'
   };
 
   var STORE_KEY = 'ddd-book:progress';
