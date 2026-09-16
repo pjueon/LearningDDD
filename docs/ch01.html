@@ -1185,9 +1185,10 @@ class OrderLine:
     """응용 서비스 — 유스케이스를 조립할 뿐, 규칙은 갖지 않는다."""
 
     def place_order(self, cmd: PlaceOrderCommand) -&gt; OrderNumber:
-        with self.uow:
-            items = self.catalog.snapshot(cmd.items)       # 상품명·가격 스냅샷
-            grade = self.members.grade_of(cmd.customer_id)
+        items = self.catalog.snapshot(cmd.items)           # 상품명·가격 스냅샷
+        grade = self.members.grade_of(cmd.customer_id)
+
+        with self.uow:                                     # 트랜잭션은 여기서부터
             order = Order.place(
                 order_number=self.uow.orders.next_order_number(date.today()),
                 customer_id=cmd.customer_id,
@@ -1199,8 +1200,9 @@ class OrderLine:
             )
             self.uow.orders.add(order)
             self.uow.commit()
+            events = order.pull_events()
 
-        self.bus.publish(order.pull_events())              # 재고 할당·메일·슬랙은 이벤트로
+        self.bus.publish(events)                           # 재고 할당·메일·슬랙은 이벤트로
         return order.order_number
 </code></pre>
     </div>

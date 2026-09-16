@@ -21,7 +21,7 @@
   참조하기로 했는데, 응용 서비스 안에서는 결국 둘 다 동시에 손에 쥐고 있습니다.</p>
 
   <p>그리고 갚지 못한 빚이 둘 더 있습니다. 3장이 만든 <code>repromise()</code>는
-  아직 몸통이 없고(화면 11), 1장의 300줄짜리 함수에 있던 <b>메일 발송</b>은 5장부터
+  아직 몸통이 없고(화면 11), 1장의 83줄짜리 함수에 있던 <b>메일 발송</b>은 5장부터
   코드 예제에서 조용히 빠져 있었습니다(화면 9). 이 장은 그 자리를 만듭니다 —
   <b>도메인 이벤트</b>입니다.</p>
 
@@ -168,8 +168,8 @@ class OrderPlaced(DomainEvent):
     items: tuple[tuple[str, int], ...]   # (sku, quantity)
 </code></pre>
 
-  <p><code>PlaceOrderCommand</code>(5장)와 이름도 비슷하고 둘 다 <code>frozen</code>
-  <span class="term" data-term="vo">값 객체</span>지만, 뜻은 정반대입니다.</p>
+  <p><code>PlaceOrderCommand</code>(5장)와 이름도 비슷하고 둘 다
+  <code>frozen=True</code> 불변 데이터지만, 뜻은 정반대입니다.</p>
 
   <div class="table-wrap">
     <table>
@@ -234,14 +234,21 @@ class OrderPlaced(DomainEvent):
 
     def promise_delivery(self, promise: "Promise") -&gt; None:
         self.promise = promise
-        self.events.append(StockAllocated(               # 4
+        self.events.append(DeliveryPromised(             # 4
             occurred_at=datetime.now(),
             order_number=self.order_number.value))
 </code></pre>
 
   <ol class="notes">
     <li><span class="ln">4행</span> 빈 리스트로 시작합니다. 아직 아무 일도
-    없었습니다.</li>
+    없었습니다.
+    <br>5장 화면 8이 "<code>Order</code>에 필드를 하나 추가하면(예: 7장의
+    <code>events</code>) 직렬화 코드가 덩달아 깨진다"고 경고했던 그 필드입니다.
+    그런데 <b><code>events</code>는 저장하지 않습니다</b> — 4장 화면 9의 임퍼러티브
+    매핑은 <code>Table</code>에 적은 컬럼만 다루므로, 이 필드를 추가해도
+    <code>orders</code> 테이블은 그대로입니다. 리포지토리가 되살린
+    <code>Order</code>는 <b>항상 빈 <code>events</code>로 시작</b>합니다. 저장된
+    주문을 꺼냈다고 옛날 이벤트가 다시 나가면 안 되니까요.</li>
     <li><span class="ln">7~8행</span> <code>pull_events()</code>는 이벤트를
     돌려주면서 <b>동시에 자기 리스트를 비웁니다.</b> 한 번 꺼낸 이벤트를 다시 꺼내
     발행하는 실수를 구조적으로 막습니다.</li>
@@ -249,7 +256,13 @@ class OrderPlaced(DomainEvent):
     할인·배송비를 다 채운 <b>맨 마지막</b>에 이벤트를 적습니다. 아직 불완전한
     상태에서 이벤트가 나가는 일이 없습니다.</li>
     <li><span class="ln">30~32행</span> 3장의 <code>promise_delivery()</code>에
-    한 줄이 늘었습니다. 약속이 정해졌다는 사실도 이벤트입니다.</li>
+    한 줄이 늘었습니다. 약속이 정해졌다는 사실도 이벤트입니다 — 그래서 이름도
+    <code>DeliveryPromised</code>입니다. <b>이 메서드가 하는 일이 곧 이벤트의
+    이름</b>이어야, 나중에 "이 이벤트는 언제 나오나"를 코드에서 되짚을 수 있습니다.
+    <br>이 이벤트에는 <b>이 교재 안에서 구독자가 하나도 없습니다.</b> 그래도
+    괜찮습니다 — 화면 4의 표대로 이벤트의 구독자는 "0개 이상"이고, 3장 화면 14가
+    "<b>최초 약속은 조용히 해도 된다</b>"고 이미 정해 뒀기 때문입니다. 반대로
+    재조정은 반드시 통지를 동반해야 하는데, 그 이야기는 화면 11입니다.</li>
   </ol>
 
   <div class="box note">
@@ -319,6 +332,57 @@ bus.subscribe(InboundDelayed,
     요구사항 "메일 보내고 슬랙 알린다"가 여기 자리 잡습니다). <b>셋은 서로의
     존재를 모릅니다.</b></li>
   </ol>
+
+
+  <figure class="fig">
+    <svg viewBox="0 0 700 220" role="img" aria-label="place_order가 발행한 OrderPlaced 하나가 MessageBus를 거쳐 핸들러 셋으로 갈라지는 그림">
+      <g class="svg-line" stroke-width="1.3">
+        <rect x="16" y="94" width="140" height="42" rx="9"/>
+        <rect x="470" y="26"  width="212" height="38" rx="9"/>
+        <rect x="470" y="96"  width="212" height="38" rx="9"/>
+        <rect x="470" y="166" width="212" height="38" rx="9"/>
+      </g>
+      <g class="svg-line" stroke-width="1.3">
+        <rect x="212" y="94" width="152" height="42" rx="21"/>
+      </g>
+      <g class="svg-line" stroke-width="2">
+        <path d="M412 20 V210"/>
+      </g>
+      <g class="svg-muted" stroke="currentColor" stroke-width="1.3" fill="none">
+        <path d="M156 115 H208"/>
+        <path d="M364 115 H408"/>
+        <path d="M412 45  H466"/>
+        <path d="M412 115 H466"/>
+        <path d="M412 185 H466"/>
+      </g>
+      <g class="svg-muted" stroke="none">
+        <path d="M204 111 l4 4 -4 4 z"/>
+        <path d="M404 111 l4 4 -4 4 z"/>
+        <path d="M462 41  l4 4 -4 4 z"/>
+        <path d="M462 111 l4 4 -4 4 z"/>
+        <path d="M462 181 l4 4 -4 4 z"/>
+      </g>
+      <g text-anchor="middle" font-size="12" font-weight="700" class="svg-fg">
+        <text x="86"  y="120">place_order()</text>
+        <text x="288" y="120">OrderPlaced</text>
+      </g>
+      <g text-anchor="middle" font-size="11.5" class="svg-fg">
+        <text x="576" y="50">allocate_stock — 재고 할당</text>
+        <text x="576" y="120">notify_customer — 확인 메일</text>
+        <text x="576" y="190">notify_warehouse — 창고 슬랙</text>
+      </g>
+      <g text-anchor="middle" font-size="9.5" class="svg-muted">
+        <text x="182" y="106">발행</text>
+        <text x="288" y="150">이미 일어난 사실</text>
+        <text x="412" y="14">MessageBus</text>
+      </g>
+    </svg>
+    <figcaption>왼쪽은 <code>place_order()</code>가 아는 전부입니다 — 사실 하나를
+    버스에 놓을 뿐입니다. 오른쪽 셋은 서로의 존재도, 왼쪽의 존재도 모릅니다.
+    핸들러를 하나 더 붙이려면 <code>subscribe</code> 한 줄만 추가하면 되고,
+    <code>place_order()</code>는 한 글자도 바뀌지 않습니다. 이 그림의 세로줄
+    오른쪽이 <b>화면 12에서 대가를 치를 자리</b>입니다.</figcaption>
+  </figure>
 
   <div class="box warn">
     <p class="box-t">지금은 동기, 나중엔 큐</p>
@@ -438,31 +502,58 @@ def place_order(self, cmd: PlaceOrderCommand) -&gt; OrderNumber:
   1일 전부터는 할당 대상에서 뺍니다. 분류는 재고가 모르는 값이라, <b>정책 객체로
   밖에서 받습니다.</b></p>
 
-<pre><span class="cap"># domain/inventory.py — allocate() 시그니처 확장(3장 화면 9)</span><code>class ExpiryBufferPolicy(Protocol):
+<pre><span class="cap"># domain/inventory.py — 3장 화면 12·13의 코드에 buffer_days 를 얹는다</span><code>class ExpiryBufferPolicy(Protocol):
     def buffer_days(self, sku: str) -&gt; int: ...
 
+def _candidates(self, as_of: date,
+                <b class="hl">buffer_days: int = 0</b>) -&gt; list[StockBatch]:
+    <b class="hl">cutoff = as_of + timedelta(days=buffer_days)</b>          # 1
+    usable = [b for b in self._batches
+              if b.available &gt; 0
+              and (b.expires_on is None or b.expires_on &gt; <b class="hl">cutoff</b>)]
+
+    def priority(b: StockBatch) -&gt; tuple[int, date]:      # 2
+        ...                                               # 3장 화면 12 그대로
+
+    return sorted(usable, key=priority)
+
 def allocate(self, quantity: int, as_of: date,
-             <b class="hl">buffer_days: int = 0</b>) -&gt; Allocation:
-    cutoff = as_of + timedelta(days=buffer_days)               # 1
-    candidates = [b for b in self._batches
-                  if b.available &gt; 0
-                  and (b.expires_on is None or b.expires_on &gt; cutoff)]
-    candidates.sort(key=lambda b: b.expires_on or date.max)
-    # ... 나머지는 3장 화면 9와 동일
+             <b class="hl">buffer_days: int = 0</b>) -&gt; "Allocation":
+    candidates = self._candidates(as_of, <b class="hl">buffer_days</b>)     # 3
+    # ... 나머지는 3장 화면 13과 동일
 </code></pre>
 
   <ol class="notes">
-    <li><span class="ln">4~6행</span> <code>buffer_days</code>가 기본값 0이라
-    3장 화면 9의 호출부(<code>allocate(quantity, as_of)</code>)는 <b>그대로
-    유효</b>합니다. 여유 없이 할당하던 그때 코드를 고치지 않아도 됩니다.</li>
+    <li><span class="ln">6~9행</span> 실제로 바뀐 것은 <b>이 두 줄</b>입니다.
+    3장 화면 12의 <code>expires_on &gt; as_of</code>가 <code>&gt; cutoff</code>로
+    바뀌었을 뿐입니다.</li>
+
+    <li><span class="ln">11~14행</span> <b>정렬에는 손대지 않습니다.</b> 3장
+    화면 12가 정한 순서(창고 배치 먼저 → 그 안에서 FEFO, 그다음 입고예정 배치를
+    ETA 순으로)는 I19 그대로입니다. 유통기한 여유는 <b>"후보로 칠 것인가"의
+    조건</b>이지 "고른 것을 줄 세우는 규칙"이 아니기 때문입니다.
+    <br>조건을 <code>allocate()</code>가 아니라 <code>_candidates()</code>에
+    넣는 이유도 같습니다 — 3장 화면 12가 후보 선정을 이미 이 한 곳으로 모아
+    뒀으니, 조건이 늘어나도 <b>늘어날 자리는 계속 한 곳</b>입니다.</li>
+
+    <li><span class="ln">16~18행</span> <code>buffer_days</code>가 기본값 0이라
+    3장의 호출부(<code>allocate(quantity, as_of)</code>)는 <b>그대로 유효</b>합니다.
+    여유 없이 할당하던 그때 코드를 고치지 않아도 됩니다.</li>
   </ol>
 
-  <p>여유 일수는 어디서 오나요? <code>ExpiryBufferPolicy</code>는 6장의 판별
-  질문을 그대로 통과합니다 — SKU 하나에 속한 규칙이 아니고(여러 SKU에 걸친 표
-  하나), 입출력이 도메인 개념(<code>sku</code>, 일수)뿐이고, 무상태입니다.
-  <b>도메인 서비스입니다.</b> 구현은 "SKU별 여유일수 표"를 들고 있는 인프라
-  객체면 충분합니다 — <code>InventoryItem</code>은 "며칠 여유를 둘지"만 알고
-  "왜 그 SKU가 그만큼인지"(상품 분류)는 몰라도 됩니다.</p>
+  <p>여유 일수는 어디서 오나요? <code>ExpiryBufferPolicy</code>는 6장 화면 6의
+  판별 질문 셋을 그대로 통과합니다 — ① 어느 엔티티 하나에 속한 규칙이 아니고
+  (여러 SKU에 걸친 표 하나), ② 오가는 값이 <code>sku</code>와 일수뿐이라 인프라가
+  섞이지 않고, ③ 같은 SKU를 몇 번 물어도 같은 답이 나오며 부수 효과가 없습니다.
+  <b>도메인 서비스입니다.</b></p>
+
+  <p>6장의 <code>ShippingFeePolicy</code>·<code>DiscountPolicy</code>와 "같은
+  모양"이라는 말은 <b>자리가 나뉘는 방식까지 같다</b>는 뜻입니다 —
+  <code>Protocol</code>(무엇을 묻는가)은 도메인이 정의하고, "어느 SKU가 며칠인지"
+  라는 표를 실제로 들고 있는 구현은 인프라에 둡니다. 표를 들고 있는 것은
+  <b>상태가 아니라 설정</b>이라 ③을 깨지 않습니다. 그래서
+  <code>InventoryItem</code>은 "며칠 여유를 둘지"만 알고 "왜 그 SKU가
+  그만큼인지"(상품 분류)는 몰라도 됩니다.</p>
 
   <p>이제 핸들러입니다. 응용 서비스와 모양이 같습니다 — 조회하고, 도메인
   메서드를 부르고, 커밋합니다.</p>
@@ -471,30 +562,34 @@ def allocate(self, quantity: int, as_of: date,
                     expiry: ExpiryBufferPolicy, shipping: ShippingPolicy,
                     bus: MessageBus) -&gt; None:
     with uow:
-        order = uow.orders.get(OrderNumber(event.order_number))     # 1
+        order = uow.orders.get(OrderNumber(event.order_number))      # 1
         items = uow.inventory.get_many([sku for sku, _ in event.items])
         allocation: dict[str, Allocation] = {}
+        out_of_stock: str | None = None
 
         for sku, qty in event.items:                                 # 2
             try:
                 allocation[sku] = items[sku].allocate(
                     qty, date.today(), buffer_days=expiry.buffer_days(sku))
             except InsufficientStock:
-                uow.rollback()                                        # 3
-                bus.publish([OutOfStock(occurred_at=datetime.now(),
-                                         order_number=event.order_number,
-                                         sku=sku)])
-                return
+                out_of_stock = sku                                   # 3
+                break
 
-        order.allocation = allocation
-        ready_on = max(a.ready_on for a in allocation.values())       # 4
-        order.promise_delivery(Promise(
-            ship_on=ready_on, arrive_by=ready_on + shipping.lead_time,
-            promised_at=datetime.now()))
+        if out_of_stock is not None:
+            uow.rollback()                                           # 4
+            events = [OutOfStock(occurred_at=datetime.now(),
+                                  order_number=event.order_number,
+                                  sku=out_of_stock)]
+        else:
+            order.allocation = allocation
+            ready_on = max(a.ready_on for a in allocation.values())  # 5
+            order.promise_delivery(Promise(
+                ship_on=ready_on, arrive_by=ready_on + shipping.lead_time,
+                promised_at=datetime.now()))
+            uow.commit()
+            events = order.pull_events()
 
-        uow.commit()
-        events = order.pull_events()
-    bus.publish(events)                                                # 5
+    bus.publish(events)                                              # 6
 </code></pre>
 
   <ol class="notes">
@@ -502,17 +597,24 @@ def allocate(self, quantity: int, as_of: date,
     갖고 있어서(값 객체를 그대로 담지 않습니다 — 이벤트는 최대한 단순한 데이터여야
     다른 프로세스로도 보낼 수 있습니다), <code>OrderNumber</code>로 다시
     감싸 리포지토리에 넘깁니다.</li>
-    <li><span class="ln">9~12행</span> SKU마다 <b>따로</b> 여유 일수를 물어보고
+    <li><span class="ln">10~13행</span> SKU마다 <b>따로</b> 여유 일수를 물어보고
     <code>allocate()</code>를 부릅니다. 라인마다 분류가 다를 수 있기
     때문입니다.</li>
-    <li><span class="ln">13~18행</span> 하나라도 모자라면 <b>그 자리에서 멈추고
-    롤백</b>합니다. 이미 확보한 다른 SKU의 예약도 함께 풀립니다. 자세한 이야기는
-    화면 10입니다.</li>
-    <li><span class="ln">21~24행</span> 5장 화면 10에 있던 계산과 똑같습니다 —
-    이제 이 핸들러 안에 있을 뿐입니다.</li>
-    <li><span class="ln">26~28행</span> <code>with uow</code> 블록을 <b>나온
-    뒤에</b> 발행합니다. 화면 5의 규칙 그대로 — 커밋이 실제로 끝난 뒤에만
-    이벤트가 나갑니다.</li>
+    <li><span class="ln">14~16행</span> 하나라도 모자라면 <b>실패한 SKU만 적어
+    두고 루프를 빠져나옵니다.</b> 여기서 이벤트를 발행하지 <b>않는</b> 것이
+    중요합니다 — 아직 <code>with uow:</code> 안이기 때문입니다.</li>
+    <li><span class="ln">18~22행</span> 롤백합니다. 이미 확보한 다른 SKU의
+    예약도 함께 풀립니다. 그리고 내보낼 이벤트를 <b>만들어 두기만</b> 합니다.
+    품절 뒤에 주문이 어떻게 되는지는 화면 10입니다.</li>
+    <li><span class="ln">24~30행</span> 성공 경로입니다. 5장 화면 10에 있던
+    계산과 똑같습니다 — 이제 이 핸들러 안에 있을 뿐입니다.</li>
+    <li><span class="ln">32행</span> 성공이든 실패든 <b><code>with uow:</code>
+    블록을 나온 뒤 한 자리에서</b> 발행합니다. 화면 5의 규칙 그대로 —
+    커밋(또는 롤백)이 실제로 끝난 뒤에만 이벤트가 나갑니다.
+    <br>이벤트를 <b>만드는 곳</b>과 <b>보내는 곳</b>을 나눠 두면, 두 갈래 중
+    어느 쪽으로 가든 발행은 반드시 블록 밖에서 일어납니다 — 규칙을 어길 자리가
+    코드에 <b>아예 없습니다.</b> "조심해서 지키는 규칙"보다 "어길 수 없게 만든
+    구조"가 낫다는 것은 3장부터 계속 같은 이야기입니다.</li>
   </ol>
 </section>
 
@@ -540,23 +642,42 @@ def notify_warehouse(event: OrderPlaced, slack: SlackNotifier) -&gt; None:
     slack.notify_new_order(event.order_number, event.items)
 </code></pre>
 
-  <p>1장 코드와 비교하면 무엇이 달라졌을까요. <b>메일 서버가 죽어도 주문은 이미
-  커밋돼 있습니다</b> — <code>place_order()</code>가 이벤트를 발행하는 시점에는
-  주문이 이미 저장된 뒤이기 때문입니다(화면 5). 1장에서는 메일 발송이 같은 함수
-  안에 있어서 그 실패가 응답 지연으로 그대로 이어졌지만, 지금은 <code>notify_customer</code>
-  하나가 느리거나 실패해도 <code>allocate_stock</code>과 <code>notify_warehouse</code>는
-  영향을 받지 않습니다(화면 6의 <code>try</code>/<code>except</code>가 핸들러를
-  서로 격리하기 때문입니다).</p>
+  <p>1장 코드와 비교하면 무엇이 달라졌을까요. <b>달라지지 않은 것</b>부터 짚는
+  것이 정직합니다 — "메일을 커밋 뒤에 보낸다"는 <b>1장도 이미 하고 있었습니다.</b>
+  1장 화면 8의 81행 해설이 "메일 발송은 <code>try</code> 블록 밖, 즉 커밋 뒤에
+  있습니다. <b>일부러 그렇게 둔 것입니다</b>"라고 적어 뒀습니다. 달라진 것은
+  셋입니다.</p>
+
+  <ul>
+    <li><b><code>place_order()</code>가 메일의 존재를 모릅니다.</b> 1장에서는
+    알림을 하나 더 붙이려면 그 함수에 줄을 보태야 했습니다. 지금은 부팅 코드에
+    <code>subscribe</code> 한 줄을 더할 뿐, 응용 서비스는 한 글자도 바뀌지
+    않습니다.</li>
+    <li><b>핸들러끼리 격리됩니다.</b> 1장에서는 메일 줄에서 난 예외가 바로 아래
+    슬랙 줄까지 통째로 건너뛰게 만들었습니다. 지금은 <code>notify_customer</code>가
+    실패해도 <code>allocate_stock</code>과 <code>notify_warehouse</code>는 계속
+    돕니다(화면 6의 <code>try</code>/<code>except</code>).</li>
+    <li><b>큐로 옮길 이음매가 생겼습니다.</b> 1장에는 "여기부터는 나중에 해도 되는
+    일"이라고 가리킬 경계 자체가 없었습니다.</li>
+  </ul>
 
   <div class="box warn">
-    <p class="box-t">그래도 잃는 것은 있다</p>
-    <p><code>notify_customer</code>가 실패하면 <b>그 사실은 로그에만 남고
-    아무도 재시도하지 않습니다</b>(지금 구현 기준). 1장이 못 했던 "주문은 실패
-    없이 되는데 메일은 진짜로 안 갈 수도 있다"는 트레이드오프를, 이제는
-    <b>의도적으로</b> 선택한 것입니다 — 주문 성공이 메일 성공에 발목 잡히는
-    것보다는 낫다고 판단했기 때문입니다. 실제로 안정적인 시스템을 만들려면
-    "실패한 메일 발송을 큐에 다시 넣고 재시도한다" 같은 장치가 필요한데, 이것이
-    바로 화면 6에서 본 "메시지 큐로 바꾼다"의 진짜 이유입니다.</p>
+    <p class="box-t">1장의 빚 — 절반만 갚았습니다</p>
+    <p>1장 화면 8은 문제를 <b>둘</b> 적었습니다. 그중 하나만 나아졌습니다.</p>
+    <p><b>① 메일이 안 가도 아무도 모른다.</b> <code>notify_customer</code>가
+    실패하면 그 사실은 <b>로그에만 남고 아무도 재시도하지 않습니다</b>(지금 구현
+    기준). 달라진 것은 이제 이 트레이드오프를 <b>의도적으로</b> 골랐다는 점입니다
+    — 주문 성공이 메일 성공에 발목 잡히는 것보다는 낫다고 판단했기 때문입니다.</p>
+    <p><b>② 메일 서버가 느리면 고객이 보는 응답도 느리다.</b> 이건 <b>손도 못
+    댔습니다.</b> <code>publish()</code>가 같은 스레드에서 핸들러를 바로
+    부르므로(화면 6), 메일 서버가 3초 걸리면 <code>place_order()</code>도 3초 늦게
+    돌아옵니다. <b>이벤트로 쪼개는 것과 비동기로 만드는 것은 다른 일입니다</b> —
+    이 장은 앞의 것만 했습니다.</p>
+    <p>둘의 답은 같습니다. "실패한 발송을 큐에 다시 넣고 재시도한다", "발행은 큐에
+    넣기만 하고 즉시 돌아온다" — 화면 6에서 본 "메시지 큐로 바꾼다"의 진짜 이유가
+    이 둘입니다. 이 장이 한 일은 <b>그날 바꿀 코드를 한 곳으로 몰아 둔 것</b>입니다.
+    큐로 옮기는 날 손댈 곳은 <code>MessageBus</code> 안쪽뿐이고, 핸들러도
+    <code>place_order()</code>도 한 줄 안 바뀝니다.</p>
   </div>
 </section>
 
@@ -580,11 +701,13 @@ def notify_warehouse(event: OrderPlaced, slack: SlackNotifier) -&gt; None:
       보상 트랜잭션·사가 주제예요 — 여기서는 맛만 봅니다.</p></div></div>
   </div>
 
-<pre><span class="cap"># 부팅 코드에 한 줄 추가</span><code>bus.subscribe(OutOfStock, notify_cs_team)
+<pre><span class="cap"># 부팅 코드에 한 줄 추가</span><code>bus.subscribe(OutOfStock, partial(notify_cs_team, slack=slack))
 </code></pre>
 
   <p><code>notify_cs_team</code>은 <code>notify_customer</code>와 같은 모양의
-  핸들러입니다 — 사람에게 알릴 뿐, 상태를 바꾸지 않습니다. 3장 화면 6이 이미
+  핸들러입니다 — 사람에게 알릴 뿐, 상태를 바꾸지 않습니다. 의존성(여기서는
+  <code>slack</code>)을 <code>partial</code>로 미리 묶어 <code>MessageBus</code>
+  에게는 "이벤트 하나만 받는 함수"로 보이게 하는 것까지 똑같습니다(화면 6). 3장 화면 6이 이미
   말했던 것과 같은 이야기입니다. <b>실제 쇼핑몰이 이렇게 동작합니다</b> — 즉시
   일관성을 포기하고, 어긋난 상태를 나중에(자동 또는 수동으로) 바로잡습니다.
   이것을 <b>결과적 일관성</b>이라고 부르고, 본격적으로는 12장에서 다룹니다.</p>
@@ -619,10 +742,11 @@ def notify_warehouse(event: OrderPlaced, slack: SlackNotifier) -&gt; None:
 
   <div class="box note">
     <p class="box-t">누가 대신 아는가 — 리포지토리 조회</p>
-    <p>답은 응용 계층의 조회입니다. <code>Order.allocation</code>은 이미
-    <code>dict[str, Allocation]</code>이고, 각 <code>Allocation.lines</code>에
-    <code>batch_id</code>가 들어 있습니다(5장). 그러니 "이 SKU, 이 배치로
-    할당받은 주문들"을 리포지토리에 물어볼 수 있습니다.</p>
+    <p>답은 응용 계층의 조회입니다. <code>Allocation.lines</code>의 각
+    <code>AllocationLine</code>에는 <code>batch_id</code>가 들어 있고(3장 화면 14),
+    <code>Order.allocation</code>은 그것을 SKU별로 담은
+    <code>dict[str, Allocation]</code>입니다(5장 화면 10). 그러니 "이 SKU, 이
+    배치로 할당받은 주문들"을 리포지토리에 물어볼 수 있습니다.</p>
 <pre><code>class OrderRepository(Protocol):
     ...
     def find_by_allocation(self, sku: str, batch_id: UUID) -&gt; Sequence[Order]: ...
@@ -665,7 +789,7 @@ def notify_warehouse(event: OrderPlaced, slack: SlackNotifier) -&gt; None:
   <ol class="notes">
     <li><span class="ln">4행</span> 영향받는 주문 <b>전부</b>를 한 번에 가져옵니다
     — 배치 하나가 늦어지면 그 배치로 할당받은 주문이 여러 건일 수 있습니다.</li>
-    <li><span class="ln">7~9행</span> 이 주문의 <b>다른 SKU</b> 라인들이 이미
+    <li><span class="ln">8~9행</span> 이 주문의 <b>다른 SKU</b> 라인들이 이미
     확보한 날짜도 함께 봅니다. 지연된 배치가 이 주문의 유일한 병목이 아닐 수도
     있기 때문입니다.
     <br><b>단순화한 부분</b>: 실제로는 이 배치가 그 SKU 라인의 <b>유일한
@@ -678,8 +802,16 @@ def notify_warehouse(event: OrderPlaced, slack: SlackNotifier) -&gt; None:
     있습니다.</b> 그럴 때는 <code>continue</code>로 재조정하지 않습니다 —
     안 바뀐 사실을 이벤트로 낼 이유가 없습니다.</li>
     <li><span class="ln">13~18행</span> <code>reason</code>에 무엇이, 왜
-    바뀌었는지 사람이 읽을 수 있는 문장을 남깁니다. 6장 화면 11이 미뤄 둔
-    "재조정은 통지를 동반해야 한다"는 요구가 여기서 시작됩니다.</li>
+    바뀌었는지 사람이 읽을 수 있는 문장을 남깁니다. 3장 화면 14가 못박고 6장
+    화면 11이 다시 미뤄 둔 "재조정은 통지를 동반해야 한다"는 요구가 여기서
+    시작됩니다 — 통지문에 들어갈 문장을 <b>도메인이 직접 만들어</b> 이벤트에
+    실어 보냅니다.</li>
+
+    <li><span class="ln">23행</span> 화면 8과 <b>같은 자리</b>에서 발행합니다 —
+    <code>with uow:</code> 블록 밖입니다. 그리고 <code>changed</code>에 담긴
+    주문들의 이벤트를 <b>한 번에 모아</b> 넘깁니다. 주문 하나를 고칠 때마다
+    발행하면, 뒤쪽 주문을 고치다 예외가 났을 때 앞쪽 통지는 이미 나가 버린
+    뒤입니다.</li>
   </ol>
 
 <pre><span class="cap"># domain/order.py — Order 안, 3장부터 몸통이 없었던 메서드</span><code>def repromise(self, promise: "Promise", reason: str) -&gt; None:
@@ -693,16 +825,43 @@ def notify_warehouse(event: OrderPlaced, slack: SlackNotifier) -&gt; None:
         reason=reason))
 </code></pre>
 
+  <p>마지막 한 칸이 남았습니다. 이 이벤트를 <b>누가 받느냐</b>입니다.</p>
+
+<pre><span class="cap"># application/handlers.py — 통지 핸들러, 그리고 부팅 코드 한 줄</span><code># 화면 9의 Mailer 에 메서드 하나가 는다
+class Mailer(Protocol):
+    ...
+    def send_promise_change(self, order_number: str, old_ship_on: date,
+                             new_ship_on: date, reason: str) -&gt; None: ...
+
+def notify_promise_change(event: PromisedDateChanged,
+                           mailer: Mailer) -&gt; None:
+    mailer.send_promise_change(event.order_number, event.old_ship_on,
+                                event.new_ship_on, event.reason)
+
+# 부팅 코드
+bus.subscribe(PromisedDateChanged,
+              partial(notify_promise_change, mailer=mailer))
+</code></pre>
+
   <div class="box good">
     <p class="box-t">3장·6장이 남긴 빚 — 갚았습니다</p>
     <p>3장 화면 14: "<code>repromise()</code>는 7장에서 만듭니다." 6장 화면 11:
-    "이 메서드의 몸통은 7장에서 만듭니다." 재조정이 <code>promise_delivery()</code>와
-    <b>다른 이름</b>이어야 했던 이유도 이제 코드로 보입니다 —
-    <code>PromisedDateChanged</code>라는, <code>StockAllocated</code>와는 다른
-    이벤트를 냅니다. 이 이벤트를 구독하는 핸들러(이 교재에서는 구현을 보이지
-    않습니다)가 고객에게 "출고일이 바뀌었습니다" 통지를 보내면 <b>이벤트
-    연쇄</b>가 완성됩니다 — <code>InboundDelayed</code> → <code>repromise()</code>
-    → <code>PromisedDateChanged</code> → 고객 통지.</p>
+    "이 메서드의 몸통은 7장에서 만듭니다." 그런데 몸통보다 중요한 것은 <b>왜
+    이름을 나눴는가</b>였습니다. 3장 화면 14의 답은 이랬습니다 — "최초 약속은
+    조용히 해도 되지만 <b>재조정은 반드시 고객 통지를 동반</b>한다. 같은 메서드를
+    쓰면 통지를 빠뜨린다."</p>
+    <p>그 약속이 이제 <b>구조로</b> 지켜집니다. <code>promise_delivery()</code>는
+    <code>DeliveryPromised</code>를 내고 <b>아무도 구독하지 않습니다</b>(화면 5).
+    <code>repromise()</code>는 <code>PromisedDateChanged</code>를 내고
+    <code>notify_promise_change</code>가 <b>반드시 구독합니다.</b> 두 행위가 다른
+    이벤트를 내기 때문에 "재조정했는데 통지를 안 하는" 경로가 <b>아예
+    없습니다</b> — 통지를 빠뜨리려면 부팅 코드의 <code>subscribe</code> 줄을
+    일부러 지워야 합니다.</p>
+    <p>이것이 <b>이벤트 연쇄</b>입니다 — <code>InboundDelayed</code> →
+    <code>repromise_delayed_orders</code> → <code>PromisedDateChanged</code> →
+    <code>notify_promise_change</code>. 재고 컨텍스트에서 시작한 사건이 주문을
+    거쳐 고객에게 닿는데, <b>이 넷은 서로를 모릅니다.</b> 그 편함의 청구서가
+    다음 화면입니다.</p>
   </div>
 </section>
 
@@ -715,6 +874,43 @@ def notify_warehouse(event: OrderPlaced, slack: SlackNotifier) -&gt; None:
   간다"까지 코드를 눈으로 따라갈 방법이 없습니다.</b> 어떤 핸들러가 무엇을
   구독하는지는 화면 6의 부팅 코드에만 있고, 각 핸들러는 서로를 모릅니다.
   이것이 이벤트의 장점(화면 6)이자 동시에 대가입니다.</p>
+
+
+  <figure class="fig">
+    <svg viewBox="0 0 700 246" role="img" aria-label="입고 지연에서 고객 통지까지 이어지는 이벤트 연쇄. 상자 셋은 코드이고 그 사이를 잇는 점선 화살표 둘은 어느 파일에도 없다">
+      <g class="svg-line" stroke-width="1.3">
+        <rect x="158" y="12"  width="384" height="50" rx="9"/>
+        <rect x="158" y="98"  width="384" height="50" rx="9"/>
+        <rect x="158" y="184" width="384" height="50" rx="9"/>
+      </g>
+      <g class="svg-muted" stroke="currentColor" stroke-width="1.4" fill="none" stroke-dasharray="5 4">
+        <path d="M350 62 V94"/>
+        <path d="M350 148 V180"/>
+      </g>
+      <g class="svg-muted" stroke="none">
+        <path d="M346 90 l4 7 4 -7 z"/>
+        <path d="M346 176 l4 7 4 -7 z"/>
+      </g>
+      <g font-size="12" font-weight="700" class="svg-fg" text-anchor="middle">
+        <text x="350" y="34">InventoryItem.delay()</text>
+        <text x="350" y="120">repromise_delayed_orders</text>
+        <text x="350" y="206">notify_promise_change</text>
+      </g>
+      <g font-size="10" class="svg-muted" text-anchor="middle">
+        <text x="350" y="51">창고팀이 입고 지연을 등록한다</text>
+        <text x="350" y="137">order.repromise() 를 부른다</text>
+        <text x="350" y="223">고객에게 "출고일이 바뀌었습니다"</text>
+      </g>
+      <g font-size="10.5" class="svg-fg">
+        <text x="366" y="82">InboundDelayed</text>
+        <text x="366" y="168">PromisedDateChanged</text>
+      </g>
+    </svg>
+    <figcaption>상자 셋은 "정의로 이동"으로 찾아갈 수 있는 코드입니다. 점선
+    화살표 둘은 <b>어느 파일에도 없습니다</b> — 유일한 흔적은 부팅 코드의
+    <code>subscribe</code> 두 줄뿐입니다. 이 그림이 이 장의 성과이자, 바로 아래
+    표에 적힌 대가입니다.</figcaption>
+  </figure>
 
   <div class="table-wrap">
     <table>
@@ -743,6 +939,16 @@ def notify_warehouse(event: OrderPlaced, slack: SlackNotifier) -&gt; None:
     필요한 조건은 오히려 명확합니다 — <b>다른 애그리게이트가 관련되거나, 트랜잭션
     경계를 넘거나, "지금 당장"이 아니어도 되는 일</b>일 때입니다. 이 장의 두
     시나리오(재고 할당, 입고 지연)가 모두 이 조건을 만족했습니다.</p>
+    <p>만족하지 <b>못한</b> 예도 하나 있습니다. 4장 화면 11의 빚 표는 "재고가
+    '주문이 취소됐다'는 사실을 알아야 <code>release()</code>를 부를 수 있고, 그
+    전달 장치가 도메인 이벤트"라며 <b>7장</b>을 가리켰습니다. 그런데 이 장은
+    <code>OrderCancelled</code>를 <b>만들지 않았습니다.</b> 5장 화면 12에서 이미
+    확인했기 때문입니다 — <code>cancel_order()</code>는 한 응용 서비스가 두
+    리포지토리를 같은 트랜잭션에서 쥐고 "지금 당장" 끝내는 일이라, 이벤트가
+    풀어 줄 문제가 없습니다. 만들었다면 위 표의 대가 셋을 <b>치르기만 하고 얻는
+    것은 없었을</b> 것입니다.</p>
+    <p><b>4장이 미룬 답은 "이벤트를 만든다"가 아니라 "이 자리에는 이벤트가 필요
+    없다"였습니다.</b> 빚을 갚는 방법에는 이런 것도 있습니다.</p>
   </div>
 </section>
 
@@ -769,13 +975,18 @@ def notify_warehouse(event: OrderPlaced, slack: SlackNotifier) -&gt; None:
       <code>repromise()</code>로 이어집니다.</li>
       <li>이벤트는 <b>흐름 추적 불가·순서 미보장·부분 실행</b>이라는 대가가
       있습니다. 같은 애그리게이트 안에서 지금 끝나는 일에는 그냥 메서드를
-      부릅니다.</li>
+      부릅니다 — 4장이 7장 몫으로 미뤄 둔 <code>OrderCancelled</code>를 끝내
+      만들지 <b>않은</b> 이유입니다(화면 12).</li>
+      <li>이 장이 바꾼 것은 <b>구조</b>이지 <b>타이밍</b>이 아닙니다.
+      <code>publish()</code>가 아직 동기라, 1장이 말한 "메일 서버가 느리면 응답도
+      느리다"는 그대로 남아 있습니다 — <b>이벤트로 쪼개는 것과 비동기로 만드는
+      것은 다른 일</b>입니다(화면 9).</li>
     </ol>
   </div>
 
   <div class="quiz" data-answer="1">
-    <p class="q">이벤트 이름을 <code>AllocateStock</code>이 아니라
-    <code>StockAllocated</code>처럼 과거형으로 짓는 <b>가장 근본적인</b> 이유는
+    <p class="q">이벤트 이름을 <code>PromiseDelivery</code>가 아니라
+    <code>DeliveryPromised</code>처럼 과거형으로 짓는 <b>가장 근본적인</b> 이유는
     무엇일까요?</p>
     <ol class="options">
       <li data-why="맞습니다. 과거형은 '이미 일어난 사실이라 구독자가 거부할 권한이 없다'는 뜻을 이름에 담습니다. 반대로 명령형 이름은 '아직 안 했으니 거부할 수도 있다'는 인상을 줍니다.">
@@ -843,7 +1054,8 @@ def notify_warehouse(event: OrderPlaced, slack: SlackNotifier) -&gt; None:
       <p><b class="lbl">해설</b> "쓰기 경로를 내부 엔티티로 열지 않는다"는
       4장의 규칙은 <b>조회에도 그대로 적용됩니다</b> — 다만 기준은 "조회냐
       아니냐"가 아니라 "돌려주는 것이 루트 전체이고, 바꾸는 길이 루트의
-      메서드뿐이냐"입니다. 화면 11의 표를 다시 보면 이 구분이 명확합니다.</p>
+      메서드뿐이냐"입니다. 화면 11의 상자 "누가 대신 아는가 — 리포지토리 조회"를
+      다시 보면 이 구분이 명확합니다.</p>
     </div>
   </div>
 
@@ -883,6 +1095,8 @@ def notify_warehouse(event: OrderPlaced, slack: SlackNotifier) -&gt; None:
             except InsufficientStock:
                 continue                                            # 3
             order.allocation = {**order.allocation, event.sku: allocation}
+            if len(order.allocation) &lt; len(order.lines):             # 4
+                continue
             ready_on = max(a.ready_on for a in order.allocation.values())
             order.promise_delivery(Promise(
                 ship_on=ready_on, arrive_by=ready_on + shipping.lead_time,
@@ -909,6 +1123,14 @@ def notify_warehouse(event: OrderPlaced, slack: SlackNotifier) -&gt; None:
         기다립니다. 여기서 실패를 다시 이벤트로 낼지는 판단이 필요합니다
         (매번 <code>OutOfStock</code>을 또 내면 화면 10의 CS 알림이 반복되어
         소음이 될 수 있습니다).</li>
+        <li><span class="ln">19~21행</span> <b>아직 못 채운 라인이 남았으면
+        약속을 미룹니다.</b> 화면 8에서 품절로 롤백된 주문은
+        <code>allocation</code>이 통째로 비어 있습니다. SKU가 셋인 주문에 그중
+        하나만 다시 들어오면 나머지 둘은 여전히 할당이 없는데, 이 검사가 없으면
+        <b>채우지도 못한 주문에 출고일을 약속</b>하게 됩니다 — I21("전량이
+        확보되는 날")이 깨집니다.
+        <br>확보한 예약 자체는 <b>커밋해 둡니다</b>(다음 입고를 기다리는 동안
+        남이 가져가면 안 되니까). 미루는 것은 <b>약속뿐</b>입니다.</li>
       </ol>
       <p><b>흔히 놓치는 것 — </b> <code>StockReplenished</code> 하나가 오면
       그 SKU를 기다리는 주문이 <b>여러 건</b>일 수 있는데, 재고가 그 전부를
