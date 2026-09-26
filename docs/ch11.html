@@ -540,8 +540,9 @@ isinstance(NotARepository(), OrderRepository)   # True
   <p>세 장치의 공통점은 이것입니다 — 셋 다 <b>"규칙을 어기면 코드가 실행되지 않는다"는
   보장이 아닙니다.</b> <code>Protocol</code>은 타입 검사기를 돌려야 의미가 있고,
   폴더 구분은 코드 리뷰가 봐야 의미가 있고, <code>import-linter</code>는 CI에
-  넣어야 의미가 있습니다. C++의 <code>private</code>·<code>friend</code>처럼
-  컴파일러가 원천적으로 막아 주는 장치는 이 중 어디에도 없습니다 — 다음 화면에서
+  넣어야 의미가 있습니다. C++이나 자바처럼 컴파일러가 강제하는 언어를 써
+  봤다면 그 감각과 비교해 보세요 — 몰라도 상관없습니다, 파이썬은 이런 규칙을
+  원천적으로 막아 주지 않는다는 점만 기억해 두면 됩니다 — 다음 화면에서
   가장 강력한 장치(<code>import-linter</code>)를 실제로 걸어 봅니다.</p>
 </section>
 
@@ -813,8 +814,8 @@ hanbitmall.ordering.infrastructure:
     <p>포트 하나를 뽑을 때마다 인터페이스, 최소 하나의 어댑터, 그리고 대개
     테스트용 가짜 구현까지 늘어납니다. 팀 규모가 작고 요구사항이 자주 바뀌는
     초기 단계에서는 이 보일러플레이트가 속도를 깎아 먹습니다. 화면 11의 신호
-    없이 "나중에 필요할지도 모르니" 미리 포트를 뽑는 것은 00-기획이 경계하는
-    바로 그 과잉 설계입니다.</p>
+    없이 "나중에 필요할지도 모르니" 미리 포트를 뽑는 것은 이 교재가 처음부터
+    경계해 온 바로 그 과잉 설계입니다.</p>
   </div>
 
   <div class="box warn">
@@ -952,7 +953,7 @@ hanbitmall.ordering.infrastructure:
     <summary>모범답안</summary>
     <div class="fold-body">
       <p><b>안 됩니다 — 계약은 필요합니다.</b></p>
-<pre><span class="cap"># .importlinter에 추가</span><code class="plain">[importlinter:contract:5]
+<pre><span class="cap"># .importlinter에 추가</span><code class="plain">[importlinter:contract:4]
 name = 재고와 창고는 파트너십이어도 서로의 도메인 모듈을 직접 import하지 않는다
 type = forbidden
 source_modules =

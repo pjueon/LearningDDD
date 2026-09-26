@@ -63,8 +63,8 @@
 </code></pre>
 
   <ol class="notes">
-    <li><span class="ln">7행</span> <code>sqlite3</code>는 표준 라이브러리라 정본의
-    "도메인은 표준 라이브러리만 쓴다"는 규칙을 <b>문법적으로는</b> 어기지 않습니다.
+    <li><span class="ln">7행</span> <code>sqlite3</code>는 표준 라이브러리라
+    "도메인 코드는 표준 라이브러리만 쓴다"는 원칙을 <b>문법적으로는</b> 어기지 않습니다.
     그런데도 문제입니다 — <code>Order</code>가 이제 <b>파일 경로, 테이블 이름, SQL 문법</b>을
     알아야 합니다. 이것들은 업무 규칙이 아니라 <b>저장 방식에 대한 지식</b>입니다.</li>
 
@@ -203,7 +203,7 @@ class InventoryRepository(Protocol):
     포트 뒤로 넘깁니다.</li>
 
     <li><span class="ln">9행</span> <code>get_many</code>가 따로 있는 이유는
-    3장 화면 9의 그 문장 때문입니다 — "SKU마다 <code>allocate()</code>를 부르고, 가장 늦은
+    3장 화면 16의 그 문장 때문입니다 — "SKU마다 <code>allocate()</code>를 부르고, 가장 늦은
     <code>ready_on</code>을 고른다." 라인이 5개인 주문은 SKU를 5번 조회해야 하는데,
     <code>get</code>을 5번 부르면 <b>왕복이 5번</b>입니다. <code>get_many</code>는
     <b>한 번의 왕복으로</b> 5개를 가져옵니다. 이런 문제를 흔히 <b>N+1 문제</b>라고 부릅니다.</li>

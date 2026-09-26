@@ -767,11 +767,11 @@ class OrderLine:
 
   <ol class="notes">
     <li><span class="ln">10~12행</span> 가용재고도 <b>저장하지 않고 계산합니다.</b>
-    I7이 "항상 성립한다"고 했는데, 저장하면 실물재고을 고칠 때 가용재고을 같이 고쳐야 하고
+    I7이 "항상 성립한다"고 했는데, 저장하면 실물재고를 고칠 때 가용재고를 같이 고쳐야 하고
     언젠가 잊습니다. <b>계산값으로 두면 어긋날 수가 없습니다.</b></li>
 
     <li><span class="ln">14~17행</span> I8과 I9를 <b>같은 한 줄이 지킵니다.</b>
-    <code>count</code>가 가용재고을 넘지 않으면 <code>reserved</code>는 <code>quantity</code>를
+    <code>count</code>가 가용재고를 넘지 않으면 <code>reserved</code>는 <code>quantity</code>를
     넘을 수 없고(I8), 따라서 <code>available</code>도 음수가 될 수 없습니다(I9).</li>
 
     <li><span class="ln">18행</span> <code>self.reserved += count</code>는
@@ -904,7 +904,7 @@ class OrderLine:
     <div class="fold-body">
       <p>날카로운 독자라면 눈치챘을 것입니다. <code>allocate()</code>는 만료 배치를 빼는데
       <code>available_quantity</code>는 <b>안 뺍니다.</b> 만료된 배치가 10개 남아 있으면
-      가용재고은 10인데 할당은 실패합니다.</p>
+      가용재고는 10인데 할당은 실패합니다.</p>
       <p>이유는 단순합니다. <code>available_quantity</code>는 프로퍼티라
       <b>기준일을 받을 수 없습니다.</b> <code>available_quantity(as_of)</code>처럼
       메서드로 바꾸면 해결되지만, 그러면 이 값을 읽는 모든 곳이 날짜를 알아야 합니다.</p>
@@ -955,7 +955,7 @@ class OrderLine:
     <ol>
       <li>입고 예정(<span class="term" data-term="eta">ETA</span> 확정) 물량도 판매 수량에 포함한다.</li>
       <li>할당은 <b>창고에 있는 것부터</b>, 그다음 입고 예정분에서 한다.</li>
-      <li>고객에게 <b>출고 예정일</b>을 알려준다.</li>
+      <li>고객에게 <b><span class="term" data-term="promised">출고 예정일</span></b>을 알려준다.</li>
       <li>한빛몰은 분할 출고를 하지 않는다. <b>전량이 모여야</b> 나간다.</li>
     </ol>
   </blockquote>
@@ -1267,7 +1267,7 @@ datetime.date(2026, 9, 15)                 # 2개를 기다려야 하므로
   <p class="kicker">3장 · 화면 13</p>
   <h2>"재고"라는 낱말이 셋으로 갈라졌다</h2>
 
-  <p>화면 8의 <code>available_quantity</code>는 배치 전체의 가용재고을 더했습니다.
+  <p>화면 8의 <code>available_quantity</code>는 배치 전체의 가용재고를 더했습니다.
   이제 배치가 두 종류이므로 <b>이 값이 무엇을 뜻하는지가 모호해졌습니다.</b></p>
 
   <div class="dialog">
@@ -1713,7 +1713,7 @@ datetime.date(2026, 9, 15)
         입고예정 배치에서 6개. <code>ready_on</code>은 09-20</li>
       <li data-why="맞습니다. 창고 가용 3개(5−2)를 먼저 쓰고 모자란 3개를 입고예정에서 채웁니다. 전량이 모이는 날은 09-20입니다.">
         창고 3개 + 입고예정 3개. <code>ready_on</code>은 09-20</li>
-      <li data-why="창고 배치의 가용재고은 5가 아니라 3입니다. 이미 2개가 예약되어 있습니다(I7).">
+      <li data-why="창고 배치의 가용재고는 5가 아니라 3입니다. 이미 2개가 예약되어 있습니다(I7).">
         창고 5개 + 입고예정 1개. <code>ready_on</code>은 09-20</li>
       <li data-why="판매가능수량(ATP)은 3 + 10 = 13이므로 6개 요청은 충분히 가능합니다. 실패하지 않습니다.">
         <code>InsufficientStock</code> 예외. 창고 가용이 3개뿐이므로</li>

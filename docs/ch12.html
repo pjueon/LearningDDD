@@ -234,14 +234,14 @@
     행이 실제로 <code>UPDATE</code>될 때만</b> 버전을 검사합니다. <code>reserve()</code>가
     자식(<code>StockBatch</code>) 필드만 바꾸고 부모(<code>InventoryItem</code>) 쪽은
     아무 속성도 안 바뀐 채로 두면, 부모 행에 대한 <code>UPDATE</code> 자체가 나가지
-    않아 <b>버전이 조용히 그대로</b>입니다 — scratchpad에 SQLite로 직접 만들어
-    확인했습니다.</p>
+    않아 <b>버전이 조용히 그대로</b>입니다 — 실제로 SQLite로 간단히 재현해서
+    확인한 결과입니다.</p>
     <div class="table-wrap">
       <table>
         <tr><th style="width:14rem">실험</th><th>결과</th></tr>
-        <tr><td>자식(<code>StockBatch.reserved</code>)만 바꾸고 커밋</td>
+        <tr><td><b>실험 A</b> — 자식(<code>StockBatch.reserved</code>)만 바꾸고 커밋</td>
           <td><code>version</code>: 1 → <b>1</b> (그대로). 충돌이 있어도 못 잡는다</td></tr>
-        <tr><td>루트에서 <code>self.version += 1</code>을 함께 하고,<br>
+        <tr><td><b>실험 B</b> — 루트에서 <code>self.version += 1</code>을 함께 하고,<br>
           같은 버전을 읽은 두 세션이 하나씩 커밋</td>
           <td>먼저 커밋한 쪽은 성공. 나중 쪽은 <code>StaleDataError</code>로 실패
           (그 자리에서 즉시 <code>rollback()</code>)</td></tr>
@@ -264,7 +264,7 @@
 </code></pre>
 
   <div class="box note">
-    <p class="box-t">C++의 감각으로 보면 — 뭐가 DB 보장이고 뭐가 관례인가</p>
+    <p class="box-t">DB가 보장하는 것과 관례일 뿐인 것</p>
     <p><b>DB가 진짜로 보장하는 것</b>: <code>UPDATE inventory_item SET version=2
     WHERE sku='SKU-1' AND version=1</code> 한 문장이 <b>영향받은 행 수</b>를
     돌려줍니다. 이 문장 하나는 원자적입니다 — 다른 트랜잭션이 그 사이에 끼어들어
@@ -272,7 +272,7 @@
     급의, DB 엔진 자체의 보장입니다.</p>
     <p><b>관례일 뿐인 것</b>: "배치를 바꾸는 메서드는 반드시 <code>version</code>도
     올린다"는 규칙 자체는 <b>파이썬 문법이 강제하지 않습니다.</b> 새 메서드를
-    추가하면서 이 줄을 빠뜨려도 문법 에러는 나지 않고, 위 실험의 case A처럼 그
+    추가하면서 이 줄을 빠뜨려도 문법 에러는 나지 않고, 위 실험의 <b>실험 A</b>처럼 그
     메서드만 조용히 락이 없는 채로 남습니다. 11장이 <code>Protocol</code>·폴더·
     <code>import-linter</code>를 두고 "보장 수준이 다르다"고 한 것과 같은 결의
     이야기입니다 — <b>여기서는 코드 리뷰가 그 자리를 대신합니다.</b></p>
@@ -319,7 +319,7 @@
   <p class="kicker">12장 · 화면 5</p>
   <h2>입고 예정 수량을 두 주문이 동시에 잡으면?</h2>
 
-  <p>커리큘럼이 따로 짚은 질문입니다. 창고 배치와 입고예정 배치는 같은 위험에 같은
+  <p>이 장에서 따로 짚어야 할 질문이 하나 있습니다. 창고 배치와 입고예정 배치는 같은 위험에 같은
   방식으로 노출돼 있을까요? 코드를 보면 답이 바로 나옵니다 — <code>StockBatch</code>는
   <code>kind</code>로만 구분될 뿐(3장 화면 13, I18) <b>같은 <code>InventoryItem</code>
   루트 아래, 같은 <code>_batches</code> 리스트</b>에 있습니다. 화면 4의
@@ -667,7 +667,7 @@ bus.subscribe(PaymentFailed, notify_customer_payment_failed)
 bus.subscribe(PaymentUncertain, partial(notify_cs_team, slack=slack))
 </code></pre>
 
-  <p><code>OrderingService.__init__</code>의 6개 인자(체크포인트 3)는 <b>바뀌지
+  <p><code>OrderingService.__init__</code>의 6개 인자(7장에서 정한 것)는 <b>바뀌지
   않습니다</b> — <code>payment: PaymentPort</code>는 응용 서비스가 아니라 이 핸들러가
   직접 받습니다. 7장이 <code>expiry</code>·<code>shipping</code>을 핸들러 인자로
   넘긴 것과 같은 이유입니다 — 결제 승인은 <code>place_order()</code>가 하는 일이
