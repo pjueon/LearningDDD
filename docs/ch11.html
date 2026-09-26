@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="ko" data-chapter="ch11">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>11장 · 아키텍처: 계층형에서 헥사고날로 — 도메인 주도 설계 첫걸음</title>
+<link rel="stylesheet" href="assets/book.css">
+</head>
+<body>
+
+<main id="book"><div class="inner">
+
+<!-- ─────────────────────────────────────────── 화면 1 -->
+<section class="screen" data-title="이 장에서 할 일">
+  <p class="kicker">11장 · 화면 1</p>
+  <h1>아키텍처<br>계층형에서 헥사고날로</h1>
+
+  <p class="lead">10장은 마지막 화면에서 이렇게 예고했습니다 — "11장은 시선을 다시 안으로
+  돌려, 지금까지 암묵적으로 지켜 온 계층 구조(5장)를 포트와 어댑터라는 이름의 코드 구조로
+  명시적으로 세웁니다." 이 장이 그 약속을 지킵니다.</p>
+
+  <p>사실 이 장은 <b>새 기능을 만들지 않습니다.</b> <code>Order</code>도
+  <code>InventoryItem</code>도, 새 유스케이스도 없습니다. 이 장이 하는 일은 4~10장이
+  이미 짜 놓은 코드 — 리포지토리, 응용 서비스, <code>CatalogPort</code>,
+  <code>PaymentPort</code> — 를 <b>어느 폴더에 놓을지, 그리고 그 배치를 어떻게 실제로
+  지킬지</b>를 정하는 것입니다.</p>
+
+  <div class="box note">
+    <p class="box-t">이 장의 지도</p>
+    <ul>
+      <li><b>화면 2~3 · 뒤집기를 끝까지.</b> 계층형의 흔한 문제, 그리고 우리 코드가
+      4~5장에서 이미 반쯤 뒤집어 둔 그림을 끝까지 밀어붙입니다.</li>
+      <li><b>화면 4~5 · 포트 분류.</b> 지금까지 만든 모든 포트를 한 표에 놓고,
+      <code>PaymentPort</code>가 어디에 있어야 하는지 정리합니다.</li>
+      <li><b>화면 6~7 · 디렉터리와 합성 뿌리.</b> 주문 컨텍스트의 실제 폴더 구조와,
+      어댑터를 실제로 조립하는 자리.</li>
+      <li><b>화면 8~9 · 파이썬은 이걸 강제하지 않는다.</b> <code>Protocol</code>과
+      폴더가 실제로 보장하는 것, 그리고 <code>import-linter</code>로 경계에 이빨을
+      다는 방법.</li>
+      <li><b>화면 10 · 어니언·클린 아키텍처.</b> 같은 아이디어의 다른 그림.</li>
+      <li><b>화면 11~13 · 판단, 한계, 요약, 퀴즈, 과제.</b></li>
+    </ul>
+  </div>
+
+  <p>이 장이 갚는 빚은 넷입니다. 0장은 "이 교재는 11장에 가서야 폴더 구조를 이야기한다"고
+  적어 뒀고, 3장 화면 16은 애그리게이트 모듈끼리 서로 <code>import</code>하는 문제를
+  "11장에서 디렉터리 구조와 자동 검사로 굳힌다"고 미뤘습니다. 9장 화면 10이 남긴
+  <code>import-linter</code> 이야기도, 10장이 남긴 "<code>PaymentPort</code>는 어디에
+  놓이는 포트인가"라는 질문도 이 장의 몫입니다.</p>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 2 -->
+<section class="screen" data-title="계층형 아키텍처의 한계">
+  <p class="kicker">11장 · 화면 2</p>
+  <h2>계층형 아키텍처의 한계 — 그리고 이미 반쯤 뒤집힌 우리 그림</h2>
+
+  <p>많은 교과서와 실무 프로젝트가 이런 모양의 계층을 그립니다. <b>실제 우리 코드가 아니라
+  흔히 보는 일반적인 그림</b>입니다.</p>
+
+  <figure class="fig">
+    <svg viewBox="0 0 460 320" role="img" aria-label="표현, 비즈니스 로직, 데이터 접근, 데이터베이스가 위에서 아래로 쌓이고 화살표가 전부 아래로 향하는 전통적인 계층형 스택 그림">
+      <g class="svg-muted" stroke="currentColor" stroke-width="1" style="fill:none">
+        <rect x="130" y="15" width="200" height="48" rx="8"/>
+        <rect x="130" y="95" width="200" height="48" rx="8"/>
+        <rect x="130" y="175" width="200" height="48" rx="8"/>
+      </g>
+      <g stroke-width="1.2" stroke-dasharray="4 3" style="stroke:var(--warn);fill:none">
+        <rect x="130" y="255" width="200" height="45" rx="8"/>
+      </g>
+      <g text-anchor="middle" font-size="12" font-weight="700" class="svg-fg">
+        <text x="230" y="44">표현(UI)</text>
+        <text x="230" y="124">비즈니스 로직</text>
+        <text x="230" y="204">데이터 접근(DAO)</text>
+      </g>
+      <g text-anchor="middle" font-size="12" font-weight="700" style="fill:var(--warn)">
+        <text x="230" y="282">데이터베이스</text>
+      </g>
+      <g class="svg-muted" stroke="currentColor" stroke-width="1.3" fill="none">
+        <path d="M230 63 V91"/>
+        <path d="M230 143 V171"/>
+      </g>
+      <g style="stroke:var(--warn)" stroke-width="1.4" fill="none">
+        <path d="M230 223 V251"/>
+      </g>
+      <g class="svg-muted" stroke="none">
+        <path d="M226 87 L230 93 L234 87 Z"/>
+        <path d="M226 167 L230 173 L234 167 Z"/>
+      </g>
+      <g style="fill:var(--warn)" stroke="none">
+        <path d="M226 247 L230 253 L234 247 Z"/>
+      </g>
+      <g text-anchor="middle" font-size="9.5" class="svg-muted">
+        <text x="270" y="82">의존</text>
+        <text x="270" y="162">의존</text>
+      </g>
+      <g text-anchor="middle" font-size="9.5" style="fill:var(--warn)">
+        <text x="290" y="240">의존 — 문제는 여기</text>
+      </g>
+    </svg>
+    <figcaption>흔히 보는 계층형 스택입니다(가상의 예). 화살표가 전부 아래로 향합니다.
+    문제는 세 번째 화살표입니다 — 업무 규칙이 있는 "비즈니스 로직"이 데이터 접근을 거쳐
+    결국 특정 DB 기술에 의존하게 됩니다.</figcaption>
+  </figure>
+
+  <div class="box bad">
+    <p class="box-t">DB가 맨 아래에 있으면 벌어지는 일</p>
+    <p>"아래에 있다"는 말은 물리적 위치가 아니라 <b>누가 누구를 <code>import</code>
+    하는가</b>를 뜻합니다. 비즈니스 로직 모듈이 데이터 접근 모듈을 <code>import</code>하면,
+    업무 규칙을 읽으려는 사람이 <code>SELECT</code>·<code>INSERT</code>까지 같이
+    읽어야 합니다. DB 스키마가 바뀌면 업무 규칙과 무관한 이유로 비즈니스 로직 파일이
+    함께 흔들립니다. 4장 화면 2가 <code>Order.cancel()</code> 안에
+    <code>sqlite3.connect()</code>를 그대로 넣은 코드로 이 모습을 이미 보여줬습니다 —
+    그게 바로 이 그림의 세 번째 화살표가 코드로 나타난 모습입니다.</p>
+  </div>
+
+  <div class="box good">
+    <p class="box-t">우리는 이미 이 화살표 하나를 뒤집었다</p>
+    <p>4장은 그 문제에 <span class="term" data-term="repository">리포지토리</span>로
+    답했습니다 — 도메인이 <code>OrderRepository</code>라는 인터페이스를 정의하고,
+    인프라가 그걸 구현하도록 <span class="term" data-term="dip">의존성 역전 원칙</span>을
+    적용했습니다(4장 화면 3). 5장은 그 위에 응용 계층까지 얹어 <b>표현 → 응용 → 도메인
+    ← 인프라</b>라는 그림을 완성했습니다(5장 화면 3) — 화살표 셋 중 <b>인프라 쪽 화살표만
+    이미 위를 향하고 있었습니다.</b></p>
+  </div>
+
+  <p>그런데 이 그림에는 아직 손대지 않은 구석이 있습니다. <b>표현 계층은 왜 괜찮았을까요?</b>
+  표현이 응용을 <code>import</code>하는 것은 지금까지 한 번도 문제로 지적되지
+  않았습니다 — 웹 요청이 들어와 응용 서비스를 부르는 것은 <b>당연한 방향</b>이기
+  때문입니다. 그런데 그렇다면 "화살표가 아래로 향하면 안 된다"는 규칙 자체가 틀린
+  것일까요? 다음 화면에서 이 질문에 답합니다.</p>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 3 -->
+<section class="screen" data-title="안과 밖 — 포트와 어댑터">
+  <p class="kicker">11장 · 화면 3</p>
+  <h2>뒤집기를 끝까지 — 안과 밖</h2>
+
+  <p>화면 2의 질문에 대한 답은 이것입니다 — <b>"위/아래"라는 그림 자체가 오해를
+  만듭니다.</b> 표현 계층이 응용을 부르는 것과, 인프라가 도메인의 인터페이스를 구현하는
+  것은 <b>같은 종류의 규칙</b>입니다. 둘 다 "코어(도메인 + 응용)만 안정적으로 두고,
+  코어를 둘러싼 바깥쪽은 코어 쪽을 바라보게 한다"는 하나의 규칙에서 나옵니다. 다만
+  표현 쪽은 원래부터 자연스러운 방향(호출)이었고, 인프라 쪽만 방향을 <b>뒤집어야</b>
+  했을 뿐입니다.</p>
+
+  <p>이 하나의 규칙을 계단이 아니라 <b>안과 밖</b>으로 다시 그리면 이렇게 됩니다.</p>
+
+  <figure class="fig">
+    <svg viewBox="0 0 700 320" role="img" aria-label="가운데 도메인과 응용이 있고, 웹·DB·외부 컨텍스트 클라이언트·메시지 버스가 사방에서 화살표로 가운데를 향하는 그림">
+      <g class="svg-fg" stroke="currentColor" stroke-width="1.4" style="fill:none">
+        <rect x="220" y="125" width="200" height="90" rx="12"/>
+      </g>
+      <g class="svg-muted" stroke="currentColor" stroke-width="1" style="fill:none">
+        <rect x="220" y="20" width="200" height="55" rx="8"/>
+        <rect x="220" y="245" width="200" height="55" rx="8"/>
+        <rect x="520" y="95" width="150" height="55" rx="8"/>
+        <rect x="520" y="175" width="150" height="55" rx="8"/>
+      </g>
+      <g text-anchor="middle" font-size="13" font-weight="700" class="svg-fg">
+        <text x="320" y="165">도메인</text>
+        <text x="320" y="185">+ 응용</text>
+      </g>
+      <g text-anchor="middle" font-size="11.5" font-weight="700" class="svg-fg">
+        <text x="320" y="52">웹(표현)</text>
+        <text x="320" y="277">메시지 버스</text>
+        <text x="595" y="126">DB</text>
+        <text x="595" y="203">외부 컨텍스트</text>
+        <text x="595" y="216">클라이언트</text>
+      </g>
+      <g class="svg-muted" stroke="currentColor" stroke-width="1.3" fill="none">
+        <path d="M320 75 V121"/>
+        <path d="M320 245 V219"/>
+        <path d="M520 122 H426"/>
+        <path d="M520 202 H426"/>
+      </g>
+      <g class="svg-muted" stroke="none">
+        <path d="M316 114 l4 7 4 -7 z"/>
+        <path d="M316 226 l4 -7 4 7 z"/>
+        <path d="M430 118 l-7 4 7 4 z"/>
+        <path d="M430 198 l-7 4 7 4 z"/>
+      </g>
+      <g text-anchor="middle" font-size="9.5" class="svg-muted">
+        <text x="350" y="98">호출</text>
+        <text x="395" y="233">Protocol 구현(이상)</text>
+        <text x="473" y="112">Protocol 구현</text>
+        <text x="473" y="192">Protocol 구현</text>
+      </g>
+    </svg>
+    <figcaption>모든 화살표가 안쪽(도메인 + 응용)을 향합니다. 웹이 응용을 부르는 것은
+    원래도 자연스러운 방향이었고, DB·외부 컨텍스트 클라이언트가 코어 쪽 인터페이스를
+    구현하는 것은 4~5장에서 뒤집은 방향입니다. "메시지 버스" 화살표에 "(이상)"이라고
+    적어 둔 이유는 화면 4에서 확인합니다 — 지금까지 우리 코드가 정말 이 그림대로인지
+    아직 확인하지 않았습니다.</figcaption>
+  </figure>
+
+  <div class="box note">
+    <p class="box-t"><span class="term" data-term="hexagonal">헥사고날 아키텍처</span>
+    (포트와 어댑터)</p>
+    <p>알리스터 콕번(Alistair Cockburn)이 2005년에 제안한 이름입니다. 육각형이라는
+    모양 자체에 특별한 뜻은 없습니다 — 콕번이 이 모양을 고른 이유는 정확히 화면 2의
+    문제 때문입니다. 계층을 <b>위/아래 2단</b>으로 그리면 "위쪽(표현)은 원래 괜찮고
+    아래쪽(인프라)만 문제"라는 인상을 주는데, 실제로는 코어를 둘러싼 바깥쪽이 <b>몇
+    개든 될 수 있고 전부 같은 규칙을 따릅니다</b>(지금 이 그림에서만도 넷 —
+    웹·DB·외부 클라이언트·메시지 버스). 변이 여러 개인 도형을 고른 것은 "위/아래"라는
+    잘못된 직관을 지우기 위해서였습니다.</p>
+  </div>
+
+  <div class="box note">
+    <p class="box-t"><span class="term" data-term="port">포트</span>와
+    <span class="term" data-term="adapter">어댑터</span></p>
+    <p><b>포트</b>는 코어가 정의해 둔 인터페이스입니다 — <code>OrderRepository</code>,
+    <code>CatalogPort</code>, <code>UnitOfWork</code>가 모두 포트입니다. <b>어댑터</b>는
+    그 포트를 실제로 구현한, 바깥쪽에 닿아 있는 클래스입니다 —
+    <code>SqlAlchemyOrderRepository</code>, <code>PgPaymentAdapter</code>가 어댑터입니다.
+    4~10장이 이미 이 둘을 계속 만들어 왔습니다. 새 이름을 알았을 뿐입니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 4 -->
+<section class="screen" data-title="포트 분류표 — 부르는 쪽, 불리는 쪽">
+  <p class="kicker">11장 · 화면 4</p>
+  <h2>지금까지 만든 포트를 한 표에</h2>
+
+  <p>포트는 방향이 둘입니다. <b>구동 포트(driving port)</b>는 바깥이 코어를 부르는
+  통로이고, <b>피구동 포트(driven port)</b>는 코어가 바깥에 무언가를 시키는 통로입니다.
+  이 교재는 구동 포트를 별도 클래스로 뽑지 않습니다 — <code>OrderingService</code>의
+  공개 메서드(<code>place_order</code>, <code>cancel_order</code>) 자체가 그 컨텍스트의
+  구동 포트입니다. <code>web/views.py</code>가 그 메서드를 부르는 유일한 자리입니다
+  (5장).</p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th>포트</th><th style="width:5rem">방향</th><th>정의된 장</th><th>어댑터(구현)</th></tr>
+      <tr><td><code>OrderingService</code>의 공개 메서드</td><td>구동</td>
+        <td>5장</td><td><code>web/views.py</code>가 직접 부른다</td></tr>
+      <tr><td><code>OrderRepository</code>·<code>InventoryRepository</code></td><td>피구동</td>
+        <td>4장</td><td><code>SqlAlchemy*Repository</code>·<code>InMemory*Repository</code></td></tr>
+      <tr><td><code>UnitOfWork</code></td><td>피구동</td>
+        <td>5장</td><td><code>SqlAlchemyUnitOfWork</code>·<code>InMemoryUnitOfWork</code></td></tr>
+      <tr><td><code>CatalogPort</code>·<code>MembershipPort</code></td><td>피구동</td>
+        <td>5장</td><td>같은 프로세스 내 클래스(9장 이후 HTTP로 대체 가능, 10장)</td></tr>
+      <tr><td><code>ShippingPolicy</code></td><td>피구동</td>
+        <td>5장</td><td>같은 프로세스 내 클래스(배송 컨텍스트가 아직 구현되지 않음)</td></tr>
+      <tr><td><code>PaymentPort</code></td><td>피구동</td>
+        <td>10장</td><td><code>PgPaymentAdapter</code></td></tr>
+    </table>
+  </div>
+
+  <div class="box warn">
+    <p class="box-t">그런데 <code>MessageBus</code>는 이 표에 없습니다</p>
+    <p>7장이 만든 <code>MessageBus</code>를 다시 보겠습니다 — <code>OrderingService</code>의
+    생성자는 <code>bus: MessageBus</code>를 받습니다. <b><code>Protocol</code>이
+    아니라 구체 클래스 그대로</b>입니다. 화면 3의 그림이 "(이상)"이라고 적어 둔 이유가
+    이것입니다 — 그림대로라면 <code>EventPublisher(Protocol)</code> 같은 포트가 있고
+    <code>MessageBus</code>가 그걸 구현해야 하는데, 실제 코드는 응용 계층이 인프라의
+    구체 클래스를 <b>그대로 타입 힌트로</b> 씁니다. 이것도 포트라고 부를 수 있을까요?
+    화면 9에서 이 질문을 실제로 검사해 봅니다.</p>
+  </div>
+
+  <div class="box note">
+    <p class="box-t">포트가 아닌 것 — <code>ShippingFeePolicy</code>·
+    <code>ExpiryBufferPolicy</code></p>
+    <p>6~7장이 만든 <code>ShippingFeePolicy</code>·<code>DiscountPolicy</code>·
+    <code>ExpiryBufferPolicy</code>도 <code>Protocol</code>입니다. 그런데 이들은
+    위 표에 넣지 않았습니다 — <b>포트가 아니기 때문입니다.</b> 판별 기준은
+    이것입니다 — <b>이 인터페이스가 대표하는 것이 "바깥 세계와의 통신"인가, 아니면
+    "아직 정해지지 않은 계산 규칙"인가?</b> <code>CatalogPort</code>는 카탈로그
+    컨텍스트라는 <b>바깥</b>에 묻습니다. <code>ShippingFeePolicy</code>는 이미 손에
+    쥔 데이터(주문 항목, 등급)로 배송비를 <b>계산</b>할 뿐, 누구에게도 묻지
+    않습니다 — 카테고리별 여유일수나 등급별 배송비 규칙이 자주 바뀌어서 도메인
+    서비스로 뽑았을 뿐(6장), 통신 상대가 있는 건 아닙니다. <code>Protocol</code>은
+    "교체 가능한 구현"을 표현하는 도구일 뿐이고, 포트는 그중에서도 <b>바깥과의
+    경계</b>에 있는 것만을 가리키는 이름입니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 5 -->
+<section class="screen" data-title="PaymentPort는 어디에 있어야 하는가">
+  <p class="kicker">11장 · 화면 5</p>
+  <h2><code>PaymentPort</code>는 어디에 있어야 하는가</h2>
+
+  <p>10장 화면 8~9는 <code>PaymentPort</code>·<code>PaymentApproval</code>·
+  <code>PaymentDeclined</code>·<code>PaymentGatewayError</code>를
+  <code>domain/payment.py</code>라는 이름 아래 보여줬습니다. 그런데 5장 화면 9는 이미
+  이렇게 적어 뒀습니다 — <i>"인터페이스는 그것을 쓰는 쪽(도메인·응용)이 정의하고,
+  구현은 인프라가 그 인터페이스를 향해 만든다."</i> 도메인과 응용은 둘 다 "안쪽"이라
+  <b>어느 쪽에 두어도 코드는 똑같이 동작합니다.</b> 그렇다면 이 교재는 실제로 어떤
+  기준으로 나눠 왔을까요?</p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th>포트</th><th>자리</th><th>이유</th></tr>
+      <tr><td><code>OrderRepository</code></td><td><code>domain/repository.py</code>(4장)</td>
+        <td>"내 애그리게이트를 다시 만나는 통로" — 애그리게이트 자체와 뗄 수 없다</td></tr>
+      <tr><td><code>UnitOfWork</code>·<code>CatalogPort</code>·<code>MembershipPort</code></td>
+        <td><code>application/*.py</code>(5장)</td>
+        <td>"이 유스케이스를 조립하려고 바깥에 무엇을 묻는가" — 응용 계층의 조립
+        책임에 가깝다</td></tr>
+    </table>
+  </div>
+
+  <p><code>PaymentPort</code>는 어느 쪽에 가까울까요? 결제 승인은 "내 애그리게이트를
+  저장하는 문제"가 아니라 "주문을 접수하려고 결제 컨텍스트에 승인을 요청하는 문제"입니다
+  — 모양도 이유도 <code>CatalogPort</code>·<code>MembershipPort</code>와 같습니다.
+  이 장은 그 기준을 그대로 적용해 <code>PaymentPort</code>를
+  <code>application/ports.py</code> 자리로 정리합니다.</p>
+
+  <div class="box good">
+    <p class="box-t">10장의 화면을 다시 고치지 않는다</p>
+    <p>클래스 이름과 메서드 시그니처는 10장 그대로입니다 — 바뀌는 것은 "어느 파일에
+    있다고 적을 것인가"뿐입니다. 9장 화면 8이 3장 화면 13의 예고를 다시 해석했던 것처럼
+    ("뜯을 것이 없었다"), 10장의 코드를 다시 쓰지 않고 이 장에서 최종 자리만
+    정리합니다. 값 객체 <code>PaymentApproval</code>은 <code>OrderItemSnapshot</code>
+    (5장)이 <code>CatalogPort</code>와 나란히 있던 <code>application/ports.py</code>로
+    — "다른 컨텍스트에서 받아 온 값"이기 때문입니다. 예외
+    <code>PaymentDeclined</code>·<code>PaymentGatewayError</code>는 그와 다른
+    자리로 갑니다 — 주문 쪽의 다른 예외들(3장의 네 개 — 5번째인
+    <code>InsufficientStock</code>은 재고 쪽입니다 —, 4장의
+    <code>OrderNotFound</code>)이 모여 있는 <code>ordering/domain/errors.py</code>
+    입니다(화면 6). 실패를 예외로 알리는 것 자체는(3장이 정한 규칙) 값이 아니라
+    <b>도메인 예외 계층</b>의 일이기 때문입니다.</p>
+  </div>
+
+  <div class="box note">
+    <p class="box-t">참고: 언젠가 결제가 진짜 컨텍스트가 되면</p>
+    <p>10장 화면 9의 "이 계층이 안 하는 일" 상자는 "환불 누계 검증(I14)·승인 여부
+    검증(I15)은 결제 애그리게이트의 일인데, 그 애그리게이트는 아직 이 교재 어디에도
+    없다"고 밝혀 뒀습니다. 그 애그리게이트가 실제로 생기는 날, <code>PaymentPort</code>는
+    지금처럼 주문 쪽의 <code>application/ports.py</code>에 남고, 새로 생기는
+    <code>payment/domain/payment.py</code>는 그 포트를 구현하는 어댑터 반대편에서
+    결제 컨텍스트 자신의 불변식을 지키게 됩니다 — 카탈로그가 분리되기 전/후에도
+    <code>CatalogPort</code>라는 인터페이스는 그대로 두고 구현만 바뀐다고 했던 것
+    (5장 화면 9)과 같은 이유입니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 6 -->
+<section class="screen" data-title="주문 컨텍스트의 디렉터리 구조">
+  <p class="kicker">11장 · 화면 6</p>
+  <h2>주문 컨텍스트의 디렉터리 구조</h2>
+
+  <p>0장이 예고한 그 폴더 구조입니다. 2~8장은 <code>domain/order.py</code>,
+  <code>application/ordering.py</code>처럼 컨텍스트 이름 없이 파일 경로를 적어
+  왔습니다 — 그때는 한빛몰 코드에 컨텍스트가 하나뿐이라고 다뤘기 때문에 어색하지
+  않았습니다. 9장이 카탈로그·재고·창고를 <code>catalog/</code>·<code>inventory/</code>·
+  <code>warehouse/</code>로 나눈 뒤부터는, 그 앞의 평평한 경로들이 사실 <b>"주문
+  컨텍스트 안의" 계층</b>이었다는 것이 드러납니다. 지금 그 자리를 명시적으로
+  채웁니다.</p>
+
+<pre><code class="plain">hanbitmall/
+├── shared/                      # 정말 공용인 값·기반 클래스만(3장의 "공용 값 객체" 예외)
+│   ├── money.py                 # Money (2장) — Product.price(카탈로그)와
+│   │                            #   Order 금액 계산(주문)이 함께 쓴다
+│   ├── errors.py                # DomainError (3장) — 모든 컨텍스트 예외의 공통 조상
+│   └── events.py                # DomainEvent (7장) — 모든 컨텍스트 이벤트의 공통 조상
+│
+├── ordering/                    # 주문 컨텍스트
+│   ├── domain/
+│   │   ├── order.py             # Order, OrderLine, Quantity·Address·OrderNumber (2·3·6장)
+│   │   ├── errors.py            # OrderCannotBeModified·EmptyOrder·LineNotFound·
+│   │   │                        #   AlreadyShipped(3장 네 개), OrderNotFound(4장),
+│   │   │                        #   PaymentDeclined·PaymentGatewayError(10장) — 전부
+│   │   │                        #   shared.errors.DomainError를 물려받는다
+│   │   ├── events.py            # OrderPlaced, DeliveryPromised, OutOfStock,
+│   │   │                        #   PromisedDateChanged (7장)
+│   │   ├── services.py          # ShippingFeePolicy, DiscountPolicy (6장)
+│   │   └── repository.py        # OrderRepository (Protocol, 4장)
+│   ├── application/
+│   │   ├── commands.py          # PlaceOrderCommand, OrderItemInput (5장)
+│   │   ├── dto.py               # OrderSummary (5장)
+│   │   ├── ports.py             # CatalogPort·MembershipPort·ShippingPolicy·PaymentPort,
+│   │   │                        #   OrderItemSnapshot·PaymentApproval (5·10장)
+│   │   ├── unit_of_work.py      # UnitOfWork (Protocol, 5장) — orders: OrderRepository,
+│   │   │                        #   inventory: InventoryRepository를 함께 쥔다
+│   │   ├── ordering.py          # OrderingService — 구동 포트 (5·6·7장)
+│   │   └── handlers.py          # allocate_stock·repromise_delayed_orders·notify_*
+│   │                            #   (7장) — 전부 Order를 다루는 핸들러다
+│   ├── infrastructure/
+│   │   ├── sqlalchemy_repository.py
+│   │   ├── sqlalchemy_uow.py
+│   │   ├── memory_repository.py    # 테스트용 (4장)
+│   │   ├── memory_uow.py           # 테스트용 (5장)
+│   │   ├── catalog_client.py       # CatalogPort 구현
+│   │   ├── membership_client.py    # MembershipPort 구현
+│   │   ├── payment_gateway.py      # PaymentPort 구현 — PgPaymentAdapter (10장)
+│   │   └── message_bus.py          # MessageBus (7장)
+│   └── web/
+│       ├── views.py             # place_order_view 등 (1·5장)
+│       └── parsing.py
+│
+├── inventory/                   # 재고 컨텍스트
+│   ├── domain/
+│   │   ├── inventory.py         # InventoryItem, StockBatch, Allocation,
+│   │   │                        #   ExpiryBufferPolicy, InsufficientStock,
+│   │   │                        #   InventoryNotFound (3·4·7장)
+│   │   ├── events.py            # InboundDelayed (7장) — 재고 컨텍스트가 발생시킨다
+│   │   ├── sku.py               # Sku (9장)
+│   │   └── repository.py        # InventoryRepository (Protocol, 4장)
+│   └── infrastructure/
+│       └── sqlalchemy_repository.py
+│
+├── catalog/                     # 카탈로그 컨텍스트
+│   └── domain/
+│       └── product.py           # Product, ProductSku (9장)
+│
+└── warehouse/                   # 창고 컨텍스트
+    └── domain/
+        └── stored_item.py       # StoredItem, Location (9장)
+</code></pre>
+
+  <div class="box note">
+    <p class="box-t"><code>shared/</code>는 새 규칙이 아니라 이미 있던 규칙</p>
+    <p>3장이 "다른 애그리게이트 파일을 <code>import</code>하면 안 된다"고 하면서도
+    예외를 하나 뒀습니다 — "<code>uuid</code>·<code>datetime</code> 같은 표준
+    라이브러리와 공용 값 객체(<code>Money</code>) 외에는 들어오지 않아야 한다."
+    <code>shared/</code>는 그 예외를 폴더로 옮긴 것뿐입니다 — <b>의도적으로 만든,
+    아주 작은 공유 커널</b>입니다. 10장 화면 5가 카탈로그·주문 사이의 공유 커널을
+    거부한 것과 모순되지 않습니다 — 그때 거부한 것은 <code>Product</code> 전체를
+    공유하는 것이었지, <code>Money</code>처럼 어느 컨텍스트의 것도 아닌 값까지
+    막은 것은 아니었습니다. 무엇을 <code>shared/</code>에 넣을지는 엄격해야
+    합니다 — "여러 컨텍스트가 함께 쓰는가"가 아니라 <b>"그 값의 의미가 애초에
+    어느 컨텍스트에도 속하지 않는가"</b>를 물어야 합니다. <code>Allocation</code>은
+    재고 컨텍스트가 만든 값이라 이 기준을 통과하지 못합니다(화면 9에서 다시
+    봅니다).</p>
+  </div>
+
+  <div class="box warn">
+    <p class="box-t"><code>infra/</code>였다가 <code>infrastructure/</code></p>
+    <p>4~7장은 이 폴더를 <code>infra/</code>라고 줄여 적었고, 10장은
+    <code>infrastructure/</code>라고 풀어 적었습니다. 같은 자리를 가리키는 이름이
+    흔들린 것입니다. 0장이 이미 <code>infrastructure/</code>를 썼으므로(오해 1
+    상자), 이 장부터는 그 표기로 통일합니다 — 앞 장의 코드 캡션을 다시 고치지는
+    않습니다. 같은 이유로 9장이 <code>catalog/product.py</code>라고 적었던 것도
+    이 트리에서는 <code>catalog/domain/product.py</code>입니다 — 9장 시점에는
+    아직 컨텍스트 안의 계층까지 나눌 필요가 없었을 뿐입니다.</p>
+  </div>
+
+  <div class="box note">
+    <p class="box-t">주문의 <code>UnitOfWork</code>는 재고의 리포지토리도 쥔다</p>
+    <p><code>ordering/application/unit_of_work.py</code>의
+    <code>UnitOfWork.inventory</code> 필드는 <code>inventory/domain/repository.py</code>의
+    <code>InventoryRepository</code>를 타입으로 씁니다 — <b>주문의 응용 계층이
+    재고의 도메인 모듈을 <code>import</code>합니다.</b> 화면 9의 계약 어디에도
+    안 걸리는 이유는 이것이 <b>애그리게이트끼리의 직접 참조</b>(계약 2가 막는
+    것 — <code>ordering.domain.order</code>가 <code>inventory.domain.inventory</code>를
+    아는 것)가 아니라, 10장 지도의 ③ 관계 — 주문이 재고에게 "할당해 달라"고
+    요청하는 <b>고객/공급자</b> 관계 — 이기 때문입니다. 응용 계층이 상대 컨텍스트의
+    리포지토리 인터페이스를 아는 것과, 도메인 계층이 상대 컨텍스트의 애그리게이트
+    내부를 아는 것은 다른 문제입니다.</p>
+  </div>
+
+  <p><code>ordering/</code> 안의 <b>domain → application → infrastructure/web</b>이
+  화면 3의 "안과 밖"이고, 최상위의 <b>ordering / inventory / catalog / warehouse</b>가
+  9~10장이 그은 컨텍스트 경계입니다. 두 경계는 서로 다른 질문에 답합니다 — 위아래는
+  "이 코드가 바깥과 얼마나 가까운가", 좌우는 "이 코드가 누구의 관심사인가."</p>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 7 -->
+<section class="screen" data-title="합성 뿌리 — 어댑터를 실제로 잇기">
+  <p class="kicker">11장 · 화면 7</p>
+  <h2><span class="term" data-term="compositionroot">합성 뿌리</span> — 어댑터를 실제로 잇기</h2>
+
+  <p>포트는 인터페이스일 뿐입니다. 누군가는 <code>SqlAlchemyOrderRepository()</code>를
+  실제로 <code>new</code> 해서 <code>OrderingService</code>에 넘겨야 합니다. 그 일을
+  하는 단 하나의 자리를 <b>합성 뿌리(composition root)</b>라고 부릅니다.</p>
+
+<pre><span class="cap"># hanbitmall/bootstrap.py</span><code>def build_ordering_service(session_factory) -&gt; OrderingService:
+    return OrderingService(
+        uow=SqlAlchemyUnitOfWork(session_factory),        # DB
+        catalog=InProcessCatalogAdapter(),                # 카탈로그 컨텍스트(같은 프로세스)
+        members=InProcessMembershipAdapter(),              # 회원 컨텍스트(같은 프로세스)
+        fee_policy=...,                                     # 6장의 구체 구현(생략)
+        discount_policy=...,
+        bus=MessageBus(),
+    )
+</code></pre>
+
+  <div class="box note">
+    <p class="box-t">이 파일만 모든 것을 알아도 된다</p>
+    <p><code>bootstrap.py</code>는 <code>ordering</code>·<code>catalog</code>·
+    <code>inventory</code>의 구체 클래스를 전부 <code>import</code>합니다 — 그래도
+    괜찮습니다. 화면 3~6이 그은 경계는 "도메인·응용이 인프라를 몰라야 한다"는
+    것이지, "이 세상 어디에도 모든 걸 아는 코드가 있으면 안 된다"는 것이 아닙니다.
+    합성 뿌리는 그 유일한 예외 지점입니다 — 그래서 어떤 컨텍스트 폴더 <b>안에도</b>
+    두지 않고 최상위에 둡니다. <code>InProcessCatalogAdapter</code>처럼 구체
+    어댑터 클래스의 이름은 이 장에서 처음 붙여 본 예시일 뿐입니다 — 무엇이라
+    부르든 상관없습니다.</p>
+  </div>
+
+  <p>이 코드는 <code>OrderingService</code>에 결제 어댑터를 넣지 않습니다.
+  10장 화면 8이 이미 밝혀 둔 것처럼, <code>PaymentPort</code>는
+  아직 <code>OrderingService</code>에 연결되지 않습니다 — 그 연결은 12장의
+  몫입니다.</p>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 8 -->
+<section class="screen" data-title="파이썬이 보장하는 것, 안 하는 것">
+  <p class="kicker">11장 · 화면 8</p>
+  <h2>파이썬이 보장하는 것, 안 하는 것</h2>
+
+  <p>지금까지 그린 그림은 <b>설계도</b>입니다. 파이썬이 이 설계도를 실제로 강제해
+  줄까요? 하나씩 확인해 보겠습니다.</p>
+
+<pre><code>@runtime_checkable
+class OrderRepository(Protocol):
+    def get(self, order_number: OrderNumber) -&gt; Order: ...
+
+class NotARepository:
+    def get(self):                 # 인자 개수도, 반환 타입도 다르다
+        return "아무거나"
+
+isinstance(NotARepository(), OrderRepository)   # True
+</code></pre>
+
+  <p><code>@runtime_checkable</code>을 붙인 <code>Protocol</code>의
+  <code>isinstance()</code> 검사는 <b>메서드 이름이 존재하는가</b>만 봅니다 — 인자
+  개수도, 타입도 확인하지 않습니다. <code>@runtime_checkable</code>이 없으면
+  <code>isinstance()</code> 자체가 <code>TypeError</code>를 던집니다. 4장이
+  <code>Protocol</code>을 "구조적 타입"이라고 소개했을 때 이미 예고된 성질입니다 —
+  구조가 맞으면 통과시킨다는 것은, <b>얼마나 허술하게 맞아도 통과시킨다</b>는
+  뜻이기도 합니다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:11rem">장치</th><th>보장 수준</th></tr>
+      <tr><td><code>Protocol</code></td>
+        <td><b>타입 검사기(mypy·pyright)만</b> 시그니처(인자 타입·반환 타입)까지
+        검사한다. 실행 시점에는 이름 존재 여부(<code>@runtime_checkable</code> 필요)
+        정도만 확인하거나, 아예 검사하지 않는다.</td></tr>
+      <tr><td>폴더, <code>_</code>·<code>__all__</code></td>
+        <td><b>관례일 뿐이다.</b> <code>inventory/</code> 코드가
+        <code>from hanbitmall.catalog.domain.product import Product</code>를 그냥 써도
+        문법 에러는 나지 않는다(9장 화면 10).</td></tr>
+      <tr><td><code>import-linter</code></td>
+        <td><b>CI에서의 정적 분석.</b> <code>import</code> 문을 실제로 읽어
+        규칙을 검사하고, 어기면 빌드를 실패시킨다. 다만 <code>importlib.import_module()</code>로
+        문자열을 조립해 우회하는 동적 <code>import</code>는 잡지 못한다.</td></tr>
+    </table>
+  </div>
+
+  <p>세 장치의 공통점은 이것입니다 — 셋 다 <b>"규칙을 어기면 코드가 실행되지 않는다"는
+  보장이 아닙니다.</b> <code>Protocol</code>은 타입 검사기를 돌려야 의미가 있고,
+  폴더 구분은 코드 리뷰가 봐야 의미가 있고, <code>import-linter</code>는 CI에
+  넣어야 의미가 있습니다. C++의 <code>private</code>·<code>friend</code>처럼
+  컴파일러가 원천적으로 막아 주는 장치는 이 중 어디에도 없습니다 — 다음 화면에서
+  가장 강력한 장치(<code>import-linter</code>)를 실제로 걸어 봅니다.</p>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 9 -->
+<section class="screen" data-title="import-linter로 경계에 이빨 달기">
+  <p class="kicker">11장 · 화면 9</p>
+  <h2><code>import-linter</code>로 경계에 이빨 달기</h2>
+
+  <p>9장 화면 10이 예고했던 그 도구입니다. 계약(contract) 몇 개를 파일 하나에
+  적어 두면, CI가 매 커밋마다 <code>import</code> 문 전체를 스캔해 어긴 곳이 있는지
+  확인합니다.</p>
+
+<pre><span class="cap"># .importlinter</span><code class="plain">[importlinter]
+root_package = hanbitmall
+include_external_packages = True
+
+[importlinter:contract:1]
+name = 재고는 카탈로그를 몰라야 한다
+type = forbidden
+source_modules =
+    hanbitmall.inventory
+forbidden_modules =
+    hanbitmall.catalog
+
+[importlinter:contract:2]
+name = 애그리게이트끼리는 서로의 모듈을 직접 import하지 않는다
+type = forbidden
+source_modules =
+    hanbitmall.ordering.domain.order
+forbidden_modules =
+    hanbitmall.inventory.domain.inventory
+
+[importlinter:contract:3]
+name = 도메인 계층은 인프라 기술을 몰라야 한다
+type = forbidden
+source_modules =
+    hanbitmall.ordering.domain
+forbidden_modules =
+    hanbitmall.ordering.infrastructure
+    sqlalchemy
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">2행</span> <code>root_package</code>는 필수입니다 —
+    <code>import-linter</code>가 어디서부터 우리 코드로 볼지 정하는 기준입니다.
+    화면 6의 트리 전체가 <code>hanbitmall/</code> 밑에 있으므로 이 값을 씁니다.</li>
+
+    <li><span class="ln">3행</span> <code>sqlalchemy</code>처럼 우리가 만들지 않은
+    외부 패키지를 <code>forbidden_modules</code>에 쓰려면(27~28행) 이 옵션이
+    <code>True</code>여야 합니다. 없으면 "사내 모듈이 아닌 것도 검사 대상에
+    넣으려면 이 옵션부터 켜라"는 에러가 납니다.</li>
+
+    <li><span class="ln">7·15·23행</span> <code>type = forbidden</code>은 계약의
+    종류입니다. "A는 B를 <code>import</code>하면 안 된다"는 가장 단순한 형태라
+    이 장의 목적에는 이것 하나로 충분합니다.</li>
+
+    <li><span class="ln">9·17·25행</span> <code>source_modules</code>는
+    "이 규칙을 지켜야 하는 쪽"입니다.</li>
+
+    <li><span class="ln">11·19·27~28행</span> <code>forbidden_modules</code>은
+    "그 쪽이 <code>import</code>하면 안 되는 대상"입니다. 계약 3처럼 사내 모듈
+    (<code>hanbitmall.ordering.infrastructure</code>)과 외부 패키지
+    (<code>sqlalchemy</code>)를 한 계약에 함께 넣어도 됩니다.</li>
+  </ol>
+
+  <p>계약 1은 9장 화면 10이 예로 든 그 규칙이고, 계약 2는 3장 화면 16의 퀴즈가
+  경고했던 그 규칙입니다 — 재고 애그리게이트에 <code>allocate_for(order: Order)</code>를
+  추가하면 <code>inventory.py</code>가 <code>order.py</code>를 <code>import</code>하게
+  된다고 지적했던 바로 그 상황입니다. 실제로 이 위반을 코드에 넣고 돌리면 이렇게
+  나옵니다.</p>
+
+<pre><code class="plain">재고는 카탈로그를 몰라야 한다 BROKEN
+애그리게이트끼리는 서로의 모듈을 직접 import하지 않는다 BROKEN
+도메인 계층은 인프라 기술을 몰라야 한다 KEPT
+
+Contracts: 1 kept, 2 broken.
+
+----------------
+Broken contracts
+----------------
+
+재고는 카탈로그를 몰라야 한다
+----------------
+hanbitmall.inventory is not allowed to import hanbitmall.catalog:
+
+-   hanbitmall.inventory.domain.inventory -&gt; hanbitmall.catalog.domain.product
+    (l.1)
+
+애그리게이트끼리는 서로의 모듈을 직접 import하지 않는다
+---------------------------------
+hanbitmall.ordering.domain.order is not allowed to import
+hanbitmall.inventory.domain.inventory:
+
+-   hanbitmall.ordering.domain.order -&gt; hanbitmall.inventory.domain.inventory
+    (l.1)
+</code></pre>
+
+  <p>문제가 된 <code>import</code> 한 줄씩을 지우면(계약 1은 SKU 문자열만 주고받게,
+  계약 2는 <code>allocate_for(order: Order)</code> 같은 메서드를 아예 만들지
+  않으면) 이 축소판 트리에서는 다시 돌렸을 때 셋 다 통과합니다.</p>
+
+<pre><code class="plain">재고는 카탈로그를 몰라야 한다 KEPT
+애그리게이트끼리는 서로의 모듈을 직접 import하지 않는다 KEPT
+도메인 계층은 인프라 기술을 몰라야 한다 KEPT
+
+Contracts: 3 kept, 0 broken.
+</code></pre>
+
+  <div class="box warn">
+    <p class="box-t">함정 — 어댑터는 이 계약을 어겨도 된다</p>
+    <p><code>ordering/infrastructure/catalog_client.py</code>는
+    <code>catalog</code>를 <code>import</code>합니다(화면 6·7) — 그게 이 어댑터가
+    존재하는 이유입니다. 계약 1이 "재고는 카탈로그를 몰라야 한다"고 한 것이지,
+    "주문의 <b>어디도</b> 카탈로그를 몰라야 한다"고 하지 않은 이유가 이것입니다.
+    계약을 <code>hanbitmall.ordering</code> 전체로 넓게 걸면, 정작 있어야 할
+    어댑터의 <code>import</code>까지 위반으로 잡혀 버립니다. <b>어댑터가 바깥을
+    아는 것 자체는 막을 대상이 아닙니다</b> — <code>source_modules</code>를
+    도메인·응용까지로 좁히거나(이 장의 계약 2·3처럼), 주문 쪽에도 "주문은
+    카탈로그를 몰라야 한다" 같은 계약을 <code>hanbitmall.ordering</code>
+    전체로 넓게 걸고 싶다면 그 어댑터의 <code>import</code> 한 줄만
+    <code>ignore_imports</code>로 예외 처리하는 방법도 있습니다(퀴즈 3에서
+    다룹니다).</p>
+  </div>
+
+  <div class="box bad">
+    <p class="box-t">이 계약을 걸면 우리 책 코드도 걸린다</p>
+    <p>화면 4가 남긴 질문 — <code>MessageBus</code> — 을 실제로 검사해 봅니다.
+    "응용 계층은 인프라 구현을 몰라야 한다"는 계약을 하나 더 걸면:</p>
+<pre><code class="plain">응용 계층은 인프라 구현을 몰라야 한다
+---------------------
+hanbitmall.ordering.application is not allowed to import
+hanbitmall.ordering.infrastructure:
+
+-   hanbitmall.ordering.application.ordering -&gt;
+    hanbitmall.ordering.infrastructure.message_bus (l.1)
+</code></pre>
+    <p>7장의 <code>OrderingService.__init__(..., bus: MessageBus)</code>가 정확히
+    이 위반입니다 — <code>MessageBus</code>에 <code>Protocol</code>을 뽑지 않고
+    구체 클래스를 그대로 타입 힌트로 썼기 때문입니다(화면 4). 코드는 지금도 잘
+    동작하고, 타입 검사기도 통과합니다 — 이 계약을 걸기 전까지는 <b>아무도
+    몰랐을 문제</b>입니다.</p>
+    <p>하나 더 있습니다. 5장 화면 10이 <code>Order.allocation</code>을 SKU를 키로
+    담은 딕셔너리(<code>dict[str, Allocation]</code>)로 정했는데, 그
+    <code>Allocation</code>은 3장 화면 14가 <code>domain/inventory.py</code>에
+    정의해 둔 값 객체입니다 — 즉 <code>ordering/domain/order.py</code>가
+    <code>Allocation</code>이라는 타입을 쓰려면
+    <code>inventory/domain/inventory.py</code>를 <code>import</code>해야 합니다.
+    계약 2는 정확히 이 방향(<code>ordering.domain.order → inventory.domain.inventory</code>)을
+    막고 있으므로, <b>위에 쓴 모양 그대로도</b> 이 줄에 걸립니다.
+    <code>Money</code>처럼 정말 공용인 값 객체와 달리(그래서 화면 6이
+    <code>shared/</code>로 뺐습니다), <code>Allocation</code>은 재고 컨텍스트
+    고유의 값이라 그 예외에 들지 못합니다.</p>
+    <p>이 장은 7장·5장의 코드를 고치지 않습니다 — 화면 11에서 이런 누수를
+    감수할지 말지를 비용으로 따집니다. 여기서 확인할 것은 하나입니다:
+    <b>정적 도구가 없었다면 이 사실 자체를 아무도 눈치채지 못했을 것입니다.</b></p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 10 -->
+<section class="screen" data-title="어니언·클린 아키텍처와의 관계">
+  <p class="kicker">11장 · 화면 10</p>
+  <h2>어니언·클린 아키텍처 — 같은 아이디어의 다른 그림</h2>
+
+  <p>헥사고날이 유일한 이름은 아닙니다. 비슷한 시기에 비슷한 문제의식에서 나온
+  그림이 둘 더 있습니다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:9rem">이름</th><th>제안자·연도</th><th>그림의 모양</th></tr>
+      <tr><td><b>계층형(전통)</b></td><td>—</td><td>위 → 아래 스택(화면 2)</td></tr>
+      <tr><td><b>포트와 어댑터<br>(헥사고날)</b></td><td>알리스터 콕번, 2005</td>
+        <td>코어 하나 + 사방의 어댑터(화면 3)</td></tr>
+      <tr><td><b><span class="term" data-term="onion">어니언 아키텍처</span></b></td><td>제프리 팔레르모, 2008</td>
+        <td>동심원 — 도메인 모델이 가장 안쪽, 바깥 원으로 갈수록 인프라에 가까워진다</td></tr>
+      <tr><td><b><span class="term" data-term="cleanarchitecture">클린 아키텍처</span></b></td><td>로버트 마틴, 2012(블로그)·2017(저서)</td>
+        <td>동심원 + "의존성 규칙(Dependency Rule)" — 안쪽으로만 의존이 향한다는 규칙에
+        이름을 붙였다</td></tr>
+    </table>
+  </div>
+
+  <p>세 그림 모두 같은 규칙 하나를 그립니다 — <b>업무 규칙이 있는 곳(도메인)은 그것을
+  둘러싼 기술(DB·UI·외부 API)을 몰라야 하고, 의존성의 화살표는 항상 안쪽을
+  향한다.</b> 어니언의 가장 안쪽 두 원 — "도메인 모델"과 "도메인 서비스" — 을
+  합친 것이 이 교재의 도메인 계층(<code>Order</code>, 그리고 6장의
+  <code>domain/services.py</code>)과 같은 자리이고, 그다음 원 "응용 서비스"가
+  응용 계층과 같은 자리입니다. 클린 아키텍처는 이름이 다를 뿐 같은 두 자리를
+  가리킵니다 — "Entities"가 도메인, "Use Cases"가 응용입니다. 헥사고날만 유독
+  "포트/어댑터"라는 이름을 강조하는데,
+  이는 콕번이 <b>테스트 용이성</b>(포트를 가짜로 바꿔 끼우는 것)을 가장 앞세워
+  설명했기 때문입니다 — 4장 화면 5가 "메모리 구현과 갑자기 쉬워지는 테스트"라는
+  제목을 붙인 이유와 같은 동기입니다.</p>
+
+  <div class="box note">
+    <p class="box-t">그림이 다르다고 다른 설계가 아니다</p>
+    <p>세 이름 중 무엇을 골라 말해도, 4~10장이 만든 코드는 그대로 이 세 그림 모두를
+    만족합니다. 팀마다 어떤 그림으로 부르는지가 다를 뿐입니다 — "우리는 클린
+    아키텍처를 쓴다"는 팀과 "우리는 헥사고날을 쓴다"는 팀이 실제로는 같은 구조를
+    가리키고 있을 가능성이 큽니다. 이름 논쟁에 시간을 쓰기보다, <b>의존성이 정말
+    안쪽만 향하는지</b>(화면 9)를 확인하는 것이 더 값진 일입니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 11 -->
+<section class="screen" data-title="얼마나 지킬 것인가">
+  <p class="kicker">11장 · 화면 11</p>
+  <h2>얼마나 지킬 것인가</h2>
+
+  <p>화면 4가 이미 실마리를 보여줬습니다 — 이 교재 자신도 화면 4의 표에 있는 것만
+  포트로 만들었고, <code>MessageBus</code>는 만들지 않았습니다. 왜 어떤 것은
+  포트가 되고 어떤 것은 되지 않을까요?</p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:11rem"></th><th>포트를 만드는 신호</th><th>안 만드는 신호</th></tr>
+      <tr><td><b>테스트</b></td>
+        <td>실제 DB 없이 테스트해야 한다(4장 화면 5) — 리포지토리·UoW가 여기 해당</td>
+        <td>구현이 하나뿐이고, 테스트도 그 하나로 충분하다 — <code>MessageBus</code>가
+        여기 해당(인메모리 구현 하나로 이 교재 내내 충분했다)</td></tr>
+      <tr><td><b>교체 가능성</b></td>
+        <td>상대가 우리 통제 밖에 있어 모델이 새어 들어올 위험이 있다(10장 ACL) —
+        <code>PaymentPort</code>가 여기 해당</td>
+        <td>바꿀 계획이 없고, 바뀌어도 호출 지점이 한 곳뿐이다(10장 화면 12)</td></tr>
+      <tr><td><b>비용</b></td>
+        <td>클래스 하나·값 객체·예외를 유지할 값어치가 있다</td>
+        <td>포트 하나가 프로젝트 전체 클래스 수의 눈에 띄는 비율을 차지한다</td></tr>
+    </table>
+  </div>
+
+  <p>화면 9의 두 번째 위반 — <code>Order.allocation</code>이 재고의
+  <code>Allocation</code>을 직접 <code>import</code>하는 것 — 은 포트 문제가
+  아니라 <b>값 하나를 어디까지 공유해도 되는가</b>의 문제입니다.
+  <code>shared/</code>로 올리는 길은 화면 6의 기준("그 값의 의미가 애초에 어느
+  컨텍스트에도 속하지 않는가")에서 이미 막혔습니다 — <code>Allocation</code>은
+  분명히 재고 컨텍스트가 만든 값입니다. 남는 길은 주문이 재고의
+  <code>Allocation</code>을 그대로 들고 있지 않고, 자기 컨텍스트의 값(예: 배치
+  ID와 수량의 튜플)으로 옮겨 담는 것뿐입니다 — 그러면 코드 한 켜가 늘어납니다.
+  이 교재는 그렇게 하지 않았습니다 — 지금 규모에서는 이 결합 하나를 감수하는
+  비용이, 값을 옮겨 담는 코드를 늘리는 비용보다 싸다고 본 것입니다. 감수한다는
+  것과 모른다는 것은 다릅니다 — 화면 9가 이 위반을 <b>이름 붙여 드러낸 것
+  자체</b>가
+  이 장의 몫입니다.</p>
+
+  <p>1장 화면 17의 사내 게시판 예시를 떠올려 보세요 — 규칙이 거의 없는 CRUD였습니다.
+  그런 프로젝트라면 <code>domain/</code>·<code>application/</code>·
+  <code>infrastructure/</code> 폴더도, 포트도 필요 없습니다. 함수 하나가 뷰에서
+  DB까지 곧장 가도 됩니다. 반대로 한빛몰처럼 업무 규칙이 많고, 팀이 여럿이고,
+  DB나 결제사를 바꿀 가능성이 실제로 있는 프로젝트는 이 장의 구조가 값을 합니다.
+  <b>포트 개수는 프로젝트 크기가 아니라, 위 세 신호가 얼마나 자주 나타나는가로
+  정해집니다.</b> 14장이 이 판단을 프로젝트 전체 단위로 더 크게 다룹니다.</p>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 12 -->
+<section class="screen" data-title="한계와 반대의견">
+  <p class="kicker">11장 · 화면 12</p>
+  <h2>한계와 반대의견</h2>
+
+  <div class="box warn">
+    <p class="box-t">1. 폴더 구조 자체는 가치를 만들지 않는다</p>
+    <p>0장의 오해 1을 다시 떠올려 보세요 — "DDD는 폴더 구조다." <code>domain/</code>,
+    <code>application/</code>, <code>infrastructure/</code> 폴더를 만드는 것은
+    <b>결과</b>이지 목적이 아닙니다. 폴더만 나누고 그 안의 코드가 여전히 서로
+    아무렇게나 참조한다면, 화면 6의 트리는 장식일 뿐입니다. 값을 만드는 것은 폴더가
+    아니라 화면 9의 <code>import-linter</code>처럼 그 경계를 <b>실제로 검사하는
+    장치</b>입니다.</p>
+  </div>
+
+  <div class="box warn">
+    <p class="box-t">2. 계층을 다 지키면 손이 많이 간다</p>
+    <p>포트 하나를 뽑을 때마다 인터페이스, 최소 하나의 어댑터, 그리고 대개
+    테스트용 가짜 구현까지 늘어납니다. 팀 규모가 작고 요구사항이 자주 바뀌는
+    초기 단계에서는 이 보일러플레이트가 속도를 깎아 먹습니다. 화면 11의 신호
+    없이 "나중에 필요할지도 모르니" 미리 포트를 뽑는 것은 00-기획이 경계하는
+    바로 그 과잉 설계입니다.</p>
+  </div>
+
+  <div class="box warn">
+    <p class="box-t">3. 정적 도구도 문화를 대신하지 않는다</p>
+    <p><code>import-linter</code>는 CI 설정 파일 안의 계약이 삭제되거나
+    완화되는 것까지 막아 주지 않습니다. 계약을 지우는 커밋도 그 자체로는
+    빌드를 통과합니다. 결국 "이 계약을 함부로 지우지 않는다"는 합의는 도구가
+    아니라 <b>코드 리뷰 문화</b>가 지킵니다 — 화면 8의 표가 말한 "보장 수준"이
+    이 지점에서 다시 사람에게로 돌아옵니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 13 -->
+<section class="screen" data-title="요약 · 퀴즈 · 과제">
+  <p class="kicker">11장 · 화면 13</p>
+  <h2>요약 · 퀴즈 · 과제</h2>
+
+  <div class="summary">
+    <h3>핵심 요약</h3>
+    <ol>
+      <li>계층형의 문제는 "아래에 DB가 있다"는 그림 자체가 아니라, 도메인이 그
+      DB 기술을 <code>import</code>하게 되는 <b>의존 방향</b>입니다. 4~5장이 이미
+      리포지토리와 응용 계층으로 그 방향을 뒤집어 뒀습니다.</li>
+      <li><span class="term" data-term="hexagonal">헥사고날 아키텍처</span>(포트와
+      어댑터)는 "위/아래" 대신 "안/밖"으로 그려, 표현이든 인프라든 코어를 둘러싼
+      바깥은 전부 같은 규칙(코어 쪽을 바라본다)을 따른다는 것을 보여줍니다.</li>
+      <li>포트는 "바깥과의 통신"을 대표하는 인터페이스입니다. 같은
+      <code>Protocol</code>이라도 <code>ShippingFeePolicy</code>처럼 계산 규칙을
+      대표할 뿐인 것은 포트가 아닙니다.</li>
+      <li>어니언·클린 아키텍처는 같은 규칙을 다른 그림으로 그린 것일 뿐입니다 —
+      이름 자체보다 "의존성이 안쪽만 향하는가"가 중요합니다.</li>
+      <li>파이썬은 이 경계를 문법으로 강제하지 않습니다. <code>Protocol</code>은
+      타입 검사기가, 폴더는 코드 리뷰가, <code>import-linter</code>는 CI가 봐야
+      의미가 있습니다. 포트를 몇 개나 만들지는 테스트·교체 가능성·비용이라는
+      신호로 판단합니다.</li>
+    </ol>
+  </div>
+
+  <div class="quiz" data-answer="2">
+    <p class="q"><code>ShippingFeePolicy</code>·<code>DiscountPolicy</code>도
+    <code>Protocol</code>인데, 이 장이 이들을 "포트"라고 부르지 않은 가장 정확한
+    이유는?</p>
+    <ol class="options">
+      <li data-why="Protocol인지 여부는 포트인지 아닌지와 관계가 없습니다. 판별 기준은 다른 곳에 있습니다.">
+        <code>Protocol</code>로 선언되지 않았기 때문에</li>
+      <li data-why="맞습니다. 이 인터페이스들은 이미 손에 쥔 데이터로 계산만 할 뿐, 바깥 컨텍스트나 외부 시스템에 아무것도 묻지 않습니다. 포트는 그중에서도 '바깥과의 경계'에 있는 것만 가리킵니다.">
+        바깥 세계와 통신하지 않고, 이미 주어진 데이터로 계산만 하기 때문에</li>
+      <li data-why="구현이 몇 개인지는 포트 여부와 관계가 없습니다. 실제로 CatalogPort도 지금은 구현이 하나뿐입니다(같은 프로세스 내 클래스, 화면 4).">
+        구현이 하나뿐이라서 포트로 부를 필요가 없기 때문에</li>
+      <li data-why="응용 계층에 있는지 도메인 계층에 있는지는 포트 여부의 기준이 아닙니다(화면 5가 보여주듯 포트도 도메인·응용 어느 쪽에나 있을 수 있습니다).">
+        도메인 계층이 아니라 응용 계층에 있어야 하는 인터페이스이기 때문에</li>
+    </ol>
+    <div class="explain">
+      <p><b class="lbl">해설</b> 화면 4의 판별 질문입니다 — "바깥 세계와의 통신인가,
+      아직 정해지지 않은 계산 규칙인가?" <code>CatalogPort</code>는 카탈로그 컨텍스트에
+      묻고, <code>ShippingFeePolicy</code>는 아무에게도 묻지 않습니다.
+      <code>ShippingPolicy</code>(5장)를 보면 "통신"이 꼭 메서드 호출일 필요는
+      없다는 것도 알 수 있습니다 — 메서드 하나 없이 <code>lead_time: timedelta</code>
+      값 하나만 들었을 뿐인데도 화면 4의 표는 이걸 포트로 분류합니다. 그
+      값 자체가 배송 컨텍스트가 정하는 값이기 때문입니다(3장 화면 14) — 값을
+      건네받는 것도, 그 값의 진실을 우리가 아니라 바깥이 쥐고 있다는 점에서
+      여전히 "바깥과의 통신"입니다.</p>
+    </div>
+  </div>
+
+  <div class="quiz" data-answer="3">
+    <p class="q"><code>@runtime_checkable</code>이 붙은 <code>Protocol</code>에
+    <code>isinstance()</code>를 쓰면 실제로 확인되는 것은?</p>
+    <ol class="options">
+      <li data-why="Protocol의 isinstance 검사는 인자 타입이나 반환 타입까지 확인하지 않습니다. 그건 mypy 같은 정적 타입 검사기의 일입니다.">
+        메서드의 인자 타입과 반환 타입까지 정확히 일치하는가</li>
+      <li data-why="런타임에 이걸 확인하는 것은 isinstance()가 아니라 클래스가 그 Protocol을 명시적으로 상속했는지 확인하는 것과 비슷한 이야기입니다. Protocol의 매력은 명시적 상속 없이도 통과시킨다는 데 있습니다.">
+        해당 클래스가 그 Protocol을 명시적으로 상속했는가</li>
+      <li data-why="맞습니다. 이름이 존재하는지만 봅니다. 인자 개수가 다르고 반환 타입이 달라도, 같은 이름의 메서드만 있으면 isinstance()는 True를 돌려줍니다.">
+        같은 이름의 메서드(속성)가 존재하는가 — 시그니처는 보지 않는다</li>
+      <li data-why="@runtime_checkable이 없으면 isinstance() 자체가 TypeError를 던지므로, '항상 통과'가 아니라 아예 검사를 할 수 없습니다.">
+        <code>@runtime_checkable</code>이 없어도 항상 통과한다</li>
+    </ol>
+    <div class="explain">
+      <p><b class="lbl">해설</b> 화면 8의 실험입니다. 인자 개수가 다른
+      <code>NotARepository.get()</code>도 <code>isinstance()</code>를 통과했습니다
+      — 구조적 타입의 "구조"는 이름 수준에서만 확인됩니다. 참고로 파이썬에는
+      C++의 순수 가상 함수에 더 가까운 장치도 있습니다 —
+      <code>abc.ABC</code> + <code>@abstractmethod</code>는 메서드를
+      <b>구현하지 않은 채</b> 그 클래스를 인스턴스화하려는 순간
+      <code>TypeError</code>를 던집니다(직접 확인한 동작입니다). 다만 이것도
+      "메서드 이름이 존재하는가"만 볼 뿐 시그니처는 여전히 검사하지 않고,
+      <code>Protocol</code>과 달리 <b>명시적으로 상속</b>해야만 적용됩니다 —
+      "구조가 맞으면 상속 없이도 통과"라는 <code>Protocol</code>의 장점을
+      포기하는 대가로 얻는 보장입니다.</p>
+    </div>
+  </div>
+
+  <div class="quiz" data-answer="1">
+    <p class="q"><code>ordering/infrastructure/catalog_client.py</code>가
+    <code>catalog</code> 모듈을 <code>import</code>하는 것은 화면 9의
+    "재고는 카탈로그를 몰라야 한다"는 계약을 어기지 않습니다. 왜일까요?</p>
+    <ol class="options">
+      <li data-why="맞습니다. 그 계약의 source_modules는 hanbitmall.inventory이지 hanbitmall.ordering이 아닙니다. 게다가 어댑터(infrastructure)가 바깥 컨텍스트를 import하는 것은 어댑터가 존재하는 이유 그 자체입니다.">
+        그 계약은 재고(<code>inventory</code>)가 카탈로그를 아는 것만 막을 뿐,
+        주문의 인프라 어댑터가 카탈로그를 아는 것은 애초에 금지 대상이 아니기 때문에</li>
+      <li data-why="import-linter는 파일 확장자나 위치를 기준으로 예외를 두지 않습니다. 계약이 무엇을 source_modules로 지정했는지가 기준입니다.">
+        <code>infrastructure/</code> 폴더 안의 코드는 import-linter 검사 대상에서
+        자동으로 제외되기 때문에</li>
+      <li data-why="카탈로그와 주문의 관계(고객/공급자, 10장)가 재고와 카탈로그의 관계와 다르다는 것은 사실이지만, 이 질문의 답은 조직 관계가 아니라 계약의 source_modules 범위입니다.">
+        카탈로그와 주문은 고객/공급자 관계이고, 재고와 카탈로그는 아무 관계도
+        아니기 때문에 계약 자체가 다르게 적용되기 때문에</li>
+      <li data-why="타입 힌트 유무는 import-linter의 검사와 관계가 없습니다. import-linter는 import 문 자체를 정적으로 스캔합니다.">
+        <code>catalog_client.py</code>의 함수들이 타입 힌트를 갖고 있기 때문에</li>
+    </ol>
+    <div class="explain">
+      <p><b class="lbl">해설</b> 화면 9의 함정 상자입니다. 계약은 항상 특정
+      <code>source_modules</code>에만 적용됩니다 — 어댑터가 바깥을 아는 것은
+      막을 대상이 아니라 어댑터의 존재 이유입니다. 계약 범위를 좁히는 대신 쓸 수
+      있는 다른 방법도 있습니다 — <code>forbidden</code> 계약에는
+      <code>ignore_imports</code> 필드가 있어서, 계약은
+      <code>hanbitmall.ordering</code> 전체로 넓게 걸어 두고
+      <code>ignore_imports = hanbitmall.ordering.infrastructure.catalog_client -&gt;
+      hanbitmall.catalog.domain.product</code>처럼 <b>그 한 줄만</b> 예외로
+      허용할 수도 있습니다(직접 설치해 확인한 동작입니다 — 결과에
+      "1 ignored import"라고 표시됩니다). 범위를 좁히는 것과 예외를 명시하는
+      것 중 무엇이 나은지는 "이 어댑터가 몇 개나 될지"에 달려 있습니다.</p>
+    </div>
+  </div>
+
+  <div class="task">
+    <h3>직접 해보기</h3>
+    <p>재고(<code>inventory</code>)와 창고(<code>warehouse</code>)는 10장 화면 3이
+    "파트너십"이라고 부른 사이입니다. 그렇다면 <code>inventory.domain</code>이
+    <code>warehouse.domain</code>을 직접 <code>import</code>해도 괜찮을까요?
+    <code>import-linter</code> 계약을 하나 써 보고, 이유를 3줄로 설명해 보세요.</p>
+  </div>
+
+  <details class="fold answer">
+    <summary>모범답안</summary>
+    <div class="fold-body">
+      <p><b>안 됩니다 — 계약은 필요합니다.</b></p>
+<pre><span class="cap"># .importlinter에 추가</span><code class="plain">[importlinter:contract:5]
+name = 재고와 창고는 파트너십이어도 서로의 도메인 모듈을 직접 import하지 않는다
+type = forbidden
+source_modules =
+    hanbitmall.inventory.domain
+forbidden_modules =
+    hanbitmall.warehouse.domain
+</code></pre>
+      <ul>
+        <li>"파트너십"은 10장 화면 3이 정의한 <b>조직 관계 패턴</b>입니다 — 두
+        팀이 얼마나 격식 없이 조율하는가를 말합니다.</li>
+        <li>그것과 "코드가 서로의 클래스를 직접 참조해도 되는가"는 다른
+        질문입니다 — 후자는 10장이 "기술 통합 패턴"이라고 따로 부른 문제입니다.</li>
+        <li>9장이 이미 컨텍스트 사이는 ID(SKU)로만 잇기로 정했으므로, 파트너십이어도
+        <code>inventory.domain</code>은 <code>warehouse.domain</code>의 클래스를
+        <code>import</code>하지 않습니다. 대칭으로 반대 방향(<code>warehouse.domain</code>
+        →<code>inventory.domain</code>)도 같은 계약으로 막을 수 있습니다.</li>
+      </ul>
+    </div>
+  </details>
+
+  <div class="box note">
+    <p class="box-t">다음 장 예고</p>
+    <p>이 장은 코드가 <b>어디에 있는가</b>를 정리했습니다. 12장은 그 코드가
+    <b>언제 하나의 트랜잭션으로 묶이고, 언제 결과적 일관성에 맡겨지는가</b>를
+    다룹니다 — 10장이 절반만 갚고 미뤄 둔 문제(결제 실패 시 재고를 되돌리는 것)와,
+    창고→배송 이벤트의 지연이 실제로 얼마나 걸려도 되는지를 그 장에서 마저
+    답합니다.</p>
+  </div>
+
+  <div class="chapter-end">
+    <a href="ch10.html#last"><span>이전 장</span>10장 — Context Map과 통합 패턴</a>
+    <a href="index.html"><span>12장은 아직 집필 전입니다</span>표지와 목차로</a>
+  </div>
+</section>
+
+</div></main>
+
+<script src="assets/book.js"></script>
+</body>
+</html>

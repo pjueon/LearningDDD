@@ -18,7 +18,7 @@
     { id: 'ch08', num: '8장', title: '유비쿼터스 언어: 코드와 대화가 같은 말을 쓸 때', part: '전략적 설계', screens: 9, hours: 1.5, ready: true },
     { id: 'ch09', num: '9장', title: 'Bounded Context: 하나의 모델은 어디까지 유효한가', part: '전략적 설계', screens: 13, hours: 2.5, ready: true },
     { id: 'ch10', num: '10장', title: 'Context Map과 통합 패턴', part: '전략적 설계', screens: 13, hours: 2.5, ready: true },
-    { id: 'ch11', num: '11장', title: '아키텍처: 계층형에서 헥사고날로', part: '아키텍처·일관성', screens: 13, hours: 2.5 },
+    { id: 'ch11', num: '11장', title: '아키텍처: 계층형에서 헥사고날로', part: '아키텍처·일관성', screens: 13, hours: 2.5, ready: true },
     { id: 'ch12', num: '12장', title: '트랜잭션 경계와 결과적 일관성', part: '아키텍처·일관성', screens: 11, hours: 2.0 },
     { id: 'ch13', num: '13장', title: '(선택) CQRS와 이벤트 소싱 맛보기', part: '선택·마무리', screens: 9, hours: 1.5 },
     { id: 'ch14', num: '14장', title: '마무리: DDD를 쓰지 말아야 할 때', part: '선택·마무리', screens: 7, hours: 1.0 },
@@ -73,7 +73,13 @@
     sharedkernel: '공유 커널(Shared Kernel) — 두 컨텍스트가 코드나 모델의 일부를 공유하는 관계. 중복은 줄지만, 공유된 부분을 바꿀 때마다 양쪽 팀이 함께 조율해야 한다.',
     ohs: '개방 호스트 서비스(OHS) — 업스트림이 다운스트림 하나하나에 맞추는 대신, 여러 소비자가 함께 쓸 수 있는 표준화된 인터페이스 하나를 제공하는 것.',
     publishedlanguage: '발행된 언어(Published Language) — 컨텍스트 사이에서 주고받는 데이터의 형식을 문서화된 공용 언어로 정의한 것. 개방 호스트 서비스와 자주 함께 쓰인다.',
-    acl: '부패 방지 계층(ACL, Anti-Corruption Layer) — 외부(또는 우리가 통제할 수 없는) 모델을 우리 도메인 언어로 번역해, 상대의 모델이 우리 코드로 새어 들어오지 않게 막는 계층.'
+    acl: '부패 방지 계층(ACL, Anti-Corruption Layer) — 외부(또는 우리가 통제할 수 없는) 모델을 우리 도메인 언어로 번역해, 상대의 모델이 우리 코드로 새어 들어오지 않게 막는 계층.',
+    hexagonal: '헥사고날 아키텍처(포트와 어댑터) — 도메인·응용을 코어로 두고, 표현·인프라를 모두 "바깥"으로 취급해 안쪽만 바라보게 만드는 구조. 알리스터 콕번이 2005년에 제안했다. 계층형처럼 "위/아래"로 그리지 않고 "안/밖"으로 그려, 표현 쪽도 인프라 쪽도 같은 규칙을 따른다는 것을 보여준다.',
+    port: '포트 — 코어(도메인 + 응용)가 바깥과 주고받기 위해 정의해 둔 인터페이스. 리포지토리·CatalogPort·UnitOfWork가 모두 포트다. 바깥과의 통신을 대표하지 않는 Protocol(예: ShippingFeePolicy)은 포트라 부르지 않는다.',
+    adapter: '어댑터 — 포트를 실제로 구현한, 바깥쪽(DB·외부 API·웹 요청)에 닿아 있는 클래스. SqlAlchemyOrderRepository·PgPaymentAdapter가 어댑터다.',
+    compositionroot: '합성 뿌리(composition root) — 모든 어댑터의 구체 클래스를 실제로 생성해 포트에 주입하는, 애플리케이션에서 유일하게 인프라 전체를 알아도 되는 지점.',
+    onion: '어니언 아키텍처 — 도메인 모델을 가장 안쪽 동심원에 두고, 바깥 원으로 갈수록 인프라에 가까워지는 그림. 제프리 팔레르모가 2008년에 제안했다. 헥사고날(포트와 어댑터)과 같은 의존성 방향 규칙을 다른 모양으로 그린 것이다.',
+    cleanarchitecture: '클린 아키텍처 — 로버트 마틴이 정리한, 의존성이 항상 안쪽을 향해야 한다는 "의존성 규칙(Dependency Rule)"을 강조하는 동심원 그림. 헥사고날·어니언과 핵심 아이디어가 같다.'
   };
 
   var STORE_KEY = 'ddd-book:progress';
