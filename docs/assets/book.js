@@ -22,7 +22,7 @@
     { id: 'ch12', num: '12장', title: '트랜잭션 경계와 결과적 일관성', part: '아키텍처·일관성', screens: 11, hours: 2.0, ready: true },
     { id: 'ch13', num: '13장', title: '(선택) CQRS와 이벤트 소싱 맛보기', part: '선택·마무리', screens: 9, hours: 1.5, ready: true },
     { id: 'ch14', num: '14장', title: '마무리: DDD를 쓰지 말아야 할 때', part: '선택·마무리', screens: 7, hours: 1.0, ready: true },
-    { id: 'glossary', num: '부록', title: '용어집', part: '선택·마무리', screens: 1, hours: 0 }
+    { id: 'glossary', num: '부록', title: '용어집', part: '선택·마무리', screens: 1, hours: 0, ready: true }
   ];
 
   /* ── 유비쿼터스 언어 용어집 (툴팁의 원천) ─────────────────────── */
