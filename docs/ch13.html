@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="ko" data-chapter="ch13">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>13장 · (선택) CQRS와 이벤트 소싱 맛보기 — 도메인 주도 설계 첫걸음</title>
+<link rel="stylesheet" href="assets/book.css">
+</head>
+<body>
+
+<main id="book"><div class="inner">
+
+<!-- ─────────────────────────────────────────── 화면 1 -->
+<section class="screen" data-title="이 장에서 할 일">
+  <p class="kicker">13장 · 화면 1</p>
+  <h1>CQRS와 이벤트 소싱<br>맛보기</h1>
+
+  <p class="lead">12장 마지막 화면은 이렇게 예고했습니다.</p>
+
+  <div class="box warn">
+    <p class="box-t">12장이 남긴 문제 — 그대로 인용</p>
+    <p>"이 장은 <b>쓰기(write)</b> 쪽의 트랜잭션 경계를 다뤘습니다. 그런데 재고 수량을
+    <b>보여주기만 하는</b> 화면(재고 현황판, 주문 목록)도 지금은 똑같은 애그리게이트를
+    거쳐 조회합니다 — 3장 화면 6이 이미 '저장 단위가 커지는' 대가로 짚었던 문제입니다.
+    13장은 읽기 전용 조회를 쓰기 경로와 분리하는 CQRS를 맛봅니다."</p>
+  </div>
+
+  <p>더 앞서 두 장이 같은 방향을 가리키고 있었습니다. 3장 화면 16의 마무리 퀴즈는
+  "애그리게이트는 <b>쓰기 모델</b>이지 <b>읽기 단위</b>가 아니다"라고 답을 내리면서
+  "13장에서 (3)이 왜 대부분에게 과한지도 함께 다룹니다"라는 각주를 남겼습니다.
+  4장 화면 12는 <code>StockBatchRepository</code>를 반대하며 "13장에서 이 읽기 전용
+  경로를 정식으로 다룹니다"라고 적어 뒀습니다. 이 장이 그 세 청구서를 한 번에 갚습니다.</p>
+
+  <div class="box good">
+    <p class="box-t">이 장은 선택입니다 — 건너뛰어도 14장에 지장이 없습니다</p>
+    <p>커리큘럼이 못박은 성격 그대로입니다. 이 장에서 새로 등장하는 타입은
+    <b>전부 읽기 전용</b>입니다 — <code>Order</code>·<code>InventoryItem</code>·
+    <code>Product</code> 같은 쓰기 모델은 메서드 하나, 필드 하나 바뀌지 않습니다.
+    지금 시간이 없다면 14장으로 바로 넘어가도 됩니다. 다만 "읽기 전용 조회를 왜
+    도메인 모델 밖에서 따로 처리하는가"는 실무에서 거의 매번 마주치는 질문이라,
+    나중에라도 한 번은 읽어 볼 값어치가 있습니다.</p>
+  </div>
+
+  <div class="box note">
+    <p class="box-t">이 장의 지도</p>
+    <ul>
+      <li><b>화면 2~3 · 문제.</b> 상품 목록과 주문 목록, 두 화면이 왜 느려지는지
+      직접 코드로 확인합니다. 둘 다 "애그리게이트를 여러 개 읽어야 한다"는 같은
+      뿌리를 갖고 있지만, 느려지는 방식은 서로 다릅니다.</li>
+      <li><b>화면 4 · 이름 붙이기.</b> CQRS(Command Query Responsibility Segregation).
+      사실 5장부터 이미 하고 있던 일에 이름을 붙입니다.</li>
+      <li><b>화면 5 · 최소 형태.</b> 같은 DB, 읽기 전용 쿼리 객체 — 도메인 모델을
+      거치지 않고 SQL로 바로 읽습니다.</li>
+      <li><b>화면 6 · 그 다음 단계, 그리고 대부분에게 과한 이유.</b> 뷰, 동기화된
+      읽기 테이블, 그리고 언제 그게 정당화되는가.</li>
+      <li><b>화면 7~8 · 이벤트 소싱.</b> 무엇이고, 왜 한빛몰에는 과한가.</li>
+      <li><b>화면 9 · 요약 · 퀴즈 · 과제.</b></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 2 -->
+<section class="screen" data-title="상품 목록 100개, 화면이 죽는 이유">
+  <p class="kicker">13장 · 화면 2</p>
+  <h2>상품 목록 100개, 화면이 죽는 이유</h2>
+
+  <div class="dialog">
+    <div class="line"><div class="who">은수</div><div class="say">
+      <p>상품 목록에 "재고 있음/없음"만 나오니까 고객이 답답해해요. <b>몇 개 살 수 있는지</b>랑,
+      지금 없으면 <b>언제 들어오는지</b>도 같이 보여주세요.</p></div></div>
+  </div>
+
+  <p>요구사항 자체는 낯설지 않습니다 — <code>InventoryItem.sellable_quantity</code>(I20,
+  판매가능수량)는 3장부터 있었습니다. 개발자는 자연스럽게 이렇게 짭니다.</p>
+
+<pre><span class="cap"># catalog/application/queries.py — 처음 떠오르는 방법</span><code>class CatalogQueryService:
+    def __init__(self, uow: UnitOfWork, inventory: InventoryRepository,
+                 shipping: ShippingPolicy) -&gt; None:
+        self._uow, self._inventory, self._shipping = uow, inventory, shipping
+
+    def list_products(self, offset: int, limit: int) -&gt; list["ProductListingRow"]:
+        with self._uow as uow:
+            products = uow.products.list_page(offset, limit)   # 1  Product 애그리게이트 N개
+
+        skus = [c.sku for p in products for c in p.composition]
+        items = self._inventory.get_many(skus)                 # 2  한 번에 조회(4장 화면 4)
+
+        rows = []
+        for p in products:
+            atp = min(items[c.sku].sellable_quantity // c.quantity_per_product
+                       for c in p.composition)                  # 3
+            rows.append(ProductListingRow(p.product_id, p.name,
+                        int(p.price.amount), atp, None, None))
+        return rows
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">8행</span> 카탈로그 쪽 리포지토리(<code>uow.products</code>)는
+    아직 이 교재에 없지만, 4장의 <code>OrderRepository</code>·<code>InventoryRepository</code>와
+    같은 모양으로 자연스럽게 하나 더 생긴다고 상상해 보세요 — 페이지 하나 분량의
+    <code>Product</code> 애그리게이트를 통째로 불러옵니다.</li>
+    <li><span class="ln">11행</span> <code>get_many</code>를 씁니다. 4장 화면 4가
+    가르친 그대로 — SKU마다 <code>get</code>을 부르지 않고 <b>한 번에</b> 가져옵니다.</li>
+    <li><span class="ln">15~16행</span> 9장의 <code>ProductSku.quantity_per_product</code>를
+    반영합니다 — 세트 상품이라면 구성 SKU 각각의 ATP를 세트 배수로 나눈 값 중
+    <b>가장 작은 것</b>이 그 세트를 몇 개 만들 수 있는지를 정합니다(분할 출고를 하지
+    않는다는 I21과 같은 결의 논리 — 하나라도 모자라면 세트 전체가 묶입니다).</li>
+  </ol>
+
+  <p>11행에서 <code>get_many</code>를 썼으니 왕복은 두 번뿐입니다 — 겉보기엔
+  4장의 교훈을 잘 지킨 코드입니다. 그런데 상품이 100개인 페이지에서 이 코드를
+  실제로 돌리면 화면이 몇 초씩 걸립니다. 왜일까요?</p>
+
+<pre><span class="cap"># inventory/infrastructure/orm.py — 12장 화면 4에서 이미 봤던 그 매핑, 그대로</span><code>mapper_registry.map_imperatively(
+    InventoryItem, inventory_table,
+    properties={"_batches": relationship(StockBatch)},
+    version_id_col=inventory_table.c.version,
+    version_id_generator=False,
+)
+</code></pre>
+
+  <div class="box bad">
+    <p class="box-t">숨어 있는 N+1 — 이번엔 루트가 아니라 관계(relationship)에서</p>
+    <p>4장 화면 4의 N+1은 <code>InventoryItem</code> <b>루트 행</b>을 SKU마다 따로
+    조회하는 문제였고, <code>get_many</code>가 그걸 막았습니다. 그런데 위 매핑에는
+    <code>relationship(StockBatch)</code>에 <b>로딩 방식을 지정하지 않았습니다</b> —
+    SQLAlchemy의 기본값은 <b>지연 로딩(lazy loading)</b>입니다. 즉 <code>item._batches</code>는
+    <b>처음 접근하는 순간</b>에야 <code>SELECT * FROM stock_batches WHERE sku = ?</code>를
+    실행합니다. 그런데 <code>item.sellable_quantity</code>가 정확히 그 <code>_batches</code>를
+    순회합니다(9장 화면 8의 그 프로퍼티). <b>루트 100개를 한 번에 가져와도, 그 뒤
+    100번의 <code>.sellable_quantity</code> 접근이 배치 조회 100번을 새로 만듭니다.</b>
+    같은 병명(N+1)이 이번엔 관계 로딩이라는 다른 부위에서 재발한 것입니다.</p>
+  </div>
+
+  <p>N+1을 <code>selectinload</code> 같은 즉시 로딩으로 없앤다고 해도 더 근본적인
+  문제가 남습니다 — <code>InventoryItem</code>을 완전히 복원하려면 그 SKU가 지금까지
+  받은 <b>모든 배치</b>(이미 소진되어 재고에 안 잡히는 옛 배치까지)를 파이썬 객체로
+  띄워야 합니다. 정작 화면에 필요한 건 정수 두 개(판매가능수량, 도착 예정일)뿐인데,
+  그 두 숫자를 얻으려고 애그리게이트 전체 — 나중에 쓸 <code>allocate()</code>·
+  <code>release()</code> 같은 <b>쓰기 행위까지 포함된 객체</b> — 를 매번 다시
+  조립하고 있습니다.</p>
+
+  <div class="box note">
+    <p class="box-t">3장 화면 5가 이미 이 이름을 걸어 뒀다</p>
+    <p>"애그리게이트는 데이터 <b>변경</b>의 목적으로 하나로 취급되는 묶음입니다
+    (에반스의 정의). '주문 목록 화면에 회원 이름도 같이 보여줘야 하니까
+    <code>Order</code>가 <code>Customer</code>를 갖고 있어야겠다'는 애그리게이트를
+    나누는 근거가 되지 못합니다. 읽기는 13장 CQRS의 영역입니다." — 지금 우리가
+    맞닥뜨린 것이 정확히 이 문장이 가리키던 문제입니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 3 -->
+<section class="screen" data-title="주문 목록도 마찬가지다">
+  <p class="kicker">13장 · 화면 3</p>
+  <h2>주문 목록도 마찬가지다</h2>
+
+  <p>5장 화면 8은 이미 "애그리게이트에서 읽어 DTO로 조립"하는 방법을 보여준 적이
+  있습니다 — 주문 <b>한 건</b>의 상세 화면이었습니다.</p>
+
+<pre><span class="cap"># 5장 화면 8 — 주문 한 건의 상세. 다시 가져옴</span><code>def get_order_detail(self, order_number: OrderNumber) -&gt; "OrderDetail":
+    with self._uow as uow:
+        order = uow.orders.get(order_number)
+    name = self._members.name_of(order.customer_id)
+    return OrderDetail(order_number=order.order_number.value,
+                        customer_name=name,
+                        total_amount=int(order.total_amount.amount))
+</code></pre>
+
+  <p>주문 한 건이라면 이 코드는 충분히 빠릅니다. 그런데 "내 주문 내역" 화면처럼
+  <b>같은 고객의 주문 20건을 목록으로</b> 보여줘야 한다면, 개발자는 자연스럽게 이
+  코드를 반복문에 넣습니다.</p>
+
+<pre><span class="cap"># ordering/application/queries.py — 목록으로 확장한 버전</span><code>def list_my_orders(self, customer_id: UUID,
+                    numbers: Sequence[OrderNumber]) -&gt; list["OrderListingRow"]:
+    rows = []
+    with self._uow as uow:
+        for number in numbers:                                # 1
+            order = uow.orders.get(number)                     # 2  주문마다 애그리게이트 통째로
+            name = self._members.name_of(order.customer_id)    # 3  주문마다 회원 컨텍스트 왕복
+            rows.append(OrderListingRow(
+                order.order_number.value, name, order.status.name,
+                int(order.total_amount.amount), len(order.lines)))
+    return rows
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">5행</span> <code>numbers</code>(주문번호 목록)를 하나씩
+    순회합니다 — 반복문 자체는 죄가 없습니다. 문제는 그 <b>안에서</b> 무엇을
+    반복하느냐입니다.</li>
+    <li><span class="ln">6행</span> 주문이 20건이면 <code>uow.orders.get()</code>이
+    <b>20번</b> 불립니다. 그때마다 <code>Order</code>와 그 안의 <code>OrderLine</code>
+    전체가 다시 조립됩니다(4장의 <code>orders_table</code>·<code>order_lines_table</code>
+    매핑도 관계 로딩을 따로 지정하지 않았으므로, 화면 2와 같은 이유로 이 역시 지연
+    로딩입니다).</li>
+    <li><span class="ln">7행</span> 더 눈에 띄는 낭비입니다 — <b>"내 주문 내역"이므로
+    <code>customer_id</code>는 20건 내내 같은 값</b>입니다. 그런데 <code>name_of()</code>를
+    20번 부릅니다. 같은 질문을 같은 답이 나올 걸 알면서도 스무 번 반복한 것입니다.</li>
+  </ol>
+
+  <p>4장 화면 12의 퀴즈가 이미 이 논리를 한 번 냈습니다 — <code>InventoryItem</code>을
+  위해 <code>StockBatchRepository</code>를 새로 만들자는 제안에 "애그리게이트는
+  쓰기 단위이지 읽기 단위가 아니다"라고 반대했습니다. 그 자리는 <b>목록 조회가
+  아직 등장하기 전</b>이라 대안을 "13장에서 정식으로 다룬다"고만 미뤄 뒀습니다.
+  지금이 그 자리입니다.</p>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 4 -->
+<section class="screen" data-title="이름 붙이기 — CQRS">
+  <p class="kicker">13장 · 화면 4</p>
+  <h2>이름 붙이기 — <span class="term" data-term="cqrs">CQRS</span></h2>
+
+  <p>사실 이 교재는 5장부터 이미 이 방향으로 걷고 있었습니다 — <code>place_order()</code>
+  (상태를 바꾸는 <b>커맨드</b>)와 <code>get_order_detail()</code>(상태를 읽기만 하는
+  <b>쿼리</b>)을 처음부터 다른 메서드로 나눠 왔습니다. 이 구분 자체는 버트런드 마이어의
+  <b>CQS</b>(Command-Query Separation, "메서드 하나는 무언가를 바꾸거나 무언가를
+  돌려주거나 둘 중 하나만 해야 한다") 원칙입니다.</p>
+
+  <p>그렉 영(Greg Young)은 2010년경 이 아이디어를 <b>메서드 수준에서 모델 수준으로</b>
+  끌어올렸습니다 — <b>CQRS</b>(Command Query Responsibility Segregation)는 "쓰기와
+  읽기가 <i>같은 메서드</i>가 아니라 <i>같은 모델</i>도 거칠 필요가 없다"는 주장입니다.
+  화면 2~3에서 본 문제의 정체가 이것입니다 — <code>Order</code>·<code>InventoryItem</code>은
+  불변식을 지키도록 설계된 <b>쓰기 모델</b>인데, 화면 표시는 그 설계가 지켜야 할
+  책임과 아무 상관이 없습니다.</p>
+
+  <p>CQRS는 "전부 아니면 전무"가 아니라 <b>단계</b>입니다. 이 교재가 이미 있는 자리부터
+  아직 안 간 자리까지 나열하면 이렇습니다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:10rem">단계</th><th>모습</th><th>이 교재</th></tr>
+      <tr><td>0. CQS만</td><td>같은 모델, 메서드만 커맨드/쿼리로 구분</td>
+        <td>5장부터 — <code>place_order()</code> vs <code>get_order_detail()</code></td></tr>
+      <tr><td>1. DTO 조립</td><td>같은 DB, 애그리게이트를 읽어 DTO로 변환</td>
+        <td>5장 화면 8 — 주문 <b>한 건</b>에는 충분</td></tr>
+      <tr><td>2. 쿼리 객체</td><td>같은 DB, 도메인 모델을 거치지 않고 SQL로 직접 읽기</td>
+        <td><b>이 장 화면 5 — 지금 만든다</b></td></tr>
+      <tr><td>3. 동기화 읽기 테이블</td><td>미리 계산해 둔 별도 테이블. 쓰기와 별도로 갱신</td>
+        <td>화면 6 — 언제 필요한지만 다룬다</td></tr>
+      <tr><td>4. 별도 DB/서비스</td><td>읽기 모델이 물리적으로 다른 저장소</td>
+        <td>10~12장이 "다른 서비스로 분리"를 언급한 자리와 같은 방향. 코드로 만들지 않는다</td></tr>
+      <tr><td>5. 이벤트 소싱</td><td>쓰기 모델 자체가 이벤트 로그. 읽기 모델은 그 재생(replay)</td>
+        <td>화면 7~8 — 개념만. 코드로 만들지 않는다</td></tr>
+    </table>
+  </div>
+
+  <div class="box note">
+    <p class="box-t">CQRS와 이벤트 소싱은 다른 결정이다</p>
+    <p>둘을 한 세트로 묶어 말하는 경우가 많지만, <b>CQRS는 이벤트 소싱을 전제하지
+    않습니다.</b> 화면 5에서 만들 쿼리 객체는 이벤트를 하나도 쓰지 않는 CQRS입니다 —
+    같은 테이블을 도메인 모델 없이 다시 읽을 뿐입니다. 반대로 이벤트 소싱을 하면
+    (화면 7) 현재 상태를 바로 읽을 방법이 없어서 <b>사실상 CQRS가 강제</b>됩니다 —
+    이 둘의 관계는 "선택"과 "필수"만큼 다릅니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 5 -->
+<section class="screen" data-title="최소 형태 — 읽기 전용 쿼리 객체">
+  <p class="kicker">13장 · 화면 5</p>
+  <h2>최소 형태 — 읽기 전용 쿼리 객체</h2>
+
+  <p>1장 화면 5~7이 SQL을 직접 썼던 이유는 "그것 말고는 방법을 몰랐기 때문"이었고,
+  그게 이 교재가 지적한 문제였습니다. 이번엔 다릅니다 — <b>읽기 전용 조회로 한정한다는
+  조건 아래에서, 의도적으로</b> 같은 방식으로 돌아갑니다. 도메인 객체를 하나도 만들지
+  않고, SQL이 직접 답을 계산하게 둡니다.</p>
+
+  <p>SKU별 판매가능수량부터 봅니다. 9장 화면 8의 <code>sellable_quantity</code>
+  프로퍼티(<code>sum(b.available for b in batches)</code>, 창고·입고예정 배치를
+  가리지 않고 모두 더함, I20)와 <b>정확히 같은 계산</b>을 SQL로 합니다.</p>
+
+<pre><span class="cap"># reporting/queries.py — SKU 단위 판매가능수량</span><code>SELECT sku,
+       SUM(CASE WHEN kind = '창고' THEN quantity - reserved
+                ELSE 0 END) AS on_hand_available,             -- 1
+       SUM(quantity - reserved) AS atp,                        -- 2
+       MIN(CASE WHEN kind = '입고예정' AND quantity - reserved &gt; 0
+                THEN eta END) AS earliest_eta                  -- 3
+FROM stock_batches
+GROUP BY sku
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">2~3행</span> <code>CASE WHEN 조건 THEN 값 ELSE 값 END</code>는
+    행마다 조건에 따라 다른 값을 골라 쓰는 SQL 문법입니다 — 파이썬의
+    <code>값 if 조건 else 값</code>과 같은 자리에 씁니다. 여기서는 "창고 배치일 때만
+    센다"는 조건을 <code>SUM</code> 안에 넣어, 파이썬으로 치면
+    <code>sum(b.available for b in batches if b.kind == 창고)</code>와 같은 일을
+    SQL 한 줄로 합니다(9장 화면 8의 <code>available_quantity</code>, I7).</li>
+    <li><span class="ln">4행</span> <code>SUM(quantity - reserved)</code>는 배치
+    종류(창고·입고예정)를 가리지 않고 전부 더합니다 — I20이 정의하는
+    판매가능수량(<code>atp</code>, ATP) 그 자체입니다. 바로 위
+    <code>on_hand_available</code>이 창고 배치만 골라 더하는 것과 나란히 놓고
+    비교해 보세요.</li>
+    <li><span class="ln">8행</span> <code>GROUP BY</code>는 "같은 <code>sku</code> 값끼리 묶어서, 그 묶음 전체에
+    대해 <code>SUM</code>·<code>MIN</code> 같은 <b>집계 함수</b>를 한 번씩만
+    계산하라"는 뜻입니다 — SKU마다 쿼리를 따로 날리지 않고 <b>테이블 전체를 한 번
+    훑어서</b> SKU별 결과를 한 번에 뽑습니다.</li>
+    <li><span class="ln">5~6행</span> <code>ELSE</code>가 없는 <code>CASE WHEN</code>은
+    조건을 만족하는 행이 하나도 없으면 <code>NULL</code>을 돌려줍니다 — 입고예정
+    배치가 하나도 없는 SKU라면 <code>earliest_eta</code>는 <code>NULL</code>입니다.
+    1장에서 <code>COALESCE</code>로 감쌌던 것과 달리 여기서는 그냥 둡니다.
+    <code>NULL</code> 자체가 "입고 예정이 없다"는 유효한 답이기 때문입니다(빈
+    합계를 0으로 바꿔야 했던 1장의 상황과는 다릅니다).</li>
+  </ol>
+
+  <p>이제 이 결과를 상품(<code>Product</code>) 단위로 접습니다. 9장이 정한
+  <code>composition</code>(상품 1개가 SKU 몇 개로 구성되는가)을 SQL의 하위 질의로
+  한 번 더 조인합니다.</p>
+
+<pre><span class="cap"># reporting/queries.py — 상품 목록 조회, sku_atp는 위 질의</span><code>SELECT product_id, name, price,
+       MIN(atp / quantity_per_product) AS sellable_quantity,   -- 1
+       MAX(ready_date) AS ship_on                               -- 2
+FROM (
+    SELECT p.product_id, p.name, p.price, ps.quantity_per_product,
+           sa.atp,
+           CASE WHEN sa.on_hand_available &gt;= ps.quantity_per_product
+                THEN DATE('now')
+                ELSE sa.earliest_eta END AS ready_date           -- 3
+    FROM products p
+    JOIN product_skus ps ON ps.product_id = p.product_id         -- 4
+    JOIN (sku_atp) sa ON sa.sku = ps.sku
+    WHERE p.status = '판매중'
+) t
+GROUP BY product_id, name, price
+ORDER BY name
+LIMIT ? OFFSET ?
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">2행</span> <code>MIN(atp / quantity_per_product)</code> —
+    상품 하나가 SKU 여러 개로 구성되면(9장의 세트 상품), 각 SKU가 몇 세트어치를
+    감당하는지 나눠 보고 <b>가장 모자란 SKU가 전체를 정합니다.</b> 화면 2의 코드가
+    파이썬 <code>min()</code>으로 하던 일과 같습니다 — 여기서는 SQL이 합니다.</li>
+    <li><span class="ln">3행</span> 화면 2의 나머지 절반(도착 예정일)입니다.
+    <code>ship_on</code>은 <b>구성 SKU 중 가장 늦게 준비되는 날</b>입니다 — 세트
+    상품은 하나라도 모자라면 전체를 나눠 보낼 수 없다는, I21과 같은 논리입니다.</li>
+    <li><span class="ln">7~9행</span> 안쪽 <code>CASE</code>가 SKU별
+    <code>ready_date</code>를 정합니다 — 지금 창고 재고만으로 이 세트 몫을
+    채울 수 있으면 오늘(<code>DATE('now')</code>) 출고 가능, 모자라면 그 SKU의
+    <code>earliest_eta</code>(가장 이른 입고예정일)가 준비일이 됩니다. 화면 2의
+    코드는 <code>ship_on</code>·<code>arrival_estimate</code> 자리를
+    <code>None, None</code>으로 비워 뒀었는데, 이 <code>CASE</code>가(3행의
+    <code>MAX</code>를 거쳐) <code>ship_on</code>을 채웁니다 —
+    <code>arrival_estimate</code>는 <code>list_page()</code>가 그 값에 배송
+    리드타임을 더해 따로 채웁니다.</li>
+    <li><span class="ln">10~12행</span> <code>JOIN</code>은 두 테이블(또는 하위 질의)의
+    행을 <b>공통 값이 같은 것끼리</b> 짝지어 한 행으로 합칩니다 — 파이썬으로 치면
+    두 딕셔너리를 같은 키로 묶어 새 딕셔너리를 만드는 것과 비슷합니다.
+    <code>product_skus</code>·SKU별 집계·<code>products</code> 세 곳에 흩어진 값을
+    한 번의 조회로 모읍니다.</li>
+  </ol>
+
+  <p>다만 이 계산에는 놓치는 경우가 하나 있습니다 — 구성 SKU 중 하나가 영원히
+  입고 예정이 없다면(<code>earliest_eta</code>가 <code>NULL</code>), SQL의
+  <code>MAX()</code>는 <code>NULL</code>을 조용히 무시하고 다른 구성요소의
+  날짜를 대신 보여줍니다. <code>sellable_quantity</code>는 이 경우 정확히 0이
+  되어 품절임을 알리지만, <code>ship_on</code> 쪽은 그 사실을 반영하지
+  못합니다. 이런 경계 사례까지 다 잡으려면 SQL이 더 복잡해져야 하는데, 이
+  교재는 이 한계를 인정하는 선에서 넘어갑니다.</p>
+
+  <p>경계 사례가 하나 더 있습니다 — 화면 첫머리의 "정확히 같은 계산"에도
+  조건이 붙습니다. 위 <code>sku_atp</code> 서브쿼리는 <code>stock_batches</code>를
+  <code>GROUP BY sku</code>한 결과라서, 배치가 한 건도 없던 신상품 SKU는 그
+  서브쿼리에 아예 행이 없습니다. 이 상품 목록 SQL이 그 결과와 <code>JOIN</code>
+  (그냥 <code>JOIN</code>이라고 쓰면 <code>INNER JOIN</code>입니다)하므로, 그런
+  SKU를 포함한 상품은 목록에서 통째로 빠집니다 — 9장의
+  <code>sellable_quantity</code> 프로퍼티(빈 배치 리스트에 <code>sum()</code>,
+  조용히 0)라면 일어나지 않을 누락입니다. 실무라면 <code>LEFT JOIN</code>과
+  <code>COALESCE</code>로 고쳐야 하는 대목이지만, 이 교재는 이 경계 사례도
+  인정하는 선에서 넘어갑니다.</p>
+
+  <div class="box warn">
+    <p class="box-t">이 조인은 컨텍스트 경계를 넘는다 — 의도적으로, 그리고 딱 여기서만</p>
+    <p>11장의 <code>import-linter</code> 계약은 "재고가 카탈로그를 <code>import</code>하면
+    안 된다"고 정했습니다. 그런데 위 SQL은 <code>products</code>·<code>product_skus</code>
+    (카탈로그)와 <code>stock_batches</code>(재고)를 한 질의 안에서 조인합니다 — 명백히
+    경계를 넘습니다. 그런데 이건 11~12장이 이름 붙인 "크랙"(마지못해 감수하는 위반)과는
+    다릅니다. 세 조건이 함께 지켜지기 때문입니다.</p>
+    <ol>
+      <li><b>같은 DB.</b> 물리적으로 다른 서비스라면 이 조인 자체가 불가능합니다.</li>
+      <li><b>도메인 클래스를 하나도 import하지 않습니다.</b> 이 모듈은
+      <code>Product</code>·<code>Sku</code>·<code>InventoryItem</code> 어느
+      것도 모릅니다. 아는 것은 테이블 이름과 컬럼뿐입니다.</li>
+      <li><b>DTO만 반환합니다.</b> 반환값에는 행동이 없고, 이 값으로 무언가를
+      바꿀 수 없습니다.</li>
+    </ol>
+    <p>그래서 이 코드는 <code>ordering/</code>·<code>inventory/</code>·<code>catalog/</code>
+    어디에도 속하지 않는 <code>reporting/</code>이라는 <b>네 번째 자리</b>에 둡니다 —
+    어느 컨텍스트의 도메인·응용 계층에도 속하지 않는, 오직 화면을 위한 조회 전용 모듈입니다.</p>
+  </div>
+
+  <p>실제로 데이터를 넣고 돌려 본 결과입니다. 오늘은 2026-09-20이고,
+  <code>SKU-RAMEN</code>(신라면)은 창고에 10개 중 8개가 이미 예약되어 <b>2개</b>만
+  가용하고 입고예정 50개(ETA 10/5)가 더 있습니다. <code>SKU-WATER</code>(생수)는
+  창고 재고가 0이고 입고예정 100개(ETA 9/30)뿐입니다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th>상품</th><th>가격</th><th>판매가능수량</th><th>출고예정일</th><th>도착 예정(근사)</th></tr>
+      <tr><td>신라면 낱개(SKU-RAMEN×1)</td><td>1,000원</td><td>52</td>
+        <td>오늘(가용 2개 ≥ 1개)</td><td>9/22</td></tr>
+      <tr><td>신라면 3개 세트(SKU-RAMEN×3)</td><td>3,000원</td><td>17</td>
+        <td>10/5(가용 2개 &lt; 3개, 입고 기다림)</td><td>10/7</td></tr>
+      <tr><td>생수 2L(SKU-WATER×1)</td><td>1,500원</td><td>100</td>
+        <td>9/30</td><td>10/2</td></tr>
+    </table>
+  </div>
+
+  <div class="box good">
+    <p class="box-t">같은 재고인데 상품마다 답이 다르다 — 9장의 대가가 이렇게 돌아온다</p>
+    <p>낱개는 오늘 나가는데 3개 세트는 열흘을 기다려야 합니다 — <b>둘 다 같은
+    <code>SKU-RAMEN</code></b>을 씁니다. 세트는 2개 중 3개를 채워야 하니 지금
+    가용 재고로는 <b>단 하나도</b> 완성할 수 없기 때문입니다. 9장이 "상품 1개 =
+    SKU 1개" 가정을 깨고 <code>composition</code>을 도입하지 않았다면, 이 차이
+    자체를 표현할 방법이 없었습니다.</p>
+  </div>
+
+  <p>도착 예정일에는 "근사"라는 단서가 붙어 있습니다. <code>Order.promise_delivery()</code>가
+  실제로 약속하는 날짜(I22)는 그 주문이 <code>allocate()</code>를 부르는 순간 FEFO·
+  입고예정 우선순위(I19)까지 반영해 정확히 계산됩니다. 지금 이 목록의 날짜는 "이
+  SKU의 가장 빠른 입고예정 하나"만 본 <b>단순화된 값</b>입니다 — 여러 주문이 동시에
+  같은 배치를 다투는 경우까지는 반영하지 않습니다. 목록 화면은 근사치로 충분하고,
+  진짜 약속은 주문 시점에 확정된다는 이 구분 자체가 CQRS가 던지는 질문입니다 —
+  <b>모든 화면이 도메인 모델만큼 정확해야 하는 것은 아닙니다.</b></p>
+
+  <p>파이썬 쪽은 이 SQL을 감싸는 얇은 클래스 하나면 됩니다.</p>
+
+<pre><span class="cap"># reporting/queries.py</span><code>@dataclass(frozen=True)
+class ProductListingRow:
+    product_id: str
+    name: str
+    price: int
+    sellable_quantity: int
+    ship_on: date | None            # None이면 입고 예정도 없다(품절)
+    arrival_estimate: date | None   # ship_on + 배송 리드타임(근사)
+
+class SqlProductListingQuery:
+    def __init__(self, connection, shipping: ShippingPolicy) -&gt; None:
+        self._conn, self._shipping = connection, shipping
+
+    def list_page(self, offset: int, limit: int) -&gt; list[ProductListingRow]:
+        rows = self._conn.execute(_LISTING_SQL, (limit, offset)).all()
+        return [ProductListingRow(
+            r.product_id, r.name, r.price, r.sellable_quantity,
+            r.ship_on, r.ship_on + self._shipping.lead_time if r.ship_on else None,
+        ) for r in rows]
+</code></pre>
+
+  <p>여기서도 배송 리드타임을 상수로 박지 않았습니다 — <code>self._shipping.lead_time</code>은
+  3장 화면 14가 못박은 그 규칙(정책 객체로 받는다)이 읽기 쪽에도 그대로 적용된다는
+  뜻입니다. <code>ShippingPolicy</code>는 5장이 이미 정의해 둔 포트를 재사용할 뿐,
+  새로 만들지 않습니다.</p>
+
+  <p>주문 목록도 같은 방법으로 풉니다. 3장 화면 16의 퀴즈가 낸 그 상황
+  — "주문 목록에 회원 이름도 보여 달라" — 을 실제로 풀어 봅니다.</p>
+
+<pre><span class="cap"># reporting/queries.py — 주문 목록 + 회원 이름을 조인 한 번으로</span><code>SELECT o.order_number, m.name AS customer_name, o.status,
+       COALESCE(SUM(ol.unit_price_amount * ol.qty), 0)
+           - o.discount_amount + o.shipping_fee_amount AS total_amount,  -- 1
+       COUNT(ol.line_id) AS line_count
+FROM orders o
+JOIN members m ON m.member_id = o.customer_id      -- 2  주문 컨텍스트 ↔ 회원 컨텍스트
+JOIN order_lines ol ON ol.order_number = o.order_number
+WHERE o.customer_id = ?
+GROUP BY o.order_number
+ORDER BY o.order_number DESC
+LIMIT ? OFFSET ?
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">2~3행</span> <code>Order.total_amount</code>(I2, 소계 − 할인 +
+    배송비)를 SQL로 그대로 다시 씁니다. <code>COALESCE</code>를 여기 남겨
+    뒀지만, 사실 이 자리에서는 발동할 일이 없습니다 — <code>WHERE</code>만
+    있고 <code>JOIN</code>이 없었던 1장의 상황과 달리 이 쿼리는
+    <code>order_lines</code>와 <b>INNER JOIN</b>하고, 이 도메인은
+    <code>EmptyOrder</code>(I1)로 라인 없는 주문 자체를 허용하지 않습니다.
+    <code>INNER JOIN</code>에서는 라인이 0개인 주문은 애초에 그 그룹 자체가
+    생기지 않지, "그 그룹의 <code>SUM</code>이 <code>NULL</code>"이 되는 게
+    아닙니다. 그래도 남겨 둔 이유는 습관적 방어 코드이지, 이 코드가 실제로
+    그 상황을 만나서가 아닙니다.</li>
+    <li><span class="ln">6행</span> <code>members</code> 테이블과의 조인이
+    화면 5의 "경계를 넘는 조인" 원칙을 여기서도 그대로 따릅니다 — 도메인 클래스는
+    모르고 테이블만 압니다.</li>
+  </ol>
+
+  <p>고객 "박주언"의 주문 두 건으로 실제 결과를 확인했습니다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th>주문번호</th><th>고객명</th><th>상태</th><th>합계</th><th>라인 수</th></tr>
+      <tr><td>20260908-000045</td><td>박주언</td><td>결제대기</td><td>4,000원</td><td>1</td></tr>
+      <tr><td>20260907-000123</td><td>박주언</td><td>결제완료</td><td>10,000원</td><td>2</td></tr>
+    </table>
+  </div>
+
+  <p>화면 3의 반복문과 비교해 보세요 — 왕복 횟수는 주문이 2건이든 200건이든
+  <b>항상 하나</b>입니다. <code>get_order_detail()</code>이 부르던
+  <code>uow.orders.get()</code>·<code>members.name_of()</code> 어느 것도 여기선
+  호출되지 않습니다. <code>OrderListingRow</code>는 <code>OrderSummary</code>(5장)와
+  필드 셋이 겹치지만 <b>일부러 합치지 않습니다</b> — <code>OrderSummary</code>는
+  <code>Order</code> 애그리게이트 하나만 보고 필드를 그대로 복사한 <b>단일
+  애그리게이트 DTO</b>(<code>to_summary()</code>)이고, 이 타입은 목록 조회 전용
+  쿼리 객체의 산출물입니다. 정작 "두 컨텍스트에서 각각 읽어 DTO 하나로 합치는"
+  상세 조립을 하는 타입은 <code>OrderSummary</code>가 아니라, 화면 3이 다시
+  가져온 <code>get_order_detail()</code>이 만드는 <code>OrderDetail</code>입니다.
+  서로 다른 화면이 같은 이유로 바뀌는 게 아니라면, 겹치는 필드가
+  있다고 억지로 하나의 타입으로 합칠 이유는 없습니다 — 10장이 공유 커널을 함부로
+  쓰지 말라고 한 것과 같은 결의 판단입니다.</p>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 6 -->
+<section class="screen" data-title="뷰, 동기화 테이블, 그리고 과유불급">
+  <p class="kicker">13장 · 화면 6</p>
+  <h2>뷰, 동기화 테이블, 그리고 과유불급</h2>
+
+  <p>화면 5의 SQL을 <code>CREATE VIEW product_listing AS SELECT ...</code>로
+  감싸 두면 이름 하나로 재사용할 수 있습니다. 그런데 <b>뷰는 계산을 저장해 두는
+  것이 아닙니다</b> — <code>SELECT * FROM product_listing</code>을 실행할 때마다
+  뒤에 숨은 <code>JOIN</code>·<code>GROUP BY</code>가 매번 다시 돌아갑니다(더구나
+  SQLite에는 실체화 뷰(materialized view) 자체가 없습니다 — 뷰는 언제나 그 순간의
+  계산입니다). 뷰는 "같은 SQL을 여러 곳에서 복사하지 않는다"는 편의일 뿐, 화면 2가
+  겪은 "매번 다시 계산한다"는 근본 성격은 바뀌지 않습니다.</p>
+
+  <p>진짜 다음 단계는 <b>미리 계산해서 저장해 둔 별도 테이블</b>입니다 —
+  <code>product_listing_view</code> 같은 테이블에 <code>sellable_quantity</code>·
+  <code>ship_on</code>을 이미 계산된 값으로 넣어 두고, 읽기는 그 테이블 하나만
+  <code>SELECT</code>합니다. 그런데 이 값은 재고가 바뀔 때마다(입고, 할당, 취소)
+  누군가 다시 계산해 넣어야 합니다 — 7장부터 있는 <code>DeliveryPromised</code>
+  같은 실제 도메인 이벤트는 물론, 배치가 실제로 입고될 때 발행된다고 가정할
+  <code>InboundArrived</code>(지금 코드엔 없는 가상의 이벤트) 같은 것까지
+  구독하는 <b>프로젝터</b>를 새로 만드는 일입니다.</p>
+
+  <div class="box warn">
+    <p class="box-t">이건 공짜가 아니다 — 12장의 그 비용이 고스란히 따라온다</p>
+    <ul>
+      <li>프로젝터가 밀리거나 실패하면 화면의 숫자가 <b>진짜 재고와 어긋납니다</b> —
+      12장이 "5초 SLA"로 협상했던 바로 그 결과적 일관성 문제가, 이번엔 재고
+      할당이 아니라 <b>화면 표시</b>를 두고 다시 열립니다.</li>
+      <li>테이블이 하나 늘면 마이그레이션·백업·모니터링 대상도 하나 늘어납니다.</li>
+      <li>프로젝터 코드에 버그가 있으면, 화면 5의 SQL과 달리 <b>DB를 직접
+      들여다봐도 원인을 못 찾습니다</b> — 저장된 값 자체가 이미 틀렸기 때문입니다.
+      진짜 원인은 "그 값을 왜 그렇게 계산해 넣었는가"라는 프로젝터의 과거 실행에
+      있습니다.</li>
+    </ul>
+  </div>
+
+  <p>3장 화면 16의 퀴즈는 "13장에서 (3, 별도 읽기 테이블)이 왜 대부분에게 과한지도
+  다룬다"고 예고했습니다. 답은 이렇습니다 — <b>화면 5의 쿼리 객체가 이미 충분히
+  빠르다면, 동기화 테이블은 얻는 것 없이 위 세 가지 비용만 추가합니다.</b> 한빛몰
+  규모(SKU 수천 개, 배치 수만 행)에서 <code>GROUP BY</code> 한 번은 인덱스만
+  잘 잡혀 있으면 수십 밀리초 안에 끝납니다. 동기화 테이블이 <b>실제로</b> 값을
+  하는 경우는 딱 하나입니다 — <b>화면 5가 조인하던 테이블들이 더 이상 같은 DB에
+  있지 않을 때</b>입니다. 재고와 카탈로그가 서로 다른 서비스로 쪼개지면(10~12장이
+  언급만 하고 코드로 만들지 않은 그 방향), 애초에 한 번의 SQL로 조인할 방법이
+  없으므로 그때는 동기화된 사본을 두는 것이 유일한 선택지가 됩니다. <b>그 전에는
+  화면 5로 충분합니다.</b></p>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 7 -->
+<section class="screen" data-title="이벤트 소싱이란 무엇인가">
+  <p class="kicker">13장 · 화면 7</p>
+  <h2><span class="term" data-term="eventsourcing">이벤트 소싱</span>이란 무엇인가</h2>
+
+  <p>7장부터 <code>DomainEvent</code>가 있었습니다 — <code>OrderPlaced</code>,
+  <code>DeliveryPromised</code>, <code>InboundDelayed</code>. 그런데 이 이벤트들은
+  <b>애그리게이트 사이의 통신 수단</b>이었을 뿐입니다. 실제로 "지금 상태가 무엇인가"를
+  묻는 질문의 답은 여전히 <code>stock_batches</code>·<code>orders</code> 테이블의
+  <b>현재 값</b>(<code>quantity</code>, <code>reserved</code>, <code>status</code>)이
+  들고 있습니다. 이벤트는 발행되고 나면 버려집니다(구독자가 처리를 마치면 끝).</p>
+
+  <p><b>이벤트 소싱(Event Sourcing)</b>은 이 관계를 뒤집습니다 — <b>현재 상태를
+  저장하는 대신, 그 상태에 이르기까지 일어난 사실 전부를 순서대로 저장</b>합니다.
+  <code>InventoryItem</code>의 "지금 <code>reserved</code>가 5"라는 값 자체를
+  테이블에 두지 않고, 대신 이런 로그를 둡니다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:5rem">순번</th><th>이벤트</th><th>내용</th></tr>
+      <tr><td>1</td><td><code>배치입고됨</code></td><td>batch_id=B1, quantity=10</td></tr>
+      <tr><td>2</td><td><code>예약됨</code></td><td>batch_id=B1, count=3, order=O-1</td></tr>
+      <tr><td>3</td><td><code>예약됨</code></td><td>batch_id=B1, count=5, order=O-2</td></tr>
+      <tr><td>4</td><td><code>예약취소됨</code></td><td>batch_id=B1, count=3, order=O-1(주문 취소)</td></tr>
+    </table>
+  </div>
+
+  <p>"지금 <code>reserved</code>가 얼마인가?"는 저장된 값이 아니라 <b>이 로그를
+  처음부터 재생(replay)한 결과</b>입니다(0 + 3 + 5 − 3 = 5). 현재 상태는 로그의
+  <b>파생값</b>일 뿐, 진실은 로그 자체입니다.</p>
+
+  <div class="box good">
+    <p class="box-t">이벤트 소싱이 진짜로 잘하는 것</p>
+    <ul>
+      <li><b>완전한 감사 추적.</b> "이 배치의 <code>reserved</code>가 왜 지금 5인지"를
+      정확히 누가, 언제, 무엇을 했는지까지 답할 수 있습니다. 지금 한빛몰의
+      <code>stock_batches</code>는 배치 자체는 지우지 않지만(9장), <b>그 배치의
+      예약 수량이 어떤 주문들 때문에 지금 값이 됐는지의 이력은 저장하지 않습니다</b> —
+      현재 값만 있고 경로는 없습니다.</li>
+      <li><b>시간을 되돌린 질문.</b> "지난주 화요일 오후 3시의 재고는 얼마였나"에
+      로그를 그 시점까지만 재생해서 답합니다.</li>
+      <li><b>읽기 모델을 나중에 새로 만들 수 있다.</b> 화면 5·6에서 만든 읽기
+      모델에 없던 통계가 필요해지면, 처음부터 다시 재생해서 <b>과거 데이터에도
+      소급 적용된</b> 새 읽기 모델을 만들 수 있습니다 — 화면 6의 동기화 테이블은
+      "지금부터"만 쌓이지만, 이벤트 로그는 "처음부터" 다시 계산할 수 있습니다.</li>
+    </ul>
+  </div>
+
+  <p>그런데 대가가 있습니다 — 이벤트 소싱을 하는 순간, "지금 상태"를 바로 읽는
+  길이 없어집니다. 화면 6이 "선택"이라고 했던 동기화 읽기 모델이 이번에는
+  <b>모든 화면에 대해 필수</b>가 됩니다. 다음 화면에서 이 대가를 자세히 봅니다.</p>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 8 -->
+<section class="screen" data-title="왜 대부분에게 과한가">
+  <p class="kicker">13장 · 화면 8</p>
+  <h2>왜 대부분의 프로젝트에 과한가</h2>
+
+  <div class="box bad">
+    <p class="box-t">치르는 값</p>
+    <ol>
+      <li><b>모든 읽기가 프로젝션을 요구한다.</b> 화면 6에서는 "동기화 테이블이
+      필요한가"가 선택이었습니다. 이벤트 소싱에서는 <code>SELECT quantity FROM
+      stock_batches</code> 같은 가장 단순한 질문에도 답할 테이블이 애초에
+      없습니다 — 시스템을 켜는 첫날부터 프로젝터 하나 이상을 만들어야 합니다.</li>
+      <li><b>이벤트 스키마가 코드와 함께 늙는다.</b> <code>InboundDelayed</code>에
+      필드 하나를 추가하고 싶다고 합시다. 새 이벤트는 새 필드를 갖지만, <b>이미
+      저장된 옛날 이벤트들은 그 필드가 없는 채로 영원히 남습니다.</b> 재생 코드는
+      옛 모양과 새 모양을 <b>둘 다</b> 이해해야 합니다 — 이런 이벤트 버전 관리
+      자체가 하나의 전문 분야입니다.</li>
+      <li><b>디버깅이 어려워진다.</b> "왜 지금 이 값인가"에 답하려면 <code>SELECT</code>
+      한 줄이 아니라 로그를 처음(또는 마지막 스냅샷)부터 재생해야 합니다. 화면 6의
+      "동기화 테이블은 값이 틀려도 원인을 못 찾는다"는 문제가, 이벤트 소싱에서는
+      <b>모든 상태에 대해</b> 근본적으로 그렇습니다.</li>
+      <li><b>팀 전체가 새 모델로 사고해야 한다.</b> 이벤트 스토어를 운영해 본
+      팀이 드뭅니다. 학습 비용과 도구 투자가 본문 전체보다 클 수 있습니다.</li>
+    </ol>
+  </div>
+
+  <p>그런데도 값어치가 있는 도메인이 있습니다 — <b>이력 그 자체가 업무 요구사항인
+  도메인</b>입니다. 회계 원장(모든 분개가 영구히 남아야 함), 금융 거래, 보험 청구
+  처리처럼 "무슨 일이 있었는지"를 사후에 설명할 수 있어야 하는 게 법적·감사 요구인
+  경우입니다. 이때는 이벤트 소싱의 1~3번 대가를 <b>기꺼이</b> 치릅니다 — 감사
+  추적을 별도로 흉내 내는 것보다, 처음부터 그것을 저장 방식으로 삼는 편이 쌉니다.</p>
+
+  <div class="box note">
+    <p class="box-t">한빛몰은 그 도메인이 아니다</p>
+    <p>재고 불일치는 12장 화면 7이 이미 "실사 주기 단위의 결과적 일관성"으로
+    답을 냈습니다 — 실물과 장부가 어긋나면 실사로 맞추면 됩니다. "이 배치가 왜
+    지금 이 수량인지 5년 전 이벤트까지 거슬러 설명해야 한다"는 요구가 한빛몰
+    어디에도 없습니다. 배치를 지우지 않고 남겨 두는 지금 방식(9장)만으로도 이
+    도메인이 필요로 하는 이력은 충분합니다 — <b>완전한 이벤트 소싱이 주는 나머지
+    가치는, 한빛몰이 값을 치를 만큼 필요로 하지 않는 가치</b>입니다.</p>
+  </div>
+
+  <p>판단 기준을 한 문장으로 줄이면 이렇습니다 — <b>"이력을 재구성할 수 있으면
+  좋겠다"가 아니라 "이력이 없으면 이 업무 자체가 성립하지 않는다"일 때만
+  이벤트 소싱을 고려합니다.</b> 14장이 이 질문("DDD를 쓰지 말아야 할 때")을
+  더 넓은 범위로 다시 다룹니다.</p>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 9 -->
+<section class="screen" data-title="요약 · 퀴즈 · 과제">
+  <p class="kicker">13장 · 화면 9</p>
+  <h2>13장 마무리</h2>
+
+  <div class="summary">
+    <h3>핵심 요약</h3>
+    <ol>
+      <li>애그리게이트는 <b>쓰기 단위</b>이지 <b>읽기 단위</b>가 아닙니다. 화면에
+      필요한 숫자 두 개를 얻으려고 애그리게이트 전체(관계 로딩까지 포함)를
+      복원하면, 왕복 횟수를 줄여도(<code>get_many</code>) 화면은 계속 느립니다.</li>
+      <li><span class="term" data-term="cqrs">CQRS</span>는 "쓰기와 읽기가 같은
+      모델을 거칠 필요가 없다"는 아이디어이고, 전부-아니면-전무가 아니라
+      <b>단계</b>입니다 — DTO 조립(5장)도 이미 CQRS의 시작이고, 도메인 모델을
+      거치지 않는 읽기 전용 쿼리 객체(이 장)가 그 최소 형태입니다.</li>
+      <li>쿼리 객체는 <b>같은 DB, 도메인 클래스 미참조, DTO만 반환</b>이라는 세
+      조건 아래에서 컨텍스트 경계를 의도적으로 넘습니다 — 이건 11~12장의
+      "크랙"과 달리, 원칙을 지키면서 만든 예외입니다.</li>
+      <li>별도로 동기화되는 읽기 테이블은 화면 6의 세 가지 대가(지연·운영
+      부담·디버깅 난이도)를 치릅니다 — <b>조인할 테이블들이 물리적으로 갈라질
+      때</b>가 아니면 대부분 과합니다.</li>
+      <li><span class="term" data-term="eventsourcing">이벤트 소싱</span>은 현재
+      상태 대신 사실의 로그를 저장 방식으로 삼는 것입니다. CQRS를 강제하고,
+      이벤트 버전 관리·디버깅 난이도라는 새 비용을 낳습니다 — 이력 자체가 업무
+      요구사항인 도메인(회계, 금융) 밖에서는 대체로 과합니다.</li>
+    </ol>
+  </div>
+
+  <div class="quiz" data-answer="2">
+    <p class="q"><code>InventoryRepository.get_many(skus)</code>로 SKU 100개를
+    <b>한 번의 왕복</b>으로 가져왔는데도 상품 목록 화면이 여전히 느립니다.
+    가장 유력한 원인은?</p>
+    <ol class="options">
+      <li data-why="get_many은 이미 목록(Sequence[str])을 받습니다. 인자 타입은 문제가 아닙니다.">
+        <code>get_many</code>가 SKU를 한 번에 하나씩만 받아서</li>
+      <li data-why="맞습니다. relationship(StockBatch)에 로딩 방식을 지정하지 않아 기본값(지연 로딩)이 적용됩니다. 루트 100개는 한 번에 왔지만, 그 후 item.sellable_quantity가 _batches에 접근할 때마다 배치 조회가 새로 나갑니다.">
+        <code>_batches</code> 관계가 지연 로딩이라, <code>sellable_quantity</code>에
+        접근할 때마다 배치 조회가 SKU별로 다시 나가서</li>
+      <li data-why="InventoryRepository는 Protocol입니다. 이것과 실행 속도는 무관합니다.">
+        <code>InventoryRepository</code>가 <code>Protocol</code>이라 실행이
+        느려서</li>
+      <li data-why="정수 100개를 나누는 파이썬 연산은 무시할 수준입니다. 병목이 될 수 없습니다.">
+        <code>quantity_per_product</code>로 나누는 파이썬 계산 자체가 느려서</li>
+    </ol>
+    <div class="explain">
+      <p><b class="lbl">해설</b> 화면 2가 확인한 것입니다 — N+1은 루트 조회
+      (4장이 <code>get_many</code>로 막은 자리)뿐 아니라 <b>관계 로딩</b>에서도
+      똑같이 재발할 수 있습니다. 매핑에 로딩 전략을 명시하지 않으면 기본값이
+      조용히 적용됩니다.</p>
+    </div>
+  </div>
+
+  <div class="quiz" data-answer="3">
+    <p class="q">화면 5의 SQL에 있는 <code>SUM(quantity - reserved)</code>는
+    <code>InventoryItem.sellable_quantity</code> 프로퍼티와 <b>정확히 같은 계산</b>을
+    합니다. 둘을 나란히 유지하는 것의 진짜 위험은?</p>
+    <ol class="options">
+      <li data-why="SQL의 SUM은 파이썬의 sum()보다 정확도가 떨어지지 않습니다. 둘 다 정수 연산입니다.">
+        SQL의 <code>SUM</code>이 파이썬의 <code>sum()</code>보다 부정확해서</li>
+      <li data-why="쿼리 객체는 오히려 SQL 한 번으로 계산을 끝내는 것이 목적입니다. 왕복 횟수와는 무관한 문제입니다.">
+        쿼리 객체가 도메인 메서드를 호출하지 않아 왕복이 늘어나서</li>
+      <li data-why="맞습니다. I20(판매가능수량)의 계산 규칙이 두 곳(도메인 프로퍼티, 읽기 쿼리)에 따로 존재합니다. 나중에 규칙이 바뀌면(예: 유통기한 지난 배치를 ATP에서 빼기로 한다면) 한쪽만 고치고 다른 쪽을 잊기 쉽습니다 — 컴파일러도 테스트도 이 어긋남을 자동으로 잡아주지 않습니다.">
+        업무 규칙(I20)이 도메인 코드와 SQL, 두 곳에 따로 존재하게 되어
+        나중에 한쪽만 고치고 다른 쪽을 잊을 수 있어서</li>
+      <li data-why="쿼리 객체가 반환하는 것은 DTO(ProductListingRow)이지 InventoryItem이 아닙니다. 타입은 애초에 다릅니다.">
+        쿼리 객체가 반환하는 타입이 <code>InventoryItem</code>과 달라서
+        타입 검사가 깨져서</li>
+      </ol>
+    <div class="explain">
+      <p><b class="lbl">해설</b> CQRS의 최소 형태가 공짜로 얻는 게 아닙니다 —
+      속도를 얻는 대신, 업무 규칙 하나를 <b>두 군데에서 손으로 맞춰야 하는</b>
+      책임을 진다는 것이 이 장이 숨기지 않는 대가입니다. 11장의 "크랙"들이
+      그랬듯, 이것도 코드 리뷰가 메워야 하는 자리입니다.</p>
+    </div>
+  </div>
+
+  <div class="quiz" data-answer="2">
+    <p class="q">다음 중 별도로 동기화되는 읽기 테이블(화면 6) 또는 이벤트 소싱을
+    도입할 <b>정당한</b> 근거가 되는 것은?</p>
+    <ol class="options">
+      <li data-why="새 컬럼 하나는 화면 5의 쿼리 객체에 필드를 추가하는 것으로 충분합니다. 새 저장소가 필요한 이유가 아닙니다.">
+        화면 디자이너가 목록에 컬럼을 하나 더 보여달라고 요청했다</li>
+      <li data-why="맞습니다. 화면 6이 답으로 낸 유일한 기준입니다 — 조인할 테이블들이 물리적으로 같은 DB에 있지 않으면, 한 번의 SQL로 읽는 방법 자체가 없습니다.">
+        재고와 카탈로그가 서로 다른 서비스(다른 DB)로 분리되었다</li>
+      <li data-why="코드의 '느낌'은 정당한 근거가 아닙니다 — 화면 6의 세 가지 실제 비용(지연, 운영 부담, 디버깅 난이도)과 비교해 결정해야 합니다.">
+        지금 쿼리 객체의 SQL이 길고 복잡해 보인다</li>
+      <li data-why="화면 8의 결론과 반대입니다 — '배우고 싶다'는 이유로 이력 저장 방식 자체를 바꾸는 것은 이 장이 경고한 바로 그 과잉 엔지니어링입니다.">
+        팀이 이벤트 소싱을 도입해 보고 싶어 한다</li>
+    </ol>
+    <div class="explain">
+      <p><b class="lbl">해설</b> 화면 6과 8이 같은 형태의 기준을 씁니다 —
+      "더 정교해 보인다"가 아니라 "지금 방법이 물리적으로 불가능해지는 지점이
+      어디인가"를 먼저 확인합니다. 그 지점에 아직 도달하지 않았다면, 더 단순한
+      단계(화면 4의 표)로 충분합니다.</p>
+    </div>
+  </div>
+
+  <div class="task">
+    <h3>직접 해보기</h3>
+    <p>창고팀이 "입고예정 배치가 실제로 도착하면 화면 5의 상품 목록에 몇 초
+    안에 반영되어야 하는지 CS팀과 협상해 달라"고 요청했습니다(도착을 알리는
+    <code>InboundArrived</code> 같은 이벤트는 지금 코드엔 없습니다 — 있다고
+    가정합니다) —
+    12장 화면 7이 재고 할당에 대해 "5초 안에"를 협상했던 것과 같은 방식입니다.
+    지금 화면 5의 쿼리 객체를 그대로 쓴다면 이 협상이 필요할까요? 화면 6의
+    동기화 테이블로 바꾼다면 무엇이 달라질까요? 3줄로 설명해 보세요.</p>
+  </div>
+
+  <details class="fold answer">
+    <summary>모범답안</summary>
+    <div class="fold-body">
+      <ul>
+        <li><b>화면 5(쿼리 객체) 그대로라면</b>: 협상이 필요 없습니다. 이
+        쿼리는 <code>stock_batches</code>를 <b>매번 직접</b> 읽으므로,
+        (가상의) <code>InboundArrived</code> 이벤트가 나든 안 나든 상관없이
+        입고 트랜잭션의 커밋을 마치는 순간부터 다음 조회는 항상 최신 값을 봅니다. "지연"이라는 개념 자체가 없습니다 —
+        읽기와 쓰기가 같은 진실(같은 테이블)을 보기 때문입니다.</li>
+        <li><b>화면 6(동기화 테이블)으로 바꾸면</b>: 협상이 <b>반드시</b>
+        필요해집니다. (가상의) <code>InboundArrived</code> 이벤트가 발행된 시점과
+        프로젝터가 그 값을 <code>product_listing_view</code>에 반영하는 시점
+        사이에 <b>지연 창</b>이 생기기 때문입니다 — 12장이 재고 할당에 대해
+        했던 것과 똑같은 종류의 협상을, 이번엔 "화면에 보이는 숫자"에 대해
+        다시 해야 합니다.</li>
+        <li><b>결론</b>: 화면 6에서 "동기화 테이블은 공짜가 아니다"라고 한
+        것이 바로 이 대가입니다 — 빠른 읽기를 얻는 대신, 이전에는 없던
+        결과적 일관성 협상 하나를 새로 만들어 냅니다. 이 협상 자체가 필요
+        없는 화면 5가, 그 협상 비용을 감수할 이유가 생기기 전까지는 더 나은
+        선택인 이유이기도 합니다.</li>
+      </ul>
+    </div>
+  </details>
+
+  <div class="chapter-end">
+    <a href="ch12.html#last"><span>이전 장</span>12장 — 트랜잭션 경계와 결과적 일관성</a>
+    <a href="index.html"><span>14장은 아직 집필 전입니다</span>표지와 목차로</a>
+  </div>
+</section>
+
+</div></main>
+
+<script src="assets/book.js"></script>
+</body>
+</html>
