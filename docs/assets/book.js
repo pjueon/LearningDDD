@@ -19,7 +19,7 @@
     { id: 'ch09', num: '9장', title: 'Bounded Context: 하나의 모델은 어디까지 유효한가', part: '전략적 설계', screens: 13, hours: 2.5, ready: true },
     { id: 'ch10', num: '10장', title: 'Context Map과 통합 패턴', part: '전략적 설계', screens: 13, hours: 2.5, ready: true },
     { id: 'ch11', num: '11장', title: '아키텍처: 계층형에서 헥사고날로', part: '아키텍처·일관성', screens: 13, hours: 2.5, ready: true },
-    { id: 'ch12', num: '12장', title: '트랜잭션 경계와 결과적 일관성', part: '아키텍처·일관성', screens: 11, hours: 2.0 },
+    { id: 'ch12', num: '12장', title: '트랜잭션 경계와 결과적 일관성', part: '아키텍처·일관성', screens: 11, hours: 2.0, ready: true },
     { id: 'ch13', num: '13장', title: '(선택) CQRS와 이벤트 소싱 맛보기', part: '선택·마무리', screens: 9, hours: 1.5 },
     { id: 'ch14', num: '14장', title: '마무리: DDD를 쓰지 말아야 할 때', part: '선택·마무리', screens: 7, hours: 1.0 },
     { id: 'glossary', num: '부록', title: '용어집', part: '선택·마무리', screens: 1, hours: 0 }
@@ -79,7 +79,12 @@
     adapter: '어댑터 — 포트를 실제로 구현한, 바깥쪽(DB·외부 API·웹 요청)에 닿아 있는 클래스. SqlAlchemyOrderRepository·PgPaymentAdapter가 어댑터다.',
     compositionroot: '합성 뿌리(composition root) — 모든 어댑터의 구체 클래스를 실제로 생성해 포트에 주입하는, 애플리케이션에서 유일하게 인프라 전체를 알아도 되는 지점.',
     onion: '어니언 아키텍처 — 도메인 모델을 가장 안쪽 동심원에 두고, 바깥 원으로 갈수록 인프라에 가까워지는 그림. 제프리 팔레르모가 2008년에 제안했다. 헥사고날(포트와 어댑터)과 같은 의존성 방향 규칙을 다른 모양으로 그린 것이다.',
-    cleanarchitecture: '클린 아키텍처 — 로버트 마틴이 정리한, 의존성이 항상 안쪽을 향해야 한다는 "의존성 규칙(Dependency Rule)"을 강조하는 동심원 그림. 헥사고날·어니언과 핵심 아이디어가 같다.'
+    cleanarchitecture: '클린 아키텍처 — 로버트 마틴이 정리한, 의존성이 항상 안쪽을 향해야 한다는 "의존성 규칙(Dependency Rule)"을 강조하는 동심원 그림. 헥사고날·어니언과 핵심 아이디어가 같다.',
+    optimisticlock: '낙관적 락(Optimistic Lock) — 데이터를 읽을 때는 잠그지 않고, 쓸 때가 돼서야 그 사이 다른 트랜잭션이 바꾸지 않았는지 확인하는 방식. 보통 버전 컬럼으로 확인하고, 충돌이 나면 실패시켜 재시도로 넘긴다. 충돌이 드물 때 유리하다(12장).',
+    pessimisticlock: '비관적 락(Pessimistic Lock) — 데이터를 읽는 순간부터 잠가서, 다른 트랜잭션이 같은 행을 고치지도(그리고 SELECT ... FOR UPDATE로 읽지도) 못하게 막는 방식. 충돌을 아예 못 일어나게 하지만, 잠긴 동안 다른 트랜잭션은 기다려야 해 동시 처리량이 준다(12장).',
+    saga: '사가(Saga) — 여러 트랜잭션에 걸쳐 진행되는 하나의 업무 흐름. 중간 단계가 실패하면 데이터베이스의 자동 ROLLBACK이 아니라, 이미 끝난 앞 단계를 되돌리는 보상 트랜잭션을 직접 실행해야 한다(12장).',
+    processmanager: '프로세스 매니저(Process Manager) — 사가의 진행 상태를 한 객체가 쥐고 다음에 무엇을 할지 지시하는 조정자. 이벤트가 다음 이벤트를 낳는 코레오그래피 방식과 대비된다(12장).',
+    eventualconsistency: '결과적 일관성(Eventual Consistency) — 변경 시점에는 관련된 데이터가 즉시 맞아떨어지지 않다가, 합의된 시간 안에는 맞아떨어지는 것을 받아들이는 방식. "즉시 일관성"과 대비되고, 그 허용 시간은 관계마다 따로 협상해야 한다(12장).'
   };
 
   var STORE_KEY = 'ddd-book:progress';
