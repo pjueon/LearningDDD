@@ -21,7 +21,7 @@
     { id: 'ch11', num: '11장', title: '아키텍처: 계층형에서 헥사고날로', part: '아키텍처·일관성', screens: 13, hours: 2.5, ready: true },
     { id: 'ch12', num: '12장', title: '트랜잭션 경계와 결과적 일관성', part: '아키텍처·일관성', screens: 11, hours: 2.0, ready: true },
     { id: 'ch13', num: '13장', title: '(선택) CQRS와 이벤트 소싱 맛보기', part: '선택·마무리', screens: 9, hours: 1.5, ready: true },
-    { id: 'ch14', num: '14장', title: '마무리: DDD를 쓰지 말아야 할 때', part: '선택·마무리', screens: 7, hours: 1.0 },
+    { id: 'ch14', num: '14장', title: '마무리: DDD를 쓰지 말아야 할 때', part: '선택·마무리', screens: 7, hours: 1.0, ready: true },
     { id: 'glossary', num: '부록', title: '용어집', part: '선택·마무리', screens: 1, hours: 0 }
   ];
 
@@ -86,7 +86,10 @@
     processmanager: '프로세스 매니저(Process Manager) — 사가의 진행 상태를 한 객체가 쥐고 다음에 무엇을 할지 지시하는 조정자. 이벤트가 다음 이벤트를 낳는 코레오그래피 방식과 대비된다(12장).',
     eventualconsistency: '결과적 일관성(Eventual Consistency) — 변경 시점에는 관련된 데이터가 즉시 맞아떨어지지 않다가, 합의된 시간 안에는 맞아떨어지는 것을 받아들이는 방식. "즉시 일관성"과 대비되고, 그 허용 시간은 관계마다 따로 협상해야 한다(12장).',
     cqrs: 'CQRS(Command Query Responsibility Segregation) — 쓰기(커맨드)와 읽기(쿼리)가 같은 모델을 거칠 필요가 없다는 아이디어. 버트런드 마이어의 CQS(메서드 수준 분리) 원칙을 그렉 영이 모델 수준으로 확장했다. 같은 DB에서 읽기 전용 쿼리 객체를 쓰는 최소 형태부터, 별도로 동기화되는 읽기 테이블까지 단계가 있다(13장).',
-    eventsourcing: '이벤트 소싱(Event Sourcing) — 현재 상태를 테이블에 저장하는 대신, 상태에 이르기까지 일어난 사실(이벤트)의 순서를 저장하고 현재 상태는 그 로그를 재생(replay)해 얻는 방식. 완전한 감사 추적과 시간을 되돌린 조회를 얻는 대신, 모든 읽기에 프로젝션이 필요해지고 이벤트 스키마 관리 비용이 든다(13장).'
+    eventsourcing: '이벤트 소싱(Event Sourcing) — 현재 상태를 테이블에 저장하는 대신, 상태에 이르기까지 일어난 사실(이벤트)의 순서를 저장하고 현재 상태는 그 로그를 재생(replay)해 얻는 방식. 완전한 감사 추적과 시간을 되돌린 조회를 얻는 대신, 모든 읽기에 프로젝션이 필요해지고 이벤트 스키마 관리 비용이 든다(13장).',
+    coredomain: '핵심 도메인(Core Domain) — 이 회사가 다른 회사와 달라지는 지점. 잘하면 돈을 벌고 못하면 고객이 떠나는 곳이라, 애그리게이트·리포지토리 등 이 교재의 모든 패턴을 아낌없이 투자할 값어치가 있다(14장).',
+    supportingsubdomain: '지원 하위 도메인(Supporting Subdomain) — 핵심 도메인을 돌아가게는 해야 하지만 그 자체가 경쟁력은 아닌 영역. 직접 만들되 핵심만큼 정교한 설계를 들이지 않는다(14장).',
+    genericsubdomain: '일반 하위 도메인(Generic Subdomain) — 어느 회사에나 있고 이미 잘 만들어진 상용품이 있는 영역. 로직 자체는 사거나 외부 서비스를 쓰고, 그 경계(포트·ACL)만 직접 만든다(14장).'
   };
 
   var STORE_KEY = 'ddd-book:progress';
