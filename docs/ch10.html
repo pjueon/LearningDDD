@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="ko" data-chapter="ch10">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>10장 · Context Map과 통합 패턴 — 도메인 주도 설계 첫걸음</title>
+<link rel="stylesheet" href="assets/book.css">
+</head>
+<body>
+
+<main id="book"><div class="inner">
+
+<!-- ─────────────────────────────────────────── 화면 1 -->
+<section class="screen" data-title="이 장에서 할 일">
+  <p class="kicker">10장 · 화면 1</p>
+  <h1>Context Map<br>경계를 넘는 관계를 그리다</h1>
+
+  <p class="lead">9장은 <code>Product</code> 하나에 뭉쳐 있던 관심사를 카탈로그·재고·창고
+  세 <span class="term" data-term="boundedcontext">바운디드 컨텍스트</span>로 갈랐습니다.
+  그리고 마지막 화면이 숙제를 하나 남겼습니다 — 지금까지 본 통합(<code>CatalogPort</code>)은
+  <b>대등한 두 팀</b> 사이의 관계였는데, 결제 컨텍스트처럼 <b>우리가 모델을 바꿀 수 없는
+  상대</b>와의 관계는 다른 이름과 다른 도구가 필요하다는 예고였습니다. 이 장이 그 이름과
+  도구를 다룹니다.</p>
+
+  <div class="box note">
+    <p class="box-t">이 장의 지도</p>
+    <ul>
+      <li><b>화면 2 · 초안.</b> 한빛몰 일곱 컨텍스트와 외부 시스템을 한 장에 그립니다.
+      화살표는 있지만 아직 이름이 없습니다.</li>
+      <li><b>화면 3~4 · 조직 관계 패턴.</b> 두 팀 사이의 힘 관계 — 파트너십, 고객/공급자,
+      순응자, 분리된 방법.</li>
+      <li><b>화면 5~6 · 기술 통합 패턴.</b> 그 관계를 코드로 어떻게 잇는가 — 공유 커널,
+      개방 호스트 서비스, 발행된 언어.</li>
+      <li><b>화면 7~9 · 결제와 ACL.</b> 1장·8장이 미뤄 온 PG 응답 코드를 실제로
+      번역합니다.</li>
+      <li><b>화면 10 · 이벤트와 또 다른 ACL.</b> 창고→배송, 배송→택배사.</li>
+      <li><b>화면 11 · 완성된 지도.</b> 이름이 붙은 화살표들.</li>
+      <li><b>화면 12~13 · 한계, 요약, 퀴즈, 과제.</b></li>
+    </ul>
+  </div>
+
+  <p>미리 말해 둘 것이 있습니다. 이 장은 <b>새 애그리게이트를 만들지 않습니다.</b>
+  <code>Order</code>도 <code>InventoryItem</code>도 손대지 않습니다. 이 장이 만드는 것은
+  컨텍스트 <b>안</b>의 규칙이 아니라 컨텍스트 <b>사이</b>의 통로 — 포트 하나
+  (<code>PaymentPort</code>)와 그 포트를 구현하는 부패 방지 계층뿐입니다. 그리고 결제가
+  실패했을 때 이미 잡아 둔 재고를 어떻게 되돌릴지는 <b>여기서 답하지 않습니다.</b> 그건
+  트랜잭션 경계와 보상의 문제이고, 12장의 몫입니다.</p>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 2 -->
+<section class="screen" data-title="일곱 컨텍스트, 이름 없는 화살표">
+  <p class="kicker">10장 · 화면 2</p>
+  <h2>일곱 컨텍스트, 이름 없는 화살표</h2>
+
+  <p>0장과 00-기획 단계에서 이미 한빛몰의 일곱 컨텍스트를 정해 뒀습니다. 9장까지 코드로
+  실제로 나눈 것은 카탈로그·재고·창고 셋뿐입니다. 나머지 넷 — 주문·배송·결제·회원 —은
+  이름과 책임만 있었습니다. 지도를 그리려면 일곱을 한 번에 올려놓아야 합니다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:6rem">컨텍스트</th><th>책임</th><th>코드 상태</th></tr>
+      <tr><td><b>카탈로그</b></td><td>상품 정보, 판매가, 판매 상태</td><td>9장에서 <code>Product</code> 분리 완료</td></tr>
+      <tr><td><b>주문</b></td><td>주문 접수·취소, 금액 계산</td><td>3~7장에서 구현</td></tr>
+      <tr><td><b>재고</b></td><td>SKU별 가용 재고, 할당</td><td>3장에서 구현, 9장에서 그대로 확인</td></tr>
+      <tr><td><b>창고</b></td><td>로케이션, 피킹</td><td>9장에서 <code>StoredItem</code> 신설</td></tr>
+      <tr><td><b>배송</b></td><td>출고, 택배사 연동, 배송 추적</td><td>이름만 있음(리드타임 정책만 5장에 등장)</td></tr>
+      <tr><td><b>결제</b></td><td>PG 연동, 승인·환불</td><td>이름만 있음. 코드에는 <code>pg_client</code> 호출만 있었다(1장) — 이 장에서 처음 경계를 갖는다</td></tr>
+      <tr><td><b>회원</b></td><td>등급, 배송지</td><td><code>MembershipPort</code>로 5장에서 이미 연결</td></tr>
+    </table>
+  </div>
+
+  <p>이 일곱을 화살표로 이어 보면 이런 그림이 나옵니다. 화살표는 "누가 누구에게 정보를
+  요청하거나 전달하는가"를 뜻합니다. 점선 상자는 <b>한빛몰 밖의 시스템</b>입니다 — 우리
+  코드가 아니라 남의 회사 서비스입니다.</p>
+
+  <figure class="fig">
+    <svg viewBox="0 0 840 270" role="img" aria-label="한빛몰 일곱 컨텍스트와 외부 시스템 둘을 상자로 놓고 화살표로 이은 그림. 화살표에는 아직 이름표가 없다">
+      <g class="svg-muted" stroke="currentColor" stroke-width="1" style="fill:none">
+        <rect x="20" y="20" width="140" height="50" rx="8"/>
+        <rect x="20" y="110" width="140" height="50" rx="8"/>
+        <rect x="260" y="20" width="140" height="50" rx="8"/>
+        <rect x="260" y="110" width="140" height="50" rx="8"/>
+        <rect x="500" y="20" width="140" height="50" rx="8"/>
+        <rect x="500" y="110" width="140" height="50" rx="8"/>
+        <rect x="680" y="110" width="140" height="50" rx="8"/>
+      </g>
+      <g stroke-width="1.2" stroke-dasharray="4 3" style="stroke:var(--warn);fill:none">
+        <rect x="260" y="200" width="140" height="50" rx="8"/>
+        <rect x="680" y="200" width="140" height="50" rx="8"/>
+      </g>
+      <g text-anchor="middle" font-size="12.5" font-weight="700" class="svg-fg">
+        <text x="90" y="49">카탈로그</text>
+        <text x="90" y="139">회원</text>
+        <text x="330" y="49">주문</text>
+        <text x="330" y="139">결제</text>
+        <text x="570" y="49">재고</text>
+        <text x="570" y="139">창고</text>
+        <text x="750" y="139">배송</text>
+      </g>
+      <g text-anchor="middle" font-size="12.5" font-weight="700" style="fill:var(--warn)">
+        <text x="330" y="229">PG사</text>
+        <text x="750" y="229">택배사</text>
+      </g>
+      <g class="svg-muted" stroke="currentColor" stroke-width="1.3" fill="none">
+        <path d="M160 45 H256"/>
+        <path d="M160 135 V45 H256"/>
+        <path d="M400 45 H496"/>
+        <path d="M570 70 V106"/>
+        <path d="M640 135 H676"/>
+        <path d="M330 70 V106"/>
+        <path d="M330 160 V196"/>
+        <path d="M750 160 V196"/>
+      </g>
+      <g class="svg-muted" stroke="none">
+        <path d="M250 41 L256 45 L250 49 Z"/>
+        <path d="M490 41 L496 45 L490 49 Z"/>
+        <path d="M566 100 L570 106 L574 100 Z"/>
+        <path d="M670 131 L676 135 L670 139 Z"/>
+        <path d="M326 100 L330 106 L334 100 Z"/>
+        <path d="M326 190 L330 196 L334 190 Z"/>
+        <path d="M746 190 L750 196 L754 190 Z"/>
+      </g>
+    </svg>
+    <figcaption>한빛몰 일곱 컨텍스트(실선)와 외부 시스템 둘(점선, 주황 — PG사·택배사)을
+    이은 초안입니다. 화살표는 이미 다 그려집니다 — 카탈로그→주문, 회원→주문, 주문→재고,
+    재고→창고, 창고→배송, 주문→결제, 결제→PG사, 배송→택배사. 그런데 이 여덟 화살표가
+    다 같은 종류일까요? 카탈로그 팀에게 "이번 스프린트에 이 필드 좀 추가해 주세요"라고
+    부탁하는 것과, PG사에게 같은 부탁을 하는 것은 전혀 다른 대화입니다.</figcaption>
+  </figure>
+
+  <div class="box note">
+    <p class="box-t">업스트림과 다운스트림</p>
+    <p>화살표가 나오는(의존하는) 쪽을 <b>다운스트림(downstream)</b>, 화살표가 가리키는
+    (정보를 제공하는) 쪽을 <b>업스트림(upstream)</b>이라 부릅니다. 카탈로그→주문에서는
+    주문이 다운스트림입니다 — 카탈로그가 만든 값을 받아 쓰기 때문입니다. 이 방향은
+    "누가 힘이 센가"와는 다른 질문입니다. 업스트림이 다운스트림보다 늘 힘이 세다고
+    단정할 수 없습니다 — 화면 3에서 그 힘 관계 자체에 이름을 붙입니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 3 -->
+<section class="screen" data-title="조직 관계 패턴 ① 파트너십·고객/공급자">
+  <p class="kicker">10장 · 화면 3</p>
+  <h2>조직 관계 패턴 ① — 파트너십과 고객/공급자</h2>
+
+  <p>에릭 에반스(Eric Evans)는 <i>Domain-Driven Design</i>(2003, 통칭 Blue Book)에서
+  컨텍스트 사이의 관계를 <b>두 팀 사이의 힘 관계</b>로 분류했습니다. 코드를 보기 전에,
+  화면 2의 여덟 화살표 중 둘을 먼저 짚어 보겠습니다.</p>
+
+  <div class="box note">
+    <p class="box-t"><span class="term" data-term="partnership">파트너십</span>(Partnership)</p>
+    <p>두 팀이 <b>같은 목표를 향해 함께 움직이는</b> 관계입니다. 어느 쪽도 일방적으로
+    계획을 세우지 않고, 필요할 때마다 서로 맞춰 갑니다. 정해진 요청 절차 같은 것도 딱히
+    없습니다 — 같은 회의에 같이 앉아 있으니까요.</p>
+    <p>재고↔창고가 여기 해당합니다. 9장에서 <code>InventoryItem</code>과
+    <code>StoredItem</code>으로 코드는 갈랐지만, 도현 팀이 실무에서 재고와 창고를 함께
+    운영합니다. 화면 2 그림에서 이 화살표에도 머리를 그려 뒀지만, 사실 방향을 물을
+    필요가 없을 만큼 밀착된 관계입니다 — <b>두 팀이 사실상 하나처럼 움직일 때</b>는
+    화살표의 방향보다 "누가 먼저 알아야 하는가"가 그때그때 정해집니다.</p>
+  </div>
+
+  <div class="box note">
+    <p class="box-t"><span class="term" data-term="customersupplier">고객/공급자</span>(Customer-Supplier)</p>
+    <p>다운스트림(고객)이 원하는 것을 업스트림(공급자)의 <b>계획에 반영시킬 힘이 있는</b>
+    관계입니다. 힘의 우열은 있지만, 요청하면 들어줍니다.</p>
+    <p>주문→재고가 정확히 이 모양입니다. 00-기획 §3.5가 이미 이렇게 정의해 뒀습니다 —
+    "주문이 '할당해달라'고 요청한다." <code>allocate_stock()</code>(7장)이 이 요청을
+    코드로 옮긴 것입니다. 재고 팀이 <code>InventoryItem.allocate()</code>의 시그니처를
+    바꾸려면(예: <code>buffer_days</code> 추가, 7장 화면 8) 주문 쪽 요구를 반영해서
+    바꿉니다 — 그렇다고 주문 팀이 재고 팀의 코드를 직접 고치러 들어가지는 않습니다.</p>
+    <p>회원→주문도 같은 모양입니다. <code>MembershipPort.grade_of()</code>(5장)를 주문이
+    필요로 해서 회원 팀에 만들어 달라고 요청했고, 회원 팀이 그 인터페이스를 제공합니다.</p>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:8rem"></th><th>파트너십</th><th>고객/공급자</th></tr>
+      <tr><td><b>힘의 우열</b></td><td>없음(대등)</td><td>있음(다운스트림 요구가 반영됨)</td></tr>
+      <tr><td><b>조율 방식</b></td><td>수시로, 격식 없이</td><td>요청 → 계획에 반영 → 통보</td></tr>
+      <tr><td><b>한빛몰 예</b></td><td>재고 ↔ 창고</td><td>주문 → 재고, 회원 → 주문</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 4 -->
+<section class="screen" data-title="조직 관계 패턴 ② 순응자·분리된 방법">
+  <p class="kicker">10장 · 화면 4</p>
+  <h2>조직 관계 패턴 ② — 순응자와 분리된 방법</h2>
+
+  <p>나머지 둘은 <b>협상이 안 되거나, 협상할 필요가 없는</b> 관계입니다.</p>
+
+  <div class="box warn">
+    <p class="box-t"><span class="term" data-term="conformist">순응자</span>(Conformist)</p>
+    <p>다운스트림이 업스트림의 모델을 <b>협상 없이 그대로</b> 받아들이는 관계입니다.
+    업스트림에게 우리 요구를 들어줄 <b>의무도, 동기도</b> 없을 때 생깁니다.</p>
+    <p>결제→PG사가 여기 해당합니다. 1장 화면 8이 이미 이 관계를 코드로 보여줬습니다 —
+    <code>pg_client.approve()</code>가 돌려주는 모양(<code>resultCode</code>,
+    <code>tid</code>, <code>resultMsg</code>)은 PG사가 정한 것이고, 한빛몰은 이 회사와의
+    미팅에서 "저희는 <code>success: true</code>처럼 주세요"라고 요구할 처지가 아닙니다.
+    거래 규모가 작은 가맹점이 결제 대행사의 API 스펙을 바꾸는 일은 거의 없습니다.</p>
+  </div>
+
+  <div class="box warn">
+    <p class="box-t">순응자 그 자체는 위험하다</p>
+    <p>여기서 멈추면 문제가 생깁니다 — PG사의 모델을 <b>그대로 받아들이는 것</b>과
+    <b>그 모델을 우리 도메인 코드 안으로 그대로 들여오는 것</b>은 다른 이야기입니다.
+    1장 화면 8의 <code>if pg["resultCode"] != "0000"</code>이 바로 후자입니다. 순응자
+    관계라는 사실은 바뀌지 않지만, 그 모델이 우리 코드 안까지 새어 들어오는 것은 막을 수
+    있습니다. 화면 7~9에서 그 방법(ACL)을 봅니다.</p>
+  </div>
+
+  <div class="box note">
+    <p class="box-t"><span class="term" data-term="separateways">분리된 방법</span>(Separate Ways)</p>
+    <p>두 컨텍스트를 <b>아예 통합하지 않기로</b> 하는 선택입니다. 통합에 드는 비용
+    (포트를 만들고, 스냅샷을 맞추고, 양쪽이 조율하는 것)이 통합해서 얻는 이익보다 클 때
+    씁니다. 중복을 감수합니다.</p>
+    <p>화면 2의 그림을 다시 보면 카탈로그와 창고 사이에는 <b>애초에 화살표가 없었습니다.</b>
+    실수로 빠뜨린 게 아닙니다 — 카탈로그가 "이 상품이 몇 번 랙에 있는지" 알아야 할 이유가
+    없고, 창고가 "이 랙의 물건이 얼마에 팔리는지" 알아야 할 이유도 없습니다. 둘 다 재고를
+    거쳐서만 만납니다. <b>화살표가 없는 것도 관계의 한 종류</b>입니다 — 모든 컨텍스트
+    쌍을 억지로 이어야 하는 것은 아닙니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 5 -->
+<section class="screen" data-title="기술 통합 패턴 ① 공유 커널을 쓰지 않는 이유">
+  <p class="kicker">10장 · 화면 5</p>
+  <h2>기술 통합 패턴 ① — 공유 커널을 쓰지 않는 이유</h2>
+
+  <p>화면 3~4는 <b>조직 사이의 힘 관계</b>를 다뤘습니다. 이제 그 관계를 <b>코드로 어떻게
+  잇는가</b> — 기술 통합 패턴을 봅니다. 가장 먼저 볼 것은 우리가 <b>고르지 않은</b>
+  선택지, <span class="term" data-term="sharedkernel">공유 커널</span>입니다.</p>
+
+  <div class="box note">
+    <p class="box-t">공유 커널(Shared Kernel)</p>
+    <p>두 컨텍스트가 <b>모델(코드)의 일부를 공유</b>하는 관계입니다. 카탈로그와 주문이
+    <code>Product</code> 클래스 하나를 같이 <code>import</code>해서 쓴다고 상상해
+    보겠습니다.</p>
+  </div>
+
+<pre><span class="cap"># 가상의 예 — 실제 코드가 아니다</span><code>from catalog.product import Product   # 주문 컨텍스트가 카탈로그의 클래스를 직접 참조
+
+class OrderLine:
+    def __init__(self, product: Product, quantity: int) -&gt; None:
+        self.unit_price = product.price   # 지금 이 순간의 가격을 그대로 씀
+</code></pre>
+
+  <p>중복은 줄어듭니다 — <code>Product</code>를 두 번 정의할 필요가 없으니까요. 그런데
+  대가가 있습니다.</p>
+
+  <div class="box bad">
+    <p class="box-t">공유 커널의 대가</p>
+    <p><b>1. 카탈로그 팀이 <code>Product.price</code>의 타입을 바꾸면(예: 원 단위 정수
+    → 통화 코드가 붙은 값) 주문 팀의 코드가 그 순간 깨집니다.</b> 두 팀이 배포를
+    맞춰야 합니다.</p>
+    <p><b>2. I6이 깨집니다.</b> 3~6장에서 이미 이 문제를 다뤘습니다 — 주문 라인이
+    <code>Product</code>를 직접 들고 있으면, 카탈로그에서 가격이 바뀌는 순간 <b>이미
+    나간 주문의 금액이 조용히 바뀝니다.</b> 6장이 스냅샷(<code>OrderItemSnapshot</code>)을
+    도입한 이유가 바로 이것이었습니다.</p>
+  </div>
+
+  <div class="box good">
+    <p class="box-t">이미 내린 결정이다</p>
+    <p>사실 이 선택은 지금 새로 하는 게 아닙니다. <b>5장이 <code>CatalogPort.snapshot()</code>을
+    만들 때, 6장이 그 이유를 "과거의 사실인가, 지금의 상태인가"로 설명할 때 이미 공유
+    커널을 쓰지 않기로 정한 것</b>입니다. 이 화면은 그 결정에 이름을 붙일 뿐입니다 —
+    카탈로그와 주문은 클래스를 공유하지 않고, <b>값을 복사해서 국경을 넘습니다.</b>
+    공유 커널이 매력적으로 보이는 순간은 "두 팀이 결국 같은 회사인데 뭘 그렇게까지
+    나누나"라는 생각이 들 때입니다 — 그런데 두 팀이 같은 회사라는 것과, 같은
+    <b>이유</b>로 모델을 바꾼다는 것은 다른 이야기입니다(9장 화면 5의 기준).</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 6 -->
+<section class="screen" data-title="기술 통합 패턴 ② 개방 호스트 서비스와 발행된 언어">
+  <p class="kicker">10장 · 화면 6</p>
+  <h2>기술 통합 패턴 ② — 개방 호스트 서비스와 발행된 언어</h2>
+
+  <p>공유 커널을 안 쓴다면, 카탈로그→주문은 실제로 무엇일까요? 5장이 이미 만들어 둔
+  <code>CatalogPort</code>를 다시 보겠습니다.</p>
+
+<pre><code>class CatalogPort(Protocol):
+    def snapshot(self, items: Sequence[OrderItemInput]) -&gt; Sequence[OrderItemSnapshot]: ...
+</code></pre>
+
+  <div class="box note">
+    <p class="box-t"><span class="term" data-term="ohs">개방 호스트 서비스</span>(Open Host Service, OHS)</p>
+    <p>업스트림이 다운스트림 하나하나에 맞춤 인터페이스를 만들어 주는 대신, <b>여러
+    소비자가 함께 쓸 수 있는 표준 인터페이스 하나</b>를 제공하는 것입니다. 카탈로그가
+    <code>snapshot()</code>이라는 창구 하나를 열어 두면, 지금은 주문만 쓰지만 나중에
+    다른 컨텍스트가 상품 정보가 필요해져도 같은 창구를 씁니다 — 요청자마다 새 메서드를
+    만들지 않습니다.</p>
+  </div>
+
+  <div class="box note">
+    <p class="box-t"><span class="term" data-term="publishedlanguage">발행된 언어</span>(Published Language)</p>
+    <p>그 창구를 오갈 때 쓰는 <b>데이터의 형식</b>을 문서화된 공용 언어로 정한 것입니다.
+    <code>OrderItemSnapshot</code>(<code>sku</code>, <code>product_name</code>,
+    <code>unit_price</code>, <code>quantity</code>)이 이 언어입니다. 카탈로그 내부에
+    <code>Product</code>가 어떻게 생겼든(9장 이후로는 <code>composition</code>까지
+    갖고 있죠), 국경을 넘을 때는 항상 이 네 필드로만 말합니다. OHS와 발행된 언어는
+    거의 항상 짝으로 다닙니다 — 창구(OHS)는 있는데 오가는 말의 형식(발행된 언어)이
+    정해져 있지 않으면 창구가 무의미합니다.</p>
+  </div>
+
+  <div class="box warn">
+    <p class="box-t">5장의 예고를 정정합니다</p>
+    <p>5장 화면 9는 이렇게 적어 뒀습니다 — "10장에서 카탈로그가 진짜 다른 프로세스로
+    분리되면, 이 인터페이스는 그대로 두고 구현만 HTTP 클라이언트로 바뀝니다(ACL로
+    확장됩니다)." 지금 보니 이름이 정확하지 않았습니다. <code>CatalogPort</code>가
+    하는 일 — 카탈로그의 내부 모델을 우리 형식으로 <b>번역</b>하는 것 — 은 ACL과
+    닮았지만, ACL이라는 이름을 붙이는 진짜 기준은 <b>"상대의 모델이 우리 도메인 언어를
+    오염시킬 위험이 있는가"</b>입니다. 카탈로그 팀은 같은 회사이고,
+    <code>OrderItemSnapshot</code>이라는 형식도 우리가 정해서 카탈로그 팀에 맞춰
+    달라고 요청한 것입니다(고객/공급자, 화면 3). <b>모델을 오염시킬 만한 힘의
+    불균형이 없습니다.</b> 이런 경우는 ACL보다 <b>OHS + 발행된 언어</b>가 더 정확한
+    이름입니다. 화면 7~9에서 진짜 ACL이 필요한 관계 — 우리가 형식을 정할 힘이
+    <b>없는</b> 관계 — 를 보면 차이가 뚜렷해집니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 7 -->
+<section class="screen" data-title="결제 컨텍스트를 지도에 올리기">
+  <p class="kicker">10장 · 화면 7</p>
+  <h2>결제 컨텍스트를 지도에 올리기</h2>
+
+  <p>8장 화면 7이 이벤트 스토밍 벽에서 짚었던 문제를 다시 가져오겠습니다.</p>
+
+  <div class="box warn">
+    <p class="box-t">8장이 남긴 문제</p>
+    <p>"7장의 <code>allocate_stock</code>은 결제 확인을 기다리지 않고
+    <code>OrderPlaced</code> 직후 곧장 할당을 시작합니다(한빛몰에는 아직 결제
+    컨텍스트가 없습니다). 결제가 실패하면 이미 잡아 둔 재고는 어떻게 되는가 —
+    10장·12장에서 다시 볼 문제입니다."</p>
+  </div>
+
+  <p>이 장은 이 문제의 <b>절반</b>만 갚습니다. 결제 컨텍스트를 지도 위에 정식으로
+  올리고, 그 관계의 이름을 정하고, 통합 통로(포트)를 만드는 것까지입니다. <b>이미
+  할당된 재고를 결제 실패 시 어떻게 되돌리는가</b>(보상, 트랜잭션 경계)는 여전히 12장의
+  몫입니다. <span class="later">12장에서 다시 볼 문제</span></p>
+
+  <p>관계부터 정합니다. 화면 2에서 결제를 화살표 하나가 아니라 <b>두 홉</b>으로 그려
+  뒀던 이유가 이것입니다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:11rem">관계</th><th>패턴</th><th>왜</th></tr>
+      <tr>
+        <td>주문 → 결제</td>
+        <td><b>고객/공급자</b></td>
+        <td>둘 다 한빛몰 안의 팀입니다. 주문이 "승인해 주세요"라고 요청하면 결제 팀이
+        그 요청에 맞춰 인터페이스를 제공합니다 — 회원→주문과 같은 모양입니다.</td>
+      </tr>
+      <tr>
+        <td>결제 → PG사</td>
+        <td><b>순응자</b></td>
+        <td>여기서부터 진짜 순응자입니다. PG사는 한빛몰의 요구로 API를 바꿔주지
+        않습니다(화면 4).</td>
+      </tr>
+    </table>
+  </div>
+
+  <p>진짜 위험은 두 번째 홉에 있습니다. 1장 화면 8의 코드를 다시 보겠습니다.</p>
+
+<pre><span class="cap"># 1장 화면 8, 다시</span><code>        pg = pg_client.approve(customer_id=customer_id, amount=total, order_id=order_id)
+        if pg["resultCode"] != "0000":
+            raise ValueError("결제 실패: " + pg["resultMsg"])
+</code></pre>
+
+  <p><code>"0000"</code>이라는 문자열, <code>pg["resultCode"]</code>라는 딕셔너리 접근,
+  <code>ValueError</code>라는 파이썬 내장 예외 — 이 셋 다 <b>PG사의 사정이지 한빛몰의
+  도메인 지식이 아닙니다.</b> 지금은 이게 <code>place_order</code> 함수 안에 그대로
+  있습니다. PG사를 바꾸는 날(실제로 드물지 않습니다) 도메인 코드까지 다시 써야
+  한다는 뜻입니다. 순응자 관계를 받아들이는 것과, <b>그 모델을 우리 코드 안까지 끌고
+  들어오는 것</b>은 다른 문제라고 화면 4가 경고했던 장면이 바로 이것입니다.</p>
+
+  <div class="box note">
+    <p class="box-t"><span class="term" data-term="acl">부패 방지 계층</span>(ACL, Anti-Corruption Layer)</p>
+    <p>외부(또는 우리가 통제할 수 없는) 모델을 <b>우리 도메인 언어로 번역</b>해서, 상대의
+    모델이 우리 코드로 새어 들어오지 않게 막는 계층입니다. Evans의 Blue Book이 이름
+    붙인 패턴이고, Vernon의 <i>Implementing Domain-Driven Design</i>(2013, 통칭
+    Red Book)이 실무 사례를 더 자세히 다룹니다. 순응자 관계에서 특히 중요합니다 —
+    <b>관계의 힘은 순응해야 하지만, 우리 코드의 언어까지 순응할 필요는 없습니다.</b></p>
+  </div>
+
+  <p>화면 8~9에서 이 계층을 실제로 만듭니다.</p>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 8 -->
+<section class="screen" data-title="ACL 설계 — PaymentPort">
+  <p class="kicker">10장 · 화면 8</p>
+  <h2>ACL 설계 — <code>PaymentPort</code>로 국경을 정하기</h2>
+
+  <p>4장의 <code>OrderRepository</code>·<code>InventoryRepository</code>, 5장의
+  <code>CatalogPort</code>·<code>MembershipPort</code>와 같은 자리에 포트를 하나 더
+  놓습니다. 먼저 <b>우리 도메인 언어로만 된 값</b>을 정합니다 — PG사의
+  <code>resultCode</code>·<code>tid</code>가 아니라, 우리 코드가 알아도 되는 최소한의
+  사실입니다.</p>
+
+<pre><span class="cap"># domain/payment.py</span><code>class PaymentDeclined(DomainError): ...      # PG가 승인을 거절했다
+class PaymentGatewayError(DomainError): ...  # PG 자체가 응답하지 못했다(장애·타임아웃)
+
+@dataclass(frozen=True)
+class PaymentApproval:
+    tid: str              # 환불 요청 때 PG에 되돌려줘야 하는 값이라 그대로 보관한다
+    approved_amount: Money
+
+class PaymentPort(Protocol):
+    def approve(self, order_number: OrderNumber, customer_id: UUID,
+                amount: Money) -&gt; PaymentApproval: ...
+    def refund(self, tid: str, amount: Money) -&gt; None: ...
+</code></pre>
+
+  <p>눈여겨볼 것 — <code>PaymentApproval</code>에는 <code>resultCode</code>가
+  없습니다. <b>성공했다는 사실 자체가 이 값의 존재</b>입니다(실패하면 예외를 던지지,
+  <code>approved: bool</code> 같은 필드를 만들지 않습니다 — 3장에서 이미
+  <code>DomainError</code>를 실패 신호로 쓰기로 한 규칙과 같은 결입니다). <code>tid</code>는
+  예외입니다 — PG사가 만든 값이지만 <b>환불할 때 그대로 돌려줘야 하는 참조 키</b>라서
+  어쩔 수 없이 우리 값 객체 안에 들어옵니다. 2장 화면 11이 "PG의 <code>tid</code>를
+  <b>식별자</b>로 쓰지 않는다"고 정했던 것과 같은 이유로, 여기서도 <code>tid</code>는
+  <b>속성</b>일 뿐 우리 쪽 무언가의 식별자가 아닙니다.</p>
+
+  <p>이 포트가 없을 때와 있을 때, 결제를 확인하는 코드는 이렇게 달라집니다(실제로 지금
+  <code>place_order()</code>에 연결하지는 않습니다 — 화면 7에서 미룬 문제입니다. 모양만
+  비교합니다).</p>
+
+  <div class="tabs">
+    <div class="tab" data-label="ACL 없이 — 1장 그대로">
+<pre><code>pg = pg_client.approve(customer_id=customer_id, amount=total, order_id=order_id)
+if pg["resultCode"] != "0000":
+    raise ValueError("결제 실패: " + pg["resultMsg"])
+tid = pg["tid"]
+</code></pre>
+    </div>
+    <div class="tab" data-label="PaymentPort로 — 이 장">
+<pre><code>try:
+    approval = payments.approve(order_number, customer_id, amount)
+except PaymentDeclined:
+    ...   # 고객에게 알릴 상황(재고 부족과 같은 급의 실패)
+except PaymentGatewayError:
+    ...   # 우리가 고쳐야 할 장애
+tid = approval.tid
+</code></pre>
+    </div>
+  </div>
+
+  <div class="box good">
+    <p class="box-t">1장 화면 8이 지적했던 문제가 여기서 풀린다</p>
+    <p>1장 화면 8의 <code>except Exception</code>은 "재고 부족(고객에게 알릴 상황)과
+    데이터베이스 접속 실패(우리가 고쳐야 할 장애)가 같은 400 응답으로 나간다"고
+    지적했었습니다. <code>PaymentDeclined</code>와 <code>PaymentGatewayError</code>를
+    나눠 정의한 것이 그 지적에 대한 답입니다 — <b>"거절"과 "장애"는 도메인 언어로도
+    서로 다른 사실</b>이기 때문입니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 9 -->
+<section class="screen" data-title="ACL 구현 — PG 응답을 번역하는 코드">
+  <p class="kicker">10장 · 화면 9</p>
+  <h2>ACL 구현 — PG 응답을 번역하는 코드</h2>
+
+  <p><code>PaymentPort</code>를 구현하는 어댑터입니다. 이 클래스 하나가 국경 그 자체입니다
+  — 이 클래스 <b>안</b>에서만 <code>resultCode</code>·<code>tid</code>라는 이름을 씁니다.</p>
+
+<pre><span class="cap"># infrastructure/payment_gateway.py</span><code>class PgPaymentAdapter:
+    """PaymentPort 구현. 부패 방지 계층 — PG 응답을 우리 언어로 번역한다."""
+
+    def __init__(self, client) -&gt; None:
+        self._client = client
+
+    def approve(self, order_number: OrderNumber, customer_id: UUID,
+                amount: Money) -&gt; PaymentApproval:
+        raw = self._client.approve(                                   # 1
+            customer_id=customer_id,
+            amount=int(amount.amount),
+            order_id=str(order_number),
+        )
+        code = raw.get("resultCode")                                  # 2
+        if code == "0000":                                            # 3
+            return PaymentApproval(tid=raw["tid"], approved_amount=amount)
+        if code is None:                                               # 4
+            raise PaymentGatewayError("resultCode 없음 — 응답 형식이 다르거나 타임아웃")
+        raise PaymentDeclined(raw.get("resultMsg", "사유 없음"))         # 5
+
+    def refund(self, tid: str, amount: Money) -&gt; None:
+        raw = self._client.cancel(tid=tid, amount=int(amount.amount))  # 6
+        if raw.get("resultCode") != "0000":                            # 7
+            raise PaymentGatewayError(raw.get("resultMsg", "환불 실패"))
+</code></pre>
+
+  <ol class="notes">
+    <li><span class="ln">9행</span> 이 함수 안에서 유일하게 우리 코드 밖(네트워크)으로
+    나가는 줄입니다. 1장 화면 8의 68행과 같은 호출이지만, 지금은 <b>응용 서비스가 아니라
+    이 어댑터 안에서만</b> 일어납니다.</li>
+
+    <li><span class="ln">14행</span> <code>raw["resultCode"]</code>가 아니라
+    <code>raw.get("resultCode")</code>를 씁니다. PG사가 타임아웃이나 장애로 <b>정상
+    응답을 못 주면</b> 이 키 자체가 없을 수 있습니다. <code>[ ]</code>였다면
+    <code>KeyError</code>가 나서 "장애"와 "거절"이 똑같이 예외 하나로 뭉개집니다.
+    <code>.get()</code>은 없으면 <code>None</code>을 돌려줘, 다음 줄들에서 둘을
+    구분할 수 있게 해 줍니다.</li>
+
+    <li><span class="ln">15행</span> 성공 판정. <b>PG사가 정한 리터럴 문자열
+    <code>"0000"</code>이 이 클래스 안에만 등장합니다.</b> 이 문자열은 이 함수
+    밖으로 절대 나가지 않습니다.</li>
+
+    <li><span class="ln">17행</span> <code>code</code>가 <code>None</code>이면
+    PG사 자체가 응답하지 못한 경우입니다 — 화면 8의 <code>PaymentGatewayError</code>가
+    이 상황을 가리킵니다. "거절"이 아니라 "장애"입니다.</li>
+
+    <li><span class="ln">19행</span> <code>"0000"</code>도 아니고 <code>None</code>도
+    아니면, PG사가 정상적으로 응답했지만 승인을 거절한 것입니다.
+    <code>resultMsg</code>(사람이 읽을 문구)만 우리 예외로 옮기고,
+    <code>resultCode</code> 자체는 여기서 버립니다 — 호출한 쪽은 이 코드가 무엇이었는지
+    알 필요가 없습니다.</li>
+
+    <li><span class="ln">22행</span> 환불(취소) 요청도 같은 클라이언트의 다른 메서드를
+    부릅니다. <code>amount.amount</code>는 <code>Decimal</code>이라 정본의 통화 규칙대로
+    <code>int</code>로 바꿔 보냅니다(원 단위 정수, 2장).</li>
+
+    <li><span class="ln">23행</span> <code>refund()</code>는 <code>approve()</code>와
+    달리 성공했을 때 돌려줄 값이 없습니다(환불은 "됐다/안 됐다"뿐입니다). 실패만
+    예외로 알립니다.</li>
+  </ol>
+
+  <div class="box note">
+    <p class="box-t">이 계층이 안 하는 일</p>
+    <p><code>refund()</code>는 PG에 환불을 <b>요청</b>만 합니다. "환불 누계가 이미
+    승인된 금액을 넘지 않는가"(I14), "애초에 승인된 결제인가"(I15)를 지키는 것은 이
+    어댑터의 일이 아니라 <b>결제 애그리게이트</b>의 일입니다 — 그런데 그 애그리게이트는
+    아직 이 교재 어디에도 없습니다. ACL은 <b>번역</b>만 하고, 그 값을 가지고 무엇을
+    할지(승인 이력을 어떻게 저장하고 검증할지)는 결제 컨텍스트 안쪽의 문제로 남습니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 10 -->
+<section class="screen" data-title="창고→배송과 배송→택배사">
+  <p class="kicker">10장 · 화면 10</p>
+  <h2>창고 → 배송(이벤트)과 배송 → 택배사(ACL)</h2>
+
+  <p>지도에 남은 화살표 둘이 있습니다. 성격이 서로 다릅니다.</p>
+
+  <div class="box note">
+    <p class="box-t">창고 → 배송 — 이벤트, 결과적 일관성</p>
+    <p>창고가 물건을 내보내면(출고), 배송은 그 사실을 알아야 <b>송장을 만들고 택배사에
+    넘길 수 있습니다.</b> 7장이 이미 이 방식의 뼈대를 만들어 뒀습니다 —
+    <code>MessageBus</code>가 이벤트를 구독·발행하는 장치입니다. 8장 화면 7이
+    확인했듯 <code>출고됨(Shipped)</code>은 아직 실제 <code>DomainEvent</code> 클래스가
+    아니라 이벤트 스토밍 벽 위의 <b>후보</b>일 뿐입니다 — 창고가 실제로 피킹·출고를
+    처리하는 코드 자체가 아직 없기 때문입니다. 관계의 <b>이름</b>만 지금 정해 둡니다 —
+    창고가 업스트림, 배송이 다운스트림이고, 둘을 잇는 방식은 <b>동기 호출이 아니라
+    이벤트</b>입니다. 배송은 창고가 출고를 마친 <b>순간 즉시</b>가 아니라, 이벤트가
+    전달되는 <b>약간의 지연 뒤에</b> 알게 됩니다 — 이 지연이 만드는 대가를 자세히
+    따지는 것은 12장의 일입니다.</p>
+  </div>
+
+  <div class="box note">
+    <p class="box-t">배송 → 택배사 — 또 하나의 ACL</p>
+    <p>배송이 외부 택배사 API에 "이 주소로 이 물건 좀 가져가 주세요"라고 요청하는
+    관계도 결제와 같은 모양입니다 — 우리가 택배사의 API 스펙을 못 바꾸는
+    <b>순응자</b> 관계입니다. 택배사마다 송장번호 형식, 배송 상태 코드가 제각각입니다
+    (어떤 곳은 <code>"01"</code>이 배송중, 어떤 곳은 <code>"IN_TRANSIT"</code>을 씁니다).
+    화면 8~9와 같은 모양의 포트를 하나 더 두면 됩니다.</p>
+
+<pre><code>class ShippingCarrierPort(Protocol):
+    def request_pickup(self, order_number: OrderNumber,
+                        address: Address) -&gt; str: ...   # 우리 쪽 송장 참조를 돌려준다
+</code></pre>
+
+    <p>구현(어댑터)은 화면 9의 <code>PgPaymentAdapter</code>와 같은 모양이라 여기서
+    다시 만들지 않습니다 — <b>패턴은 한 번 배우면 반복됩니다.</b> 이것이 부패 방지
+    계층이 "결제 전용 기법"이 아니라 <b>순응자 관계 전반에 적용되는 기법</b>이라는
+    뜻입니다. (이 포트는 예시일 뿐이라 정본에는 추가하지 않습니다 — 배송 컨텍스트가
+    실제로 구현될 때 정식으로 정의합니다.)</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 11 -->
+<section class="screen" data-title="완성된 컨텍스트 맵">
+  <p class="kicker">10장 · 화면 11</p>
+  <h2>완성된 컨텍스트 맵</h2>
+
+  <p>화면 2의 초안에 이름을 채워 넣습니다.</p>
+
+  <figure class="fig">
+    <svg viewBox="0 0 840 270" role="img" aria-label="이름이 붙은 완성된 한빛몰 컨텍스트 맵">
+      <g class="svg-muted" stroke="currentColor" stroke-width="1" style="fill:none">
+        <rect x="20" y="20" width="140" height="50" rx="8"/>
+        <rect x="20" y="110" width="140" height="50" rx="8"/>
+        <rect x="260" y="20" width="140" height="50" rx="8"/>
+        <rect x="260" y="110" width="140" height="50" rx="8"/>
+        <rect x="500" y="20" width="140" height="50" rx="8"/>
+        <rect x="500" y="110" width="140" height="50" rx="8"/>
+        <rect x="680" y="110" width="140" height="50" rx="8"/>
+      </g>
+      <g stroke-width="1.2" stroke-dasharray="4 3" style="stroke:var(--warn);fill:none">
+        <rect x="260" y="200" width="140" height="50" rx="8"/>
+        <rect x="680" y="200" width="140" height="50" rx="8"/>
+      </g>
+      <g text-anchor="middle" font-size="12.5" font-weight="700" class="svg-fg">
+        <text x="90" y="49">카탈로그</text>
+        <text x="90" y="139">회원</text>
+        <text x="330" y="49">주문</text>
+        <text x="330" y="139">결제</text>
+        <text x="570" y="49">재고</text>
+        <text x="570" y="139">창고</text>
+        <text x="750" y="139">배송</text>
+      </g>
+      <g text-anchor="middle" font-size="12.5" font-weight="700" style="fill:var(--warn)">
+        <text x="330" y="229">PG사</text>
+        <text x="750" y="229">택배사</text>
+      </g>
+      <g class="svg-muted" stroke="currentColor" stroke-width="1.3" fill="none">
+        <path d="M160 45 H256"/>
+        <path d="M160 135 V45 H256"/>
+        <path d="M400 45 H496"/>
+        <path d="M570 70 V106"/>
+        <path d="M640 135 H676"/>
+        <path d="M330 70 V106"/>
+        <path d="M330 160 V196"/>
+        <path d="M750 160 V196"/>
+      </g>
+      <g class="svg-muted" stroke="none">
+        <path d="M250 41 L256 45 L250 49 Z"/>
+        <path d="M490 41 L496 45 L490 49 Z"/>
+        <path d="M566 100 L570 106 L574 100 Z"/>
+        <path d="M670 131 L676 135 L670 139 Z"/>
+        <path d="M326 100 L330 106 L334 100 Z"/>
+        <path d="M326 190 L330 196 L334 190 Z"/>
+        <path d="M746 190 L750 196 L754 190 Z"/>
+      </g>
+      <g text-anchor="middle" font-size="9.5" font-weight="700" class="svg-fg">
+        <text x="208" y="38">① OHS+언어</text>
+        <text x="185" y="98">② 고객/공급자</text>
+        <text x="448" y="38">③ 고객/공급자</text>
+        <text x="596" y="90">④ 파트너십</text>
+        <text x="658" y="128">⑤ 이벤트</text>
+        <text x="360" y="90">⑥ 고객/공급자</text>
+        <text x="360" y="180">⑦ 순응자+ACL</text>
+        <text x="784" y="180">⑧ 순응자+ACL</text>
+      </g>
+    </svg>
+    <figcaption>완성된 컨텍스트 맵입니다. 카탈로그↔창고 사이에는 여전히 화살표가
+    없습니다(분리된 방법, 화면 4) — 없는 것도 지도의 일부입니다.</figcaption>
+  </figure>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th style="width:3rem">#</th><th>관계</th><th>조직 패턴</th><th>기술 패턴</th></tr>
+      <tr><td>①</td><td>카탈로그 → 주문</td><td>고객/공급자</td><td>OHS + 발행된 언어</td></tr>
+      <tr><td>②</td><td>회원 → 주문</td><td>고객/공급자</td><td>포트(<code>MembershipPort</code>, 5장)</td></tr>
+      <tr><td>③</td><td>주문 → 재고</td><td>고객/공급자</td><td>포트(<code>InventoryRepository</code>, 4장)</td></tr>
+      <tr><td>④</td><td>재고 ↔ 창고</td><td>파트너십</td><td>ID(SKU) 참조, 9장</td></tr>
+      <tr><td>⑤</td><td>창고 → 배송</td><td>—</td><td>이벤트, 결과적 일관성(12장에서 계속)</td></tr>
+      <tr><td>⑥</td><td>주문 → 결제</td><td>고객/공급자</td><td>포트(<code>PaymentPort</code>, 이 장)</td></tr>
+      <tr><td>⑦</td><td>결제 → PG사</td><td>순응자</td><td><b>ACL</b>(<code>PgPaymentAdapter</code>, 이 장)</td></tr>
+      <tr><td>⑧</td><td>배송 → 택배사</td><td>순응자</td><td>ACL(구현은 배송 컨텍스트가 생길 때)</td></tr>
+    </table>
+  </div>
+
+  <div class="box note">
+    <p class="box-t">12장에서 다시 볼 것</p>
+    <ul>
+      <li>결제(⑥⑦)가 실패했을 때 이미 잡아 둔 재고(③)를 되돌리는 방법 — 보상,
+      트랜잭션 경계.</li>
+      <li>창고→배송(⑤)의 이벤트 지연이 실제로 얼마나 걸려도 되는가 — 결과적 일관성을
+      업무 규칙으로 승격하기.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 12 -->
+<section class="screen" data-title="한계와 반대의견">
+  <p class="kicker">10장 · 화면 12</p>
+  <h2>한계와 반대의견</h2>
+
+  <div class="box warn">
+    <p class="box-t">1. 지도를 그리는 것 자체가 목적이 아니다</p>
+    <p>컨텍스트 맵의 진짜 가치는 그림이 아니라, 그림을 그리다가 <b>"어? 이 두 팀은
+    사실 서로 다른 것을 기대하고 있었네"</b>를 발견하는 순간입니다. 8장의 이벤트
+    스토밍이 그랬듯, 발견 이후에는 <b>코드가 아니라 대화와 조직</b>이 문제일 수
+    있습니다 — 예를 들어 화면 3의 고객/공급자 관계가 사실은 재고 팀이 주문 팀의
+    요청을 만성적으로 무시하는 관계였다면, 그건 포트를 하나 더 만든다고 풀리지
+    않습니다. DDD는 이런 조직 문제까지 해결해 주지 않습니다.</p>
+  </div>
+
+  <div class="box warn">
+    <p class="box-t">2. 모든 관계에 ACL이 필요한 것은 아니다</p>
+    <p>PG사를 하나만 쓰고, 앞으로 바꿀 계획도 없고, 응답 형식이 단순하다면
+    <code>PgPaymentAdapter</code> 없이 <code>pg_client</code>를 직접 불러도 실무적으로는
+    큰 문제가 없을 수 있습니다. ACL은 <b>공짜가 아닙니다</b> — 클래스 하나, 값 객체
+    둘, 예외 둘을 더 유지해야 합니다. 이 비용을 내는 이유는 "PG사를 바꿀 수도 있어서"가
+    아니라 <b>"PG사의 응답 모양이 우리 도메인 코드 곳곳에 흩어지는 것을 막기
+    위해서"</b>입니다 — 호출 지점이 <code>place_order()</code> 한 곳뿐이라면 이 비용이
+    아까울 수 있습니다. 14장이 이 판단을 더 크게 다룹니다.</p>
+  </div>
+
+  <div class="box warn">
+    <p class="box-t">3. 관계는 고정되지 않는다</p>
+    <p>순응자였던 관계가 시간이 지나 고객/공급자로 바뀌기도 합니다. 한빛몰의 거래
+    규모가 커지면 PG사와의 미팅에서 "이 필드 이름 좀 바꿔 주세요"가 통할 수도
+    있습니다. 반대로 파트너십이던 관계가 조직 개편으로 순응자가 되기도 합니다(재고팀과
+    창고팀이 서로 다른 회사 소속이 되는 경우). 컨텍스트 맵은 <b>한 번 그리고 끝내는
+    문서가 아니라, 관계가 바뀔 때마다 다시 그리는 지도</b>입니다.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────── 화면 13 -->
+<section class="screen" data-title="요약 · 퀴즈 · 과제">
+  <p class="kicker">10장 · 화면 13</p>
+  <h2>요약 · 퀴즈 · 과제</h2>
+
+  <div class="summary">
+    <h3>핵심 요약</h3>
+    <ol>
+      <li><b><span class="term" data-term="contextmap">컨텍스트 맵</span></b>은 바운디드
+      컨텍스트 사이의 관계를 한 장에 그린 지도입니다. 화살표의 방향(업스트림/다운스트림)과
+      조직 관계(파트너십·고객/공급자·순응자·분리된 방법)를 함께 봐야 관계의 성격이
+      보입니다.</li>
+      <li>카탈로그→주문은 공유 커널이 아니라 <b>OHS + 발행된 언어</b>입니다. 5·6장이
+      스냅샷으로 이미 구현해 둔 것에 이 장이 이름을 붙였을 뿐입니다.</li>
+      <li>순응자 관계라는 사실과, 상대 모델이 우리 코드까지 오염시키는 것은
+      <b>별개의 문제</b>입니다. <b>부패 방지 계층(ACL)</b>이 그 경계를 지킵니다.</li>
+      <li><code>PaymentPort</code>/<code>PgPaymentAdapter</code>는 PG의
+      <code>resultCode</code>·<code>tid</code>를 <code>PaymentApproval</code>·
+      <code>PaymentDeclined</code>·<code>PaymentGatewayError</code>라는 우리 언어로
+      번역합니다. 다만 결제 실패 시 이미 잡아 둔 재고를 되돌리는 문제는 아직 풀리지
+      않았습니다 — 12장.</li>
+      <li>모든 컨텍스트 쌍이 화살표로 이어질 필요는 없고(분리된 방법), 모든 순응자
+      관계에 ACL이 필요한 것도 아닙니다. 관계는 시간이 지나며 바뀝니다.</li>
+    </ol>
+  </div>
+
+  <div class="quiz" data-answer="2">
+    <p class="q">고객/공급자(Customer-Supplier)와 순응자(Conformist)를 가르는 가장
+    정확한 기준은?</p>
+    <ol class="options">
+      <li data-why="업스트림과 다운스트림의 존재는 두 패턴 모두에 있습니다. 방향의 유무가 아니라 그 방향 안에서의 힘 관계가 기준입니다.">
+        업스트림에서 다운스트림으로 화살표가 있는가</li>
+      <li data-why="맞습니다. 다운스트림의 요구가 업스트림의 계획에 반영될 수 있으면 고객/공급자, 업스트림이 다운스트림의 요구를 반영해 줄 의무도 동기도 없어 다운스트림이 있는 그대로 받아들여야 하면 순응자입니다.">
+        다운스트림의 요구가 업스트림의 계획에 반영될 수 있는가</li>
+      <li data-why="두 관계 모두 인터페이스를 통해 통합됩니다. 인터페이스의 유무는 구분 기준이 아닙니다.">
+        업스트림이 인터페이스(포트)를 제공하는가</li>
+      <li data-why="두 팀이 같은 회사인지 여부는 힘의 균형에 영향을 줄 수는 있지만, 정의 자체는 아닙니다. 같은 회사 안에서도 한쪽이 다른 쪽 요구를 반영해 줄 힘이나 동기가 없으면 순응자 관계가 됩니다.">
+        두 컨텍스트가 같은 회사 소속인가</li>
+    </ol>
+    <div class="explain">
+      <p><b class="lbl">해설</b> 화면 3~4의 기준입니다. 주문→재고는 같은 회사이면서도
+      "요청하면 들어준다"는 점에서 고객/공급자였고, 결제→PG사는 "요청해도 PG사가
+      바꿔줄 이유가 없다"는 점에서 순응자였습니다.</p>
+    </div>
+  </div>
+
+  <div class="quiz" data-answer="1">
+    <p class="q"><code>PgPaymentAdapter.approve()</code>가
+    <code>raw["resultCode"]</code> 대신 <code>raw.get("resultCode")</code>를 쓰는
+    이유로 가장 정확한 것은?</p>
+    <ol class="options">
+      <li data-why="맞습니다. PG사가 타임아웃·장애로 정상 응답을 못 주면 이 키 자체가 없을 수 있습니다. [ ]였다면 KeyError가 나서 '거절'과 '장애'가 구분 없이 하나의 예외로 뭉개집니다.">
+        PG사가 응답 자체를 못 줬을 때(타임아웃 등) resultCode 키가 없을 수 있고, 그 경우를 '거절'과 구분해야 하기 때문에</li>
+      <li data-why=".get()이 딕셔너리 조회를 더 빠르게 만들지 않습니다. 이유는 성능이 아니라 예외 처리의 정확성입니다.">
+        <code>.get()</code>이 <code>[ ]</code>보다 실행 속도가 빠르기 때문에</li>
+      <li data-why="이 코드에서 resultCode는 항상 문자열로 다뤄집니다(\"0000\"과 비교). 타입과는 관계가 없습니다.">
+        <code>resultCode</code>가 문자열이 아니라 정수로 올 수도 있어서</li>
+      <li data-why="raw는 PG사가 돌려준 딕셔너리이지 우리가 만든 값 객체가 아닙니다. frozen과는 관계가 없습니다.">
+        <code>raw</code> 딕셔너리가 <code>frozen=True</code>라서</li>
+    </ol>
+    <div class="explain">
+      <p><b class="lbl">해설</b> 화면 9의 14·17행 해설입니다. "장애"와 "거절"을
+      구분하지 못하면 화면 8이 나눠 정의한 <code>PaymentGatewayError</code>·
+      <code>PaymentDeclined</code>의 의미가 없어집니다.</p>
+    </div>
+  </div>
+
+  <div class="quiz" data-answer="3">
+    <p class="q">이 장이 카탈로그→주문 관계를 "ACL"이 아니라 "OHS + 발행된 언어"로
+    정정한 가장 정확한 이유는?</p>
+    <ol class="options">
+      <li data-why="카탈로그의 내부 모델(Product)은 여전히 번역을 거쳐 OrderItemSnapshot으로 옮겨집니다. 번역 자체가 없어진 것이 아닙니다.">
+        카탈로그의 내부 모델이 완벽해서 더 이상 번역이 필요 없기 때문에</li>
+      <li data-why="ACL과 OHS+발행된 언어 모두 실행 성능과는 관계없는 설계상의 이름입니다.">
+        ACL 계층이 있으면 성능이 느려지기 때문에</li>
+      <li data-why="맞습니다. ACL은 '상대 모델이 우리 언어를 오염시킬 위험'이 있을 때 붙이는 이름입니다. 카탈로그는 같은 회사이고 발행된 언어(OrderItemSnapshot)의 형식도 우리가 요청해서 정한 것이라, 모델을 오염시킬 힘의 불균형이 없습니다.">
+        카탈로그 팀은 같은 회사이고 발행된 언어의 형식도 우리가 정한 것이라, 모델을 오염시킬 힘의 불균형이 없기 때문에</li>
+      <li data-why="분리 여부는 단서가 될 수 있지만 진짜 기준이 아닙니다. 카탈로그가 별도 프로세스로 분리돼도 같은 회사, 같은 협상 관계라면 여전히 OHS+발행된 언어입니다.">
+        카탈로그가 아직 별도 프로세스로 분리되지 않았기 때문에</li>
+    </ol>
+    <div class="explain">
+      <p><b class="lbl">해설</b> 화면 6의 warn 상자입니다. ACL이라는 이름값은 힘의
+      불균형(순응자 관계)에서 나옵니다. 대등한 관계에서의 번역 계층은 OHS + 발행된
+      언어로 부르는 것이 더 정확합니다.</p>
+    </div>
+  </div>
+
+  <div class="task">
+    <h3>직접 해보기</h3>
+    <p>재고 컨텍스트와 결제 컨텍스트 사이에 직접적인 관계(화살표)가 있어야 할까요?
+    화면 3~4의 기준으로 판단하고, 근거를 3줄로 적어 보세요.</p>
+  </div>
+
+  <details class="fold answer">
+    <summary>모범답안</summary>
+    <div class="fold-body">
+      <p><b>없어도 됩니다 — 분리된 방법입니다.</b></p>
+      <ul>
+        <li>재고는 "얼마나 팔 수 있는가"만 압니다. 결제는 "돈을 받았는가"만 압니다.
+        둘 다 아는 값이 없습니다.</li>
+        <li>재고가 결제 상태를 알아야 할 이유가 생기는 순간(예: "결제 실패 시 재고를
+        되돌린다")이 있다면, 그것은 재고와 결제가 서로의 모델을 알아야 하는 것이
+        아니라 <b>주문이 두 컨텍스트를 조율</b>하는 문제입니다. 12장의 사가가
+        다루는 것이 바로 이 조율입니다.</li>
+        <li>억지로 화살표를 하나 그으면(예: 재고가 결제 상태를 직접 조회) 재고
+        컨텍스트가 결제의 응답 모양까지 알아야 하고, 화면 4의 카탈로그↔창고와
+        같은 실수(불필요한 결합)가 반복됩니다.</li>
+      </ul>
+    </div>
+  </details>
+
+  <div class="box note">
+    <p class="box-t">다음 장 예고</p>
+    <p>이 장은 컨텍스트 <b>사이</b>의 관계를 지도로 그렸습니다. 11장은 시선을 다시
+    안으로 돌려, 지금까지 암묵적으로 지켜 온 계층 구조(5장)를 <b>포트와 어댑터</b>라는
+    이름의 코드 구조로 명시적으로 세웁니다 — 이 장에서 만든 <code>PaymentPort</code>도
+    그 구조 안에서 어디에 놓이는 포트인지 다시 봅니다.</p>
+  </div>
+
+  <div class="chapter-end">
+    <a href="ch09.html#last"><span>이전 장</span>9장 — Bounded Context: 하나의 모델은 어디까지 유효한가</a>
+    <a href="index.html"><span>11장은 아직 집필 전입니다</span>표지와 목차로</a>
+  </div>
+</section>
+
+</div></main>
+
+<script src="assets/book.js"></script>
+</body>
+</html>
