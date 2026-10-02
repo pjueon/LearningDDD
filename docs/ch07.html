@@ -528,8 +528,7 @@ def allocate(self, quantity: int, as_of: date,
     3장 화면 12의 <code>expires_on &gt; as_of</code>가 <code>&gt; cutoff</code>로
     바뀌었을 뿐입니다.</li>
 
-    <li><span class="ln">11~14행</span> <b>정렬에는 손대지 않습니다.</b> 3장
-    화면 12가 정한 순서(창고 배치 먼저 → 그 안에서 FEFO, 그다음 입고예정 배치를
+    <li><span class="ln">11~14행</span> <b>정렬에는 손대지 않습니다.</b> 3장 화면 12가 정한 순서(창고 배치 먼저 → 그 안에서 FEFO, 그다음 입고예정 배치를
     ETA 순으로)는 I19 그대로입니다. 유통기한 여유는 <b>"후보로 칠 것인가"의
     조건</b>이지 "고른 것을 줄 세우는 규칙"이 아니기 때문입니다.
     <br>조건을 <code>allocate()</code>가 아니라 <code>_candidates()</code>에
@@ -802,8 +801,7 @@ def notify_warehouse(event: OrderPlaced, slack: SlackNotifier) -&gt; None:
     있습니다.</b> 그럴 때는 <code>continue</code>로 재조정하지 않습니다 —
     안 바뀐 사실을 이벤트로 낼 이유가 없습니다.</li>
     <li><span class="ln">13~18행</span> <code>reason</code>에 무엇이, 왜
-    바뀌었는지 사람이 읽을 수 있는 문장을 남깁니다. 3장 화면 14가 못박고 6장
-    화면 11이 다시 미뤄 둔 "재조정은 통지를 동반해야 한다"는 요구가 여기서
+    바뀌었는지 사람이 읽을 수 있는 문장을 남깁니다. 3장 화면 14가 못박고 6장 화면 11이 다시 미뤄 둔 "재조정은 통지를 동반해야 한다"는 요구가 여기서
     시작됩니다 — 통지문에 들어갈 문장을 <b>도메인이 직접 만들어</b> 이벤트에
     실어 보냅니다.</li>
 
