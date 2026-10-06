@@ -10,46 +10,46 @@
 
 <main id="book"><div class="inner">
 
-<!-- ─────────────────────────────────────────── 화면 1 -->
+<!-- ─────────────────────────────────────────── 페이지 1 -->
 <section class="screen" data-title="이 장에서 할 일">
-  <p class="kicker">12장 · 화면 1</p>
+  <p class="kicker">12장 · 페이지 1</p>
   <h1>트랜잭션 경계와<br>결과적 일관성</h1>
 
-  <p class="lead">11장 마지막 화면이 예고한 그대로입니다 — "12장은 코드가 언제 하나의
+  <p class="lead">11장 마지막 페이지가 예고한 그대로입니다 — "12장은 코드가 언제 하나의
   트랜잭션으로 묶이고, 언제 결과적 일관성에 맡겨지는가를 다룹니다." 그리고 이 교재가
-  꽤 오래 미뤄 온 청구서가 하나 있습니다. 10장 화면 7은 이렇게 적어 뒀습니다.</p>
+  꽤 오래 미뤄 온 청구서가 하나 있습니다. 10장 페이지 7은 이렇게 적어 뒀습니다.</p>
 
   <div class="box warn">
     <p class="box-t">10장이 남긴 문제 — 그대로 인용</p>
     <p>"이미 할당된 재고를 결제 실패 시 어떻게 되돌리는가(보상, 트랜잭션 경계)는 여전히
-    12장의 몫입니다." 그리고 8장 화면 7은 더 앞서 이렇게 적었습니다 — "결제가 실패하면
+    12장의 몫입니다." 그리고 8장 페이지 7은 더 앞서 이렇게 적었습니다 — "결제가 실패하면
     이미 잡아 둔 재고는 어떻게 되는가 — 10장·12장에서 다시 볼 문제입니다."</p>
   </div>
 
   <p>10장은 <code>PaymentPort</code>와 <code>PgPaymentAdapter</code>를 만들었지만
   어디에도 연결하지 않았습니다. 11장은 폴더까지 다 정리해 놓고도 "그 연결은 12장의
-  몫입니다"(화면 7)라고 다시 한번 확인만 했습니다. 이 장에서 마침내 연결합니다 —
+  몫입니다"(페이지 7)라고 다시 한번 확인만 했습니다. 이 장에서 마침내 연결합니다 —
   그런데 단순히 함수 호출 한 줄을 추가하는 문제가 아닙니다. 7장이 이미
   <code>allocate_stock</code>을 만들어 <code>OrderPlaced</code> 직후 곧장 재고를
   잡아 두게 해 놨는데, 결제는 <b>그 뒤에</b> 옵니다. 그러면 결제가 실패했을 때
   <b>이미 잡아 둔 재고</b>를 누가, 어떻게 되돌릴까요? 이 질문 하나가 이 장 후반부
-  전체(화면 8~9)의 주제입니다.</p>
+  전체(페이지 8~9)의 주제입니다.</p>
 
   <div class="box note">
     <p class="box-t">이 장의 지도</p>
     <ul>
-      <li><b>화면 2 · 규칙, 그리고 이미 깨져 있는 규칙.</b> "한 트랜잭션에 하나의
+      <li><b>페이지 2 · 규칙, 그리고 이미 깨져 있는 규칙.</b> "한 트랜잭션에 하나의
       애그리게이트"를 다시 세우고, 지금 코드가 이미 그 규칙을 두 곳에서 어기고
       있다는 것부터 확인합니다.</li>
-      <li><b>화면 3~4 · 동시성과 낙관적 락.</b> 두 주문이 마지막 1개를 동시에 잡을 때
+      <li><b>페이지 3~4 · 동시성과 낙관적 락.</b> 두 주문이 마지막 1개를 동시에 잡을 때
       무슨 일이 벌어지는지 직접 보고, 버전 컬럼으로 막습니다.</li>
-      <li><b>화면 5 · 입고예정 경합.</b> 아직 실물이 없는 수량을 두 주문이 다툴 때는
+      <li><b>페이지 5 · 입고예정 경합.</b> 아직 실물이 없는 수량을 두 주문이 다툴 때는
       무엇이 다른가.</li>
-      <li><b>화면 6 · 분할 출고 결정.</b> I21을 바꿀 것인가.</li>
-      <li><b>화면 7 · 결과적 일관성의 SLA화.</b> "5초 안에" 를 업무 규칙으로.</li>
-      <li><b>화면 8~9 · 사가.</b> 결제를 연결하고, 실패를 보상합니다 — 10장·8장이
+      <li><b>페이지 6 · 분할 출고 결정.</b> I21을 바꿀 것인가.</li>
+      <li><b>페이지 7 · 결과적 일관성의 SLA화.</b> "5초 안에" 를 업무 규칙으로.</li>
+      <li><b>페이지 8~9 · 사가.</b> 결제를 연결하고, 실패를 보상합니다 — 10장·8장이
       남긴 빚을 여기서 갚습니다.</li>
-      <li><b>화면 10~11 · 규칙을 깨야 할 때, 요약, 퀴즈, 과제.</b></li>
+      <li><b>페이지 10~11 · 규칙을 깨야 할 때, 요약, 퀴즈, 과제.</b></li>
     </ul>
   </div>
 
@@ -61,12 +61,12 @@
   테이블)는 13장의 몫으로 남겨 둡니다.</p>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 2 -->
+<!-- ─────────────────────────────────────────── 페이지 2 -->
 <section class="screen" data-title="규칙, 그리고 이미 깨져 있는 규칙">
-  <p class="kicker">12장 · 화면 2</p>
+  <p class="kicker">12장 · 페이지 2</p>
   <h2>한 트랜잭션에 하나의 애그리게이트 — 그리고 이미 깨져 있는 그 규칙</h2>
 
-  <p>3장 화면 15가 애그리게이트 설계 규칙 네 줄 중 첫 줄로 이렇게 적어 뒀습니다.</p>
+  <p>3장 페이지 15가 애그리게이트 설계 규칙 네 줄 중 첫 줄로 이렇게 적어 뒀습니다.</p>
 
   <div class="table-wrap">
     <table>
@@ -76,7 +76,7 @@
     </table>
   </div>
 
-  <p>"트랜잭션"이 정확히 무엇을 가리키는지부터 다시 짚습니다. 1장 화면 6이 이미
+  <p>"트랜잭션"이 정확히 무엇을 가리키는지부터 다시 짚습니다. 1장 페이지 6이 이미
   정의했습니다 — 여러 변경을 한 덩어리로 묶어 전부 되거나 전부 안 되게 만드는 장치,
   그리고 <b>커밋 전까지는 다른 트랜잭션에 보이지 않는</b> 장치입니다. 5장부터는 이
   장치를 <code>UnitOfWork</code>가 감쌉니다 — <code>with uow: ...</code> 블록 하나가
@@ -89,30 +89,30 @@
   <div class="table-wrap">
     <table>
       <tr><th style="width:9rem">어디</th><th>무엇을 바꾸는가</th></tr>
-      <tr><td><code>allocate_stock</code>(7장 화면 8)</td>
+      <tr><td><code>allocate_stock</code>(7장 페이지 8)</td>
         <td><code>with uow:</code> 한 블록 안에서 <code>Order</code>(<code>allocation</code>,
         <code>promise_delivery()</code>)와 <code>InventoryItem</code>(<code>allocate()</code>)을
         같이 바꿉니다.</td></tr>
-      <tr><td><code>cancel_order</code>(5장 화면 12)</td>
+      <tr><td><code>cancel_order</code>(5장 페이지 12)</td>
         <td>같은 블록 안에서 <code>Order.cancel()</code>과
         <code>InventoryItem.release()</code>를 같이 부릅니다.</td></tr>
     </table>
   </div>
 
-  <p>3장·11장 모두 규칙을 <b>가르쳤을 뿐</b>, 이 두 곳을 숨기지 않았습니다 — 5장 화면 12는 "왜 지금은 이벤트가 필요 없나" 상자로, 7장은 화면 2~3에서 이 얽힘을
+  <p>3장·11장 모두 규칙을 <b>가르쳤을 뿐</b>, 이 두 곳을 숨기지 않았습니다 — 5장 페이지 12는 "왜 지금은 이벤트가 필요 없나" 상자로, 7장은 페이지 2~3에서 이 얽힘을
   정면으로 짚었습니다. 이 장이 하려는 것은 규칙을 "그래도 지켜야 한다"고 다시
   가르치는 것이 아닙니다 — <b>왜 이 두 곳에서는 깨도 괜찮았는지</b>, 그리고 이 장이
-  새로 추가할 세 번째 예외(화면 9)까지 <b>같은 기준으로</b> 설명하는 것입니다. 그
-  기준은 화면 10에서 한자리에 모아 정리합니다. 지금은 규칙이 겨냥하는 진짜 문제 —
+  새로 추가할 세 번째 예외(페이지 9)까지 <b>같은 기준으로</b> 설명하는 것입니다. 그
+  기준은 페이지 10에서 한자리에 모아 정리합니다. 지금은 규칙이 겨냥하는 진짜 문제 —
   <b>동시성</b> — 을 직접 봅니다.</p>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 3 -->
+<!-- ─────────────────────────────────────────── 페이지 3 -->
 <section class="screen" data-title="두 주문이 마지막 1개를 동시에 잡을 때">
-  <p class="kicker">12장 · 화면 3</p>
+  <p class="kicker">12장 · 페이지 3</p>
   <h2>두 주문이 마지막 1개를 동시에 잡을 때</h2>
 
-  <p>3장 화면 8의 <code>StockBatch.reserve()</code> 세 번째 노트가 남겨 둔 질문입니다
+  <p>3장 페이지 8의 <code>StockBatch.reserve()</code> 세 번째 노트가 남겨 둔 질문입니다
   — "두 주문이 동시에 이 줄을 지날 때 무슨 일이 벌어지는지는 아직 안 다뤘습니다."
   지금 확인합니다. 창고에 이 SKU가 <b>딱 1개</b> 남아 있고, 두 고객이 거의 동시에
   주문합니다.</p>
@@ -139,14 +139,14 @@
     하나인데 약속은 둘입니다. DB 값만 보고는 이 사고를 알아챌 수 없습니다.</p>
   </div>
 
-  <p>1장 화면 7이 이미 이런 사고를 한 번 막았습니다 — <code>SET reserved = reserved
+  <p>1장 페이지 7이 이미 이런 사고를 한 번 막았습니다 — <code>SET reserved = reserved
   + %s</code>는 <b>DB가 그 순간의 실제 값에 더하므로</b> 안전하다고 했습니다. 그런데
   지금 위 표의 <code>reserved</code> 0→1은 그 SQL이 아닙니다. <b>ORM이 파이썬 객체의
   최종 값을 그대로 쓰는 <code>SET reserved = 1</code>입니다</b> — "그 순간의 값에
   더하기"가 아니라 "내가 계산한 값으로 덮어쓰기"입니다.</p>
 
   <div class="box note">
-    <p class="box-t">1장의 트릭이 여기서는 왜 안 통하나 — 1장 화면 7이 남긴
+    <p class="box-t">1장의 트릭이 여기서는 왜 안 통하나 — 1장 페이지 7이 남긴
     "12장에서 이것으로도 부족한 이유를 봅니다"에 대한 답</p>
     <p><code>SET reserved = reserved + %s</code>가 안전했던 이유는 "더할 값"이 SQL
     한 줄로 끝나는 단순한 수였기 때문입니다. 그런데 <code>InventoryItem.allocate()</code>는
@@ -173,7 +173,7 @@
         <td>기다림(대기). 실패하지 않는다.</td>
         <td>실패. 다시 읽고 다시 시도해야 한다(재시도).</td></tr>
       <tr><td><b>동시 처리량</b></td>
-        <td>낮다 — 3장 화면 6의 "동시성 지옥" 표가 바로 이 대가입니다(PG 승인 1.2초
+        <td>낮다 — 3장 페이지 6의 "동시성 지옥" 표가 바로 이 대가입니다(PG 승인 1.2초
         동안 다른 주문이 대기).</td>
         <td>충돌이 드물면 높다. 충돌이 잦으면 재시도 비용이 쌓인다.</td></tr>
       <tr><td><b>이 장의 선택</b></td>
@@ -189,13 +189,13 @@
   <code>SELECT</code>는 <b>읽으면서 동시에 그 행에 쓰기 잠금을 겁니다.</b> 다른
   트랜잭션이 같은 행을 <code>FOR UPDATE</code>로 읽거나 수정하려 하면, 내가
   <code>COMMIT</code>하거나 <code>ROLLBACK</code>할 때까지 그 트랜잭션은
-  <b>멈춰서 기다립니다.</b> 다음 화면에서 만들 낙관적 락은 이 대기 자체를 없애는
+  <b>멈춰서 기다립니다.</b> 다음 페이지에서 만들 낙관적 락은 이 대기 자체를 없애는
   대신, 충돌을 <b>사후에</b> 잡아 재시도로 넘깁니다.</p>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 4 -->
+<!-- ─────────────────────────────────────────── 페이지 4 -->
 <section class="screen" data-title="낙관적 락 구현 — 버전 컬럼">
-  <p class="kicker">12장 · 화면 4</p>
+  <p class="kicker">12장 · 페이지 4</p>
   <h2>낙관적 락 구현 — 버전 컬럼</h2>
 
   <p><code>InventoryItem</code>(루트)에 필드 하나를 더합니다. <i>파이썬으로 살펴보는
@@ -209,12 +209,12 @@
 
     def allocate(self, quantity: int, as_of: date,
                  buffer_days: int = 0) -&gt; "Allocation":
-        ...                                            # 7장 화면 8과 동일
+        ...                                            # 7장 페이지 8과 동일
         self.version += 1                              # 2
         return allocation
 
     def release(self, allocation: "Allocation") -&gt; None:
-        ...                                            # 3장 화면 16과 동일
+        ...                                            # 3장 페이지 16과 동일
         self.version += 1                              # 3
 </code></pre>
 
@@ -293,14 +293,14 @@
 </code></pre>
 
   <p>이 번역은 <code>UnitOfWork</code>가 도메인이 정의한 인터페이스이기 때문에
-  가능합니다(4장 화면 3의 의존성 역전) — <code>ConcurrentUpdateError</code>는
+  가능합니다(4장 페이지 3의 의존성 역전) — <code>ConcurrentUpdateError</code>는
   <code>shared/</code>에 두지만, 특정 애그리게이트의 업무 규칙(I7~I21 같은)이
   아니라 <b>포트의 계약</b>이 알리는 신호이기 때문에 이름은 도메인 예외 계층에
   있어도 뜻은 인프라의 사정을 옮긴 것입니다.</p>
 
   <div class="box note">
     <p class="box-t">next_order_number의 동시성 — 4·5장이 남긴 문제, 그런데 답은 다르다</p>
-    <p>4장 화면 11과 5장 화면 11이 나란히 12장 몫으로 남겨 둔 문제입니다 — 두 요청이
+    <p>4장 페이지 11과 5장 페이지 11이 나란히 12장 몫으로 남겨 둔 문제입니다 — 두 요청이
     동시에 <code>next_order_number()</code>를 부르면 번호가 겹칠 수 있습니다. 그런데
     이건 낙관적 락으로 풀 문제가 <b>아닙니다.</b> 낙관적 락은 "이미 있는 행을 읽고
     → 고치고 → 쓰는" 상황을 위한 것인데, 번호 발급은 <b>새 값을 만들어내는</b>
@@ -313,15 +313,15 @@
   </div>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 5 -->
+<!-- ─────────────────────────────────────────── 페이지 5 -->
 <section class="screen" data-title="입고예정 수량의 경합">
-  <p class="kicker">12장 · 화면 5</p>
+  <p class="kicker">12장 · 페이지 5</p>
   <h2>입고 예정 수량을 두 주문이 동시에 잡으면?</h2>
 
   <p>이 장에서 따로 짚어야 할 질문이 하나 있습니다. 창고 배치와 입고예정 배치는 같은 위험에 같은
   방식으로 노출돼 있을까요? 코드를 보면 답이 바로 나옵니다 — <code>StockBatch</code>는
-  <code>kind</code>로만 구분될 뿐(3장 화면 13, I18) <b>같은 <code>InventoryItem</code>
-  루트 아래, 같은 <code>_batches</code> 리스트</b>에 있습니다. 화면 4의
+  <code>kind</code>로만 구분될 뿐(3장 페이지 13, I18) <b>같은 <code>InventoryItem</code>
+  루트 아래, 같은 <code>_batches</code> 리스트</b>에 있습니다. 페이지 4의
   <code>version</code>은 배치 종류를 가리지 않고 <b>이 SKU 전체</b>를 보호합니다.
   그래서 "어디서 막을지"라는 질문의 답은 이미 나와 있습니다 — <b>3장이 그은 경계
   그대로</b>입니다. 새 잠금 장치가 필요하지 않습니다.</p>
@@ -330,7 +330,7 @@
     <p class="box-t">그런데도 이 질문이 따로 나온 이유 — 진짜 차이는 "실패 후"에 있다</p>
     <p>막는 자리는 같아도, 충돌한 뒤 무엇을 하느냐는 배치 종류에 따라 무게가
     다릅니다. 창고 배치의 재시도가 결국 실패하면 <code>InsufficientStock</code>
-    → <code>OutOfStock</code>(7장 화면 10)으로 이어지고, 이 주문은 <b>아직 아무
+    → <code>OutOfStock</code>(7장 페이지 10)으로 이어지고, 이 주문은 <b>아직 아무
     약속도 하지 않은 상태</b>였으므로 사람이 판단해 취소하면 그만입니다. 입고예정
     배치까지 걸친 할당이 재시도 끝에 실패하면, 그 주문은 <b>이미 출고 예정일을
     약속받았을 수도 있는</b> 주문입니다(예: 입고 지연으로 재조정이 진행 중이던
@@ -339,22 +339,22 @@
     때문입니다. 코드는 같지만, <b>사람에게 전달되는 문장은 달라야 합니다.</b></p>
   </div>
 
-  <p>7장 화면 11의 <code>repromise_delayed_orders</code>가 남긴 debt도 여기서
+  <p>7장 페이지 11의 <code>repromise_delayed_orders</code>가 남긴 debt도 여기서
   같은 답을 씁니다 — "완전한 재계산은 재할당 로직 자체를 다시 돌려야 하고, 그러면서
   생기는 동시성 문제는 12장의 몫"이라고 적혀 있었습니다. 그 재계산이 실제로
   <code>allocate()</code>를 다시 부르는 형태가 된다면(지금은 "이 배치가 유일한
-  근거"라고 단순화돼 있습니다), 그 호출도 화면 4와 <b>같은
+  근거"라고 단순화돼 있습니다), 그 호출도 페이지 4와 <b>같은
   <code>version</code>·재시도 장치</b>를 그대로 씁니다 — 새 배치 종류마다 새 잠금을
   만드는 게 아니라, <b>애그리게이트 경계 하나에 잠금도 하나</b>라는 원칙이 여기서도
   유지됩니다.</p>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 6 -->
+<!-- ─────────────────────────────────────────── 페이지 6 -->
 <section class="screen" data-title="분할 출고를 허용할 것인가">
-  <p class="kicker">12장 · 화면 6</p>
+  <p class="kicker">12장 · 페이지 6</p>
   <h2>분할 출고를 허용할 것인가 — I21을 바꿀지 결정하기</h2>
 
-  <p>3장 화면 16의 퀴즈가 이 장면을 미리 보여줬습니다 — 창고에 3개, 입고예정 10개
+  <p>3장 페이지 16의 퀴즈가 이 장면을 미리 보여줬습니다 — 창고에 3개, 입고예정 10개
   (ETA 09-20)가 있고 6개를 할당하면, 창고 3개 + 입고예정 3개로 <code>ready_on</code>은
   09-20입니다. 창고에 이미 3개나 있는데 고객은 13일을 기다립니다. <b>지금 있는 3개만
   먼저 보내면 안 될까요?</b></p>
@@ -400,18 +400,18 @@ Order.status: 부분출고됨 상태가 하나 더 필요
     더 일찍 일부를 받는 만족감이고, 대가는 포장·배송비 두 배에 더해 코드 전체의
     복잡도 증가입니다. 한빛몰은 지금 규모에서 이 교환이 남는 장사가 아니라고
     판단합니다 — <b>I21은 그대로 둡니다.</b> "업무 규칙 변경이 코드 구조에 번지는
-    것을 관찰"하는 것이 이 화면의 목적이었지, 실제로 바꾸는 것이 목적이 아니었습니다.
+    것을 관찰"하는 것이 이 페이지의 목적이었지, 실제로 바꾸는 것이 목적이 아니었습니다.
     도현·은수 팀이 나중에 "그래도 해야겠다"고 판단하면, 위 네 항목이 그 작업의
     체크리스트가 됩니다.</p>
   </div>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 7 -->
+<!-- ─────────────────────────────────────────── 페이지 7 -->
 <section class="screen" data-title="결과적 일관성을 업무 규칙으로">
-  <p class="kicker">12장 · 화면 7</p>
+  <p class="kicker">12장 · 페이지 7</p>
   <h2>결과적 일관성을 업무 규칙으로 승격하기</h2>
 
-  <p>3장 화면 6은 "재고 초과 주문을 막지 않는다. 정확히는 '주문을 저장하는 순간'에
+  <p>3장 페이지 6은 "재고 초과 주문을 막지 않는다. 정확히는 '주문을 저장하는 순간'에
   막지 않는다"고 했고, 7장은 그 틈을 <code>OrderPlaced</code> → <code>allocate_stock</code>
   사이의 <b>지연</b>으로 코드에 옮겼습니다. 이 지연이 <b>실제로 얼마나 걸려도
   되는지</b>를 지금까지 이 교재는 숫자로 정한 적이 없습니다. 정합니다.</p>
@@ -419,7 +419,7 @@ Order.status: 부분출고됨 상태가 하나 더 필요
   <div class="box note">
     <p class="box-t">지금 지연은 사실상 0초다 — 그런데 그게 우연이다</p>
     <p>7장의 <code>MessageBus.publish()</code>는 같은 스레드에서 핸들러를 <b>바로</b>
-    부릅니다(7장 화면 9). 그래서 오늘은 <code>OrderPlaced</code>가 나가고
+    부릅니다(7장 페이지 9). 그래서 오늘은 <code>OrderPlaced</code>가 나가고
     <code>allocate_stock</code>이 실행되기까지 실질적으로 지연이 없습니다. 그런데
     7장은 이미 "메일 서버가 느리면 응답도 느려진다"는 대가를 짚으며 "메시지 큐로
     바꾼다"를 예고해 뒀습니다 — 큐로 옮기는 순간, 이 지연은 <b>더 이상 0이
@@ -447,11 +447,11 @@ Order.status: 부분출고됨 상태가 하나 더 필요
       <tr><th style="width:11rem">관계</th><th>지금 상태</th><th>합의가 필요한 것</th></tr>
       <tr><td>주문 → 재고<br>(<code>OrderPlaced</code>)</td>
         <td>동기 호출과 사실상 같음(위 상자)</td><td>5초 이내(위 결정)</td></tr>
-      <tr><td>창고 → 배송<br>(10장 화면 10, 아직 미구현)</td>
+      <tr><td>창고 → 배송<br>(10장 페이지 10, 아직 미구현)</td>
         <td>이벤트, 지연 폭 미정</td><td>배송 컨텍스트가 실제로 생길 때 CS·물류팀과
         따로 합의 — 출고와 송장 발행 사이는 재고 반영보다 훨씬 느려도(수 분) 괜찮을
         수 있습니다. 관계마다 허용 폭이 다릅니다.</td></tr>
-      <tr><td>재고 장부 ↔ <code>StoredItem</code><br>(9장 화면 9)</td>
+      <tr><td>재고 장부 ↔ <code>StoredItem</code><br>(9장 페이지 9)</td>
         <td>실사로만 맞춘다. 코드가 강제하지 않음</td><td>실사 주기(예: 주 1회) —
         초 단위가 아니라 <b>날짜 단위</b>로 합의되는, 훨씬 느슨한 결과적 일관성입니다.</td></tr>
     </table>
@@ -463,9 +463,9 @@ Order.status: 부분출고됨 상태가 하나 더 필요
   코드가 아니라 업무팀과 함께 정합니다.</p>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 8 -->
+<!-- ─────────────────────────────────────────── 페이지 8 -->
 <section class="screen" data-title="사가 맛보기 — 결제 연결">
-  <p class="kicker">12장 · 화면 8</p>
+  <p class="kicker">12장 · 페이지 8</p>
   <h2>사가(Saga) 맛보기 — 주문·재고·결제를 잇기</h2>
 
   <p>지금까지 나온 흐름을 한 줄로 이으면 이렇습니다 — 각 화살표가 <b>서로 다른
@@ -477,9 +477,9 @@ Order.status: 부분출고됨 상태가 하나 더 필요
       <tr><td>1. 주문 접수</td><td><code>place_order</code>(5·7장)</td>
         <td>— (여기선 실패해도 되돌릴 게 없음)</td></tr>
       <tr><td>2. 재고 할당</td><td><code>allocate_stock</code>(7장)</td>
-        <td><code>OutOfStock</code> → 사람이 판단(7장 화면 10)</td></tr>
-      <tr><td>3. 결제 승인</td><td><code>approve_payment</code>(이 화면, 신규)</td>
-        <td>보상 필요 — 화면 9</td></tr>
+        <td><code>OutOfStock</code> → 사람이 판단(7장 페이지 10)</td></tr>
+      <tr><td>3. 결제 승인</td><td><code>approve_payment</code>(이 페이지, 신규)</td>
+        <td>보상 필요 — 페이지 9</td></tr>
     </table>
   </div>
 
@@ -488,7 +488,7 @@ Order.status: 부분출고됨 상태가 하나 더 필요
   되돌려 주지 않습니다. 이렇게 <b>여러 트랜잭션에 걸쳐 진행되는 하나의 업무
   흐름</b>을 <span class="term" data-term="saga">사가(Saga)</span>라고 부릅니다.
   실패한 단계 이전의 상태를 되돌리려면, 코드가 <b>명시적인 보상 행위</b>를
-  실행해야 합니다 — 1장 화면 8이 "PG 승인 성공 직후 우리 DB가 실패하면 롤백은
+  실행해야 합니다 — 1장 페이지 8이 "PG 승인 성공 직후 우리 DB가 실패하면 롤백은
   우리 DB만 되돌린다"고 경고했던 바로 그 문제의 답입니다.</p>
 
   <div class="box note">
@@ -500,11 +500,11 @@ Order.status: 부분출고됨 상태가 하나 더 필요
     한 객체가 쥐고 다음 행동을 지시하는 방식입니다. 이 교재는 <b>코레오그래피만</b>
     씁니다 — 지금 사가는 단계가 셋뿐이고 분기도 단순해서, 중앙 조정자를 따로 두는
     비용이 이득보다 큽니다. 단계가 늘고 "어디까지 진행됐는지" 추적 자체가 어려워지면
-    (7장 화면 13이 이미 "흐름 추적 불가"를 이벤트의 대가로 짚었습니다) 그때 프로세스
+    (7장 페이지 13이 이미 "흐름 추적 불가"를 이벤트의 대가로 짚었습니다) 그때 프로세스
     매니저를 도입할 신호입니다 — 이 교재에서 실제로 만들지는 않습니다.</p>
   </div>
 
-  <p>3단계를 잇습니다. <code>DeliveryPromised</code>(7장 화면 5 — 약속이 정해진
+  <p>3단계를 잇습니다. <code>DeliveryPromised</code>(7장 페이지 5 — 약속이 정해진
   순간)를 구독합니다.</p>
 
 <pre><span class="cap"># ordering/application/handlers.py</span><code>def approve_payment(event: DeliveryPromised, uow: UnitOfWork,
@@ -516,10 +516,10 @@ Order.status: 부분출고됨 상태가 하나 더 필요
     try:                                                           # 2
         approval = payment.approve(order.order_number, customer_id, amount)
     except PaymentDeclined as e:
-        bus.publish(_compensate(uow, order.order_number, str(e)))  # 3  화면 9
+        bus.publish(_compensate(uow, order.order_number, str(e)))  # 3  페이지 9
         return
     except PaymentGatewayError as e:
-        bus.publish([PaymentUncertain(occurred_at=datetime.now(),      # 4  화면 9
+        bus.publish([PaymentUncertain(occurred_at=datetime.now(),      # 4  페이지 9
                      order_number=event.order_number, reason=str(e))])
         return
 
@@ -535,7 +535,7 @@ Order.status: 부분출고됨 상태가 하나 더 필요
     아무것도 안 바뀌었으니 무해합니다).</li>
 
     <li><span class="ln">7~15행</span> <b>PG 호출을 <code>with uow:</code> 밖에서</b>
-    합니다. 1장 화면 8과 3장 화면 6이 나란히 경고한 문제 — "외부 호출이 트랜잭션을
+    합니다. 1장 페이지 8과 3장 페이지 6이 나란히 경고한 문제 — "외부 호출이 트랜잭션을
     붙들고 있으면 그동안 이 SKU의 재고 행이 다른 주문을 기다리게 만든다" — 가 바로
     여기서 재발할 뻔했습니다. 이 호출엔 <code>InventoryItem</code>이 전혀 관여하지
     않으니 트랜잭션을 열어 둘 이유가 애초에 없습니다.</li>
@@ -545,7 +545,7 @@ Order.status: 부분출고됨 상태가 하나 더 필요
 
     <li><span class="ln">12~15행</span> <code>PaymentGatewayError</code> — PG가
     응답하지 못했습니다. <b>돈이 빠져나갔는지 안 나갔는지 모릅니다.</b> 다음
-    화면에서 이 둘을 왜 다르게 다루는지 봅니다.</li>
+    페이지에서 이 둘을 왜 다르게 다루는지 봅니다.</li>
 
     <li><span class="ln">17~20행</span> 성공 경로입니다. <b>새 <code>with uow:</code>를
     또 엽니다</b> — 첫 블록에서 읽은 <code>order</code>는 이미 그 트랜잭션과 함께
@@ -564,7 +564,7 @@ Order.status: 부분출고됨 상태가 하나 더 필요
 
   <div class="box good">
     <p class="box-t">8장이 미해결로 남긴 질문에 답한다</p>
-    <p>8장 화면 9 과제는 <code>결제대기</code>가 정말 코드에 있는 개념인지, 지민이
+    <p>8장 페이지 9 과제는 <code>결제대기</code>가 정말 코드에 있는 개념인지, 지민이
     말한 "보류"가 코드에 없는 새 개념인지는 지민에게 확인하기 전에는 알 수 없다고
     열어 뒀습니다. 지금 이 사가를 보면 그 답의 절반은 나옵니다 — 적어도 <b>이
     흐름</b>에서는 <code>결제대기</code>를 <b>거치지 않습니다.</b> 재고 할당이
@@ -581,9 +581,9 @@ Order.status: 부분출고됨 상태가 하나 더 필요
   </div>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 9 -->
+<!-- ─────────────────────────────────────────── 페이지 9 -->
 <section class="screen" data-title="결제 실패 — 보상 트랜잭션">
-  <p class="kicker">12장 · 화면 9</p>
+  <p class="kicker">12장 · 페이지 9</p>
   <h2>결제 실패 — 보상 트랜잭션</h2>
 
   <p>10장·8장이 남긴 빚을 갚습니다. <code>PaymentDeclined</code>와
@@ -600,10 +600,10 @@ Order.status: 부분출고됨 상태가 하나 더 필요
     있습니다. 확신이 있을 때만 자동으로 되돌립니다.</p>
   </div>
 
-  <p><code>PaymentDeclined</code>(확실한 거절) — 자동으로 보상합니다. 5장 화면 12의
+  <p><code>PaymentDeclined</code>(확실한 거절) — 자동으로 보상합니다. 5장 페이지 12의
   <code>cancel_order()</code>와 <b>똑같은 모양</b>입니다.</p>
 
-<pre><span class="cap"># ordering/application/handlers.py — 화면 8의 _compensate</span><code>def _compensate(uow: UnitOfWork, order_number: OrderNumber,
+<pre><span class="cap"># ordering/application/handlers.py — 페이지 8의 _compensate</span><code>def _compensate(uow: UnitOfWork, order_number: OrderNumber,
                  reason: str) -&gt; list[DomainEvent]:
     with uow:
         order = uow.orders.get(order_number)                # 1
@@ -622,27 +622,27 @@ Order.status: 부분출고됨 상태가 하나 더 필요
     넘깁니다.</li>
 
     <li><span class="ln">6행</span> <code>get(sku).release(allocation)</code>이
-    재고의 <code>Allocation</code>을 그대로 넘겨받는 지점입니다 — 11장 화면 11이 위반이라 부르며 이름 붙여 두고 감수하기로 한 지점(여기서는
+    재고의 <code>Allocation</code>을 그대로 넘겨받는 지점입니다 — 11장 페이지 11이 위반이라 부르며 이름 붙여 두고 감수하기로 한 지점(여기서는
     편의상 크랙 ②라 부릅니다 — 주문이 재고의 값 객체를 <code>import</code>)이
     바로 여기서도 나타납니다. 이 장에서도 고치지 않습니다 — 이유는 그대로입니다.</li>
 
     <li><span class="ln">6행</span> <code>release(allocation)</code>은 <b>어느
     배치에서 몇 개인지</b>를 <code>Allocation</code>이 이미 정확히 들고 있어
-    처리합니다(3장 화면 16). 3장 화면 16이 "배치에 주문번호를 적어 둬야 하나?"라고
+    처리합니다(3장 페이지 16). 3장 페이지 16이 "배치에 주문번호를 적어 둬야 하나?"라고
     물었던 <b>흔한 접근 2</b>가 결국 필요 없었습니다 — "누가 예약했는지"를 재고가
     몰라도, <code>Allocation</code> 값 하나로 정확히 해제할 수 있기 때문입니다.
     그 요구는 12장에서도 생기지 않았습니다.</li>
 
     <li><span class="ln">7행</span> <code>Order.cancel()</code>의
-    <code>CANCELLABLE</code>에는 <code>생성됨</code>도 들어 있으므로(3장 화면 4),
+    <code>CANCELLABLE</code>에는 <code>생성됨</code>도 들어 있으므로(3장 페이지 4),
     아직 결제 전(=<code>생성됨</code>) 상태의 취소도 그대로 통과합니다.</li>
 
     <li><span class="ln">3~8행</span> <code>cancel_order()</code>와 마찬가지로
-    <b>한 트랜잭션이 두 애그리게이트</b>를 바꿉니다 — 화면 2에서 예고한 세 번째
+    <b>한 트랜잭션이 두 애그리게이트</b>를 바꿉니다 — 페이지 2에서 예고한 세 번째
     예외입니다. 근거도 같습니다: 같은 프로세스, 같은 DB, 그리고 이 <code>Order</code>
     행은 지금 다른 트랜잭션과 경합 중이 아닙니다(경합은 <code>InventoryItem</code>
-    쪽에서만 일어나고, 그건 이미 화면 4의 버전 락이 지킵니다). 이 커밋도
-    <code>ConcurrentUpdateError</code>가 날 수 있으므로 화면 4와 같은 재시도가
+    쪽에서만 일어나고, 그건 이미 페이지 4의 버전 락이 지킵니다). 이 커밋도
+    <code>ConcurrentUpdateError</code>가 날 수 있으므로 페이지 4와 같은 재시도가
     붙습니다(지면상 생략).</li>
   </ol>
 
@@ -654,7 +654,7 @@ Order.status: 부분출고됨 상태가 하나 더 필요
     return
 </code></pre>
 
-  <p>재고도 풀지 않고 주문도 취소하지 않습니다 — 7장 화면 10이 <code>OutOfStock</code>을
+  <p>재고도 풀지 않고 주문도 취소하지 않습니다 — 7장 페이지 10이 <code>OutOfStock</code>을
   다룰 때 쓴 것과 <b>같은 판단(사람에게 위임)</b>이지만 <b>이유는 반대</b>입니다.
   거기서는 "자동으로 되돌릴 절차를 만들 가치가 아직 없어서"였고, 여기서는 "자동으로
   되돌리는 것 자체가 위험해서"입니다. CS팀이 PG사에 직접 문의해 실제 승인 여부를
@@ -675,12 +675,12 @@ bus.subscribe(PaymentUncertain, partial(notify_cs_team, slack=slack))
   구독 등록 한 줄</b>로 실제 흐름에 들어옵니다.</p>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 10 -->
+<!-- ─────────────────────────────────────────── 페이지 10 -->
 <section class="screen" data-title="규칙을 깨야 할 때, 그리고 한계">
-  <p class="kicker">12장 · 화면 10</p>
+  <p class="kicker">12장 · 페이지 10</p>
   <h2>규칙을 깨야 할 때, 그리고 한계</h2>
 
-  <p>화면 2가 예고한 대로, 이 교재에는 "한 트랜잭션에 하나의 애그리게이트"를 어기는
+  <p>페이지 2가 예고한 대로, 이 교재에는 "한 트랜잭션에 하나의 애그리게이트"를 어기는
   자리가 셋 있습니다. 셋 다 같은 세 조건을 함께 만족합니다.</p>
 
   <div class="table-wrap">
@@ -699,11 +699,11 @@ bus.subscribe(PaymentUncertain, partial(notify_cs_team, slack=slack))
       합니다 — 다른 서비스의 DB라면 애초에 불가능합니다.</li>
       <li><b>경합하는 쪽은 한 애그리게이트뿐.</b> 셋 다 실제 동시 접근·재시도가
       필요한 쪽은 <code>InventoryItem</code>이고, <code>Order</code> 행은 이
-      흐름 안에서 경합 상대가 없습니다. 화면 4의 버전 락 하나면 충분합니다 —
+      흐름 안에서 경합 상대가 없습니다. 페이지 4의 버전 락 하나면 충분합니다 —
       묶는다고 잠금이 두 배로 필요해지지 않습니다.</li>
       <li><b>쪼개면 그 자체로 사가가 필요해진다.</b> 셋 다 쪼개면 "재고를
-      해제했는데 주문 취소가 실패하면?" 같은, 방금 화면 8~9에서 본 것과 같은
-      문제를 <b>또</b> 만들게 됩니다. 이미 사가 하나(화면 8)를 쓰고 있는데 그
+      해제했는데 주문 취소가 실패하면?" 같은, 방금 페이지 8~9에서 본 것과 같은
+      문제를 <b>또</b> 만들게 됩니다. 이미 사가 하나(페이지 8)를 쓰고 있는데 그
       안의 한 단계마다 사가를 하나씩 더 만드는 것은 배보다 배꼽이 큽니다.</li>
     </ol>
   </div>
@@ -711,15 +711,15 @@ bus.subscribe(PaymentUncertain, partial(notify_cs_team, slack=slack))
   <p>11장이 위반이라 이름 붙이고 감수하기로 한 두 지점(여기서는 편의상 크랙이라
   부릅니다)도 다시 확인합니다. 크랙 ①
   (<code>MessageBus</code>가 <code>Protocol</code>이 아니라 구체 클래스)은 이 장의
-  새 핸들러 구독(화면 9)에도 그대로 적용되고, 여전히 감수합니다 — 구현이 하나뿐이라는
+  새 핸들러 구독(페이지 9)에도 그대로 적용되고, 여전히 감수합니다 — 구현이 하나뿐이라는
   사정이 달라지지 않았습니다. 크랙 ②(<code>Order.allocation</code>이 재고의
-  <code>Allocation</code>을 <code>import</code>)는 화면 9에서 실제로 다시
+  <code>Allocation</code>을 <code>import</code>)는 페이지 9에서 실제로 다시
   나타났습니다 — 여전히 고치지 않습니다. 값을 옮겨 담는 코드를 추가하는 비용이,
   지금 결합의 비용보다 여전히 크다고 봅니다.</p>
 
   <div class="box warn">
     <p class="box-t">1. 재시도 횟수는 도메인 지식이 아니라 임의의 숫자다</p>
-    <p>화면 4의 재시도는 몇 번까지 다시 시도할지를 코드가 정해 두지 않았습니다 —
+    <p>페이지 4의 재시도는 몇 번까지 다시 시도할지를 코드가 정해 두지 않았습니다 —
     무한정 재시도할 수는 없으니 어딘가에서 최대 횟수를 정해야 하는데, 그 숫자는
     충돌 빈도를 실측하기 전까지는 도메인 지식이 아니라 감으로 정하는 임의의
     값입니다. 운영 데이터가 쌓이면 조정할 값입니다.</p>
@@ -727,16 +727,16 @@ bus.subscribe(PaymentUncertain, partial(notify_cs_team, slack=slack))
 
   <div class="box warn">
     <p class="box-t">2. 사가는 중간에 멈춘 상태를 남길 수 있다</p>
-    <p>화면 9의 보상 자체(<code>_compensate</code>)가 실패하면(예: 재시도까지
+    <p>페이지 9의 보상 자체(<code>_compensate</code>)가 실패하면(예: 재시도까지
     소진) 주문은 결제도 안 됐고 취소도 안 된 채로 남습니다. 이 상태를 감지해
     사람에게 알리는 장치(예: 일정 시간 안 끝난 사가를 찾는 배치)는 이 교재에
     없습니다 — 프로세스 매니저를 도입하면 자연스럽게 딸려 오는 기능이지만,
-    화면 8이 그 도입을 미룬 대가이기도 합니다.</p>
+    페이지 8이 그 도입을 미룬 대가이기도 합니다.</p>
   </div>
 
   <div class="box warn">
     <p class="box-t">3. "5초"는 협상 결과이지 물리 법칙이 아니다</p>
-    <p>화면 7의 숫자는 지금 이 교재 안에서 처음 등장한 것이라 실제 업무 협상을
+    <p>페이지 7의 숫자는 지금 이 교재 안에서 처음 등장한 것이라 실제 업무 협상을
     거치지 않았습니다. 실무에서는 트래픽·재고 회전율에 따라 이 숫자가 완전히
     달라집니다.</p>
   </div>
@@ -752,9 +752,9 @@ bus.subscribe(PaymentUncertain, partial(notify_cs_team, slack=slack))
   </div>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 11 -->
+<!-- ─────────────────────────────────────────── 페이지 11 -->
 <section class="screen" data-title="요약 · 퀴즈 · 과제">
-  <p class="kicker">12장 · 화면 11</p>
+  <p class="kicker">12장 · 페이지 11</p>
   <h2>12장 마무리</h2>
 
   <div class="summary">
@@ -799,7 +799,7 @@ bus.subscribe(PaymentUncertain, partial(notify_cs_team, slack=slack))
         애그리게이트 루트만 정수 기본키를 가질 수 있기 때문에</li>
     </ol>
     <div class="explain">
-      <p><b class="lbl">해설</b> 화면 4의 실험이 정확히 이것을 보여줬습니다 —
+      <p><b class="lbl">해설</b> 페이지 4의 실험이 정확히 이것을 보여줬습니다 —
       <code>StockBatch.reserved</code>만 바꾸고 커밋했더니 <code>InventoryItem.version</code>은
       그대로였습니다. 잠금을 걸고 싶은 불변식(I7~I9, I19)이 여러 배치에 걸쳐 있다면,
       그 불변식을 지키는 <b>루트 자신이</b> 바뀌었다는 신호를 내야 합니다.</p>
@@ -824,7 +824,7 @@ bus.subscribe(PaymentUncertain, partial(notify_cs_team, slack=slack))
         없기 때문에</li>
     </ol>
     <div class="explain">
-      <p><b class="lbl">해설</b> 화면 9의 핵심 판단입니다. 자동화의 위험은
+      <p><b class="lbl">해설</b> 페이지 9의 핵심 판단입니다. 자동화의 위험은
       "실패했는가"가 아니라 "실패를 얼마나 확신하는가"에서 옵니다. 확신이 없는
       상태에서의 자동 보상은, 하지 않는 것보다 더 나쁜 결과(이중 손실)를 만들
       수 있습니다.</p>
@@ -848,13 +848,13 @@ bus.subscribe(PaymentUncertain, partial(notify_cs_team, slack=slack))
     <div class="explain">
       <p><b class="lbl">해설</b> 배송이 별도 서비스(별도 DB)로 분리된다는 전제
       자체가, 애초에 하나의 <code>with uow:</code>로 묶을 수 없다는 뜻입니다.
-      이럴 때가 정확히 10장 화면 10과 이 장 화면 8이 이벤트·사가를 쓰는 이유입니다.</p>
+      이럴 때가 정확히 10장 페이지 10과 이 장 페이지 8이 이벤트·사가를 쓰는 이유입니다.</p>
     </div>
   </div>
 
   <div class="task">
     <h3>직접 해보기</h3>
-    <p><code>approve_payment</code>(화면 8)가 <code>DeliveryPromised</code>를
+    <p><code>approve_payment</code>(페이지 8)가 <code>DeliveryPromised</code>를
     구독하는 대신, <code>OrderPlaced</code>를 구독해 재고 할당보다 <b>먼저</b>
     결제를 승인하도록 바꾼다고 가정해 보세요. 무엇이 좋아지고, 무엇이 새로
     나빠지나요? 특히 <b>보상이 필요해지는 방향</b>이 어떻게 바뀌는지 3줄로
@@ -871,7 +871,7 @@ bus.subscribe(PaymentUncertain, partial(notify_cs_team, slack=slack))
         <li><b>나빠지는 점</b>: 보상의 방향이 뒤집힙니다. 결제가 먼저 성공한
         뒤 재고 할당이 실패(<code>InsufficientStock</code>)하면, 이번엔
         <b>이미 승인된 결제를 환불</b>해야 합니다 — <code>PaymentPort.refund()</code>가
-        필요해지고, 10장 화면 9가 "그건 아직 없는 결제 애그리게이트의 일"이라고
+        필요해지고, 10장 페이지 9가 "그건 아직 없는 결제 애그리게이트의 일"이라고
         미뤄 둔 I14·I15(환불 누계 검증)를 이 교재가 결국 만들어야 하는 상황을
         앞당깁니다.</li>
         <li><b>결론</b>: "먼저 vs 나중"을 바꿔도 보상 자체가 없어지지는
@@ -888,7 +888,7 @@ bus.subscribe(PaymentUncertain, partial(notify_cs_team, slack=slack))
     <p class="box-t">다음 장 예고</p>
     <p>이 장은 <b>쓰기(write)</b> 쪽의 트랜잭션 경계를 다뤘습니다. 그런데 재고
     수량을 <b>보여주기만 하는</b> 화면(재고 현황판, 주문 목록)도 지금은 똑같은
-    애그리게이트를 거쳐 조회합니다 — 3장 화면 6이 이미 "저장 단위가 커지는" 대가로
+    애그리게이트를 거쳐 조회합니다 — 3장 페이지 6이 이미 "저장 단위가 커지는" 대가로
     짚었던 문제입니다. 13장은 읽기 전용 조회를 쓰기 경로와 분리하는 CQRS를
     맛봅니다.</p>
   </div>

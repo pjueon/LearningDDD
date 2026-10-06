@@ -1,7 +1,7 @@
 /* 학습 교재 런타임 — textbook-html 스킬 동봉본
    - 외부 의존 없음. file:// 로 열려도 동작한다 (fetch / module script 미사용)
-   - 담당: 목차 사이드바, 화면 넘김, 진행률, 퀴즈 채점, Before/After 탭,
-           용어 툴팁, 화면 참조 링크(미리보기·돌아가기), 코드 하이라이팅, 진도 저장
+   - 담당: 목차 사이드바, 페이지 넘김, 진행률, 퀴즈 채점, Before/After 탭,
+           용어 툴팁, 페이지 참조 링크(미리보기·돌아가기), 코드 하이라이팅, 진도 저장
    - 교재마다 고쳐야 하는 곳은 아래 [교재별] 다섯 블록뿐이다. 그 밖은 손대지 않는다. */
 (function () {
   'use strict';
@@ -260,10 +260,10 @@
     window.addEventListener('resize', hideTip);
   }
 
-  /* ── 불변식 번호 툴팁, 화면 참조 링크 ──────────────────────
-     본문 텍스트에서 "N장 화면 M", "화면 N", I 번호를 찾아 바꾼다.
+  /* ── 불변식 번호 툴팁, 페이지 참조 링크 ──────────────────────
+     본문 텍스트에서 "N장 페이지 M", "페이지 N", I 번호를 찾아 바꾼다.
      코드, 이미 링크인 곳, kicker, 그림 안은 건드리지 않는다. */
-  var REF_RE = /(\d{1,2})장 화면 (\d{1,2})((?:\s?[·,~]\s?\d{1,2})*)|화면 (\d{1,2})(?!\d|개|화면)((?:\s?[·,~]\s?\d{1,2})*)|(^|[^A-Za-z0-9_.])(I2[0-2]|I1\d|I[1-9])(?![0-9A-Za-z_]|\.\d)/g;
+  var REF_RE = /(\d{1,2})장 페이지 (\d{1,2})((?:\s?[·,~]\s?\d{1,2})*)|페이지 (\d{1,2})(?!\d|개|페이지)((?:\s?[·,~]\s?\d{1,2})*)|(^|[^A-Za-z0-9_.])(I2[0-2]|I1\d|I[1-9])(?![0-9A-Za-z_]|\.\d)/g;
   var SKIP_SEL = 'pre, code, a, button, svg, .kicker, .term, .cap, script, style, #tip, #xpop';
 
   function chapterOf(num) {
@@ -275,7 +275,7 @@
   function linkRefs(root, chId, screenCount) {
     var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode: function (n) {
-        if (!n.nodeValue || !/화면 \d|I\d/.test(n.nodeValue)) return NodeFilter.FILTER_REJECT;
+        if (!n.nodeValue || !/페이지 \d|I\d/.test(n.nodeValue)) return NodeFilter.FILTER_REJECT;
         return n.parentNode.closest(SKIP_SEL) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
       }
     }, false);
@@ -287,7 +287,7 @@
       var text = node.nodeValue, frag = document.createDocumentFragment(), last = 0, m, changed = false;
       REF_RE.lastIndex = 0;
       function put(s) { if (s) frag.appendChild(document.createTextNode(s)); }
-      // "화면 4·6", "4장 화면 2~3" 처럼 이어지는 번호도 하나씩 링크로 만든다
+      // "페이지 4·6", "4장 페이지 2~3" 처럼 이어지는 번호도 하나씩 링크로 만든다
       function putList(prefix, first, tail, make) {
         var a = make(parseInt(first, 10), prefix + first);
         if (!a) return false;
@@ -307,14 +307,14 @@
           if (!ch) continue;
           put(text.slice(last, start));
           var sameCh = ch.id === chId;
-          putList(m[1] + '장 화면 ', m[2], m[3] || '', function (n, label) {
+          putList(m[1] + '장 페이지 ', m[2], m[3] || '', function (n, label) {
             if (n < 1 || n > ch.screens) return null;
             return sameCh ? makeXref(n, label) : makeChRef(ch, n, label);
           });
         } else if (m[4]) {
           if (!screenCount) continue;
           put(text.slice(last, start));
-          if (!putList('화면 ', m[4], m[5] || '', function (n, label) {
+          if (!putList('페이지 ', m[4], m[5] || '', function (n, label) {
             return (n >= 1 && n <= screenCount) ? makeXref(n, label) : null;
           })) put(m[0]);
         } else {
@@ -348,7 +348,7 @@
     a.className = 'xref xref-ch';
     a.href = ch.id + '.html#s' + n;
     a.textContent = label;
-    a.title = ch.num + ' 화면 ' + n + '(으)로 이동합니다';
+    a.title = ch.num + ' 페이지 ' + n + '(으)로 이동합니다';
     return a;
   }
 
@@ -507,7 +507,7 @@
     if (!screens.length) return;
 
     var titles = Array.prototype.map.call(screens, function (s, i) {
-      return s.dataset.title || (i + 1) + '번째 화면';
+      return s.dataset.title || (i + 1) + '번째 페이지';
     });
 
     var cur = 0;
@@ -522,7 +522,7 @@
     nav.id = 'nav';
     nav.innerHTML =
       '<button type="button" id="prev">← 이전</button>' +
-      '<div class="where"><b>' + meta.num + '</b> · 화면 <b class="cnt"></b></div>' +
+      '<div class="where"><b>' + meta.num + '</b> · 페이지 <b class="cnt"></b></div>' +
       '<button type="button" id="next">다음 →</button>';
     document.body.appendChild(nav);
 
@@ -548,8 +548,8 @@
     var nextCh = neighbourReady(1);
 
     // writeLast=false 이면 이 장의 진도만 남기고 '이어서 읽기' 기준점은 건드리지 않는다.
-    // (#s5 같은 딥링크로 특정 화면만 열어볼 때 기준점이 그리로 끌려가는 것을 막는다)
-    // 완독(✓)은 직전 화면에서 '다음'으로 마지막 화면에 왔을 때만 남긴다.
+    // (#s5 같은 딥링크로 특정 페이지만 열어볼 때 기준점이 그리로 끌려가는 것을 막는다)
+    // 완독(✓)은 직전 페이지에서 '다음'으로 마지막 페이지에 왔을 때만 남긴다.
     function remember(writeLast, finished) {
       var p = loadProgress();
       var rec = p[chId] || {};
@@ -560,14 +560,14 @@
       saveProgress(p);
     }
 
-    // 주소의 #sN 을 지금 화면에 맞춰 두면 새로고침·북마크가 그 화면으로 돌아온다.
+    // 주소의 #sN 을 지금 페이지에 맞춰 두면 새로고침·북마크가 그 페이지로 돌아온다.
     // push=true 이면 기록을 하나 쌓아 브라우저의 뒤로 가기로 돌아올 수 있게 한다.
     function setHash(push) {
       var h = '#s' + (cur + 1);
       try {
         if (push) history.pushState(null, '', h);
         else if (location.hash !== h) history.replaceState(null, '', h);
-      } catch (e) { /* file:// 에서 막히는 브라우저가 있어도 화면 넘김은 동작한다 */ }
+      } catch (e) { /* file:// 에서 막히는 브라우저가 있어도 페이지 넘김은 동작한다 */ }
     }
 
     function show(i, silentLast, finished, push) {
@@ -586,7 +586,7 @@
       prevBtn.textContent = (cur === 0 && prevCh) ? '← ' + prevCh.num : '← 이전';
       nextBtn.textContent = (cur === screens.length - 1 && nextCh) ? nextCh.num + ' →' : '다음 →';
 
-      // 사이드바의 현재 화면 항목이 목차 밖으로 밀려나 있으면 보이게 굴린다(본문은 굴리지 않는다)
+      // 사이드바의 현재 페이지 항목이 목차 밖으로 밀려나 있으면 보이게 굴린다(본문은 굴리지 않는다)
       var on = screenItems[cur];
       if (on) {
         var top = on.offsetTop, bottom = top + on.offsetHeight;
@@ -609,7 +609,7 @@
     nextBtn.addEventListener('click', function () {
       if (cur === screens.length - 1) {
         if (nextCh) {
-          // 다음 장은 늘 첫 화면부터 연다. 차례대로 넘어온 것이므로 '이어서 읽기' 기준점도 옮긴다.
+          // 다음 장은 늘 첫 페이지부터 연다. 차례대로 넘어온 것이므로 '이어서 읽기' 기준점도 옮긴다.
           try { sessionStorage.setItem(NAV_KEY, 'seq'); } catch (e) {}
           location.href = nextCh.id + '.html#s1';
         }
@@ -635,7 +635,7 @@
     initQuiz(book);
     initTip();
 
-    /* ── 화면 참조: 같은 장이면 미리보기, 이동하면 돌아가기 버튼 ── */
+    /* ── 페이지 참조: 같은 장이면 미리보기, 이동하면 돌아가기 버튼 ── */
     var pop = null, popTimer = null, popFrom = null;
     function closePop() {
       clearTimeout(popTimer);
@@ -650,7 +650,7 @@
         pop = document.createElement('div');
         pop.id = 'xpop';
         pop.setAttribute('role', 'dialog');
-        pop.innerHTML = '<div class="xpop-head"><b></b><button type="button" class="go">이 화면으로 이동</button>' +
+        pop.innerHTML = '<div class="xpop-head"><b></b><button type="button" class="go">이 페이지로 이동</button>' +
           '<button type="button" class="x" aria-label="닫기">✕</button></div><div class="xpop-body"></div>';
         document.body.appendChild(pop);
         pop.querySelector('.x').addEventListener('click', closePop);
@@ -661,7 +661,7 @@
       if (n - 1 === cur) return;
       pop.dataset.screen = n;
       pop.dataset.pinned = pinned ? '1' : '';
-      pop.querySelector('.xpop-head b').textContent = '화면 ' + n + ' · ' + titles[n - 1];
+      pop.querySelector('.xpop-head b').textContent = '페이지 ' + n + ' · ' + titles[n - 1];
       var body = pop.querySelector('.xpop-body');
       body.innerHTML = '';
       var clone = target.cloneNode(true);
@@ -700,7 +700,7 @@
     function jumpTo(n) {
       var from = cur;
       show(n - 1, false, false, true);
-      showBack('화면 ' + (from + 1), function () { show(from, false, false, true); });
+      showBack('페이지 ' + (from + 1), function () { show(from, false, false, true); });
     }
 
     document.addEventListener('click', function (e) {
@@ -734,7 +734,7 @@
       if (pop && pop.classList.contains('on') && !pop.contains(e.target) && !(e.target.closest && e.target.closest('a.xref'))) closePop();
     });
 
-    // 브라우저의 뒤로/앞으로 가기로 #sN 이 바뀌면 그 화면을 보인다
+    // 브라우저의 뒤로/앞으로 가기로 #sN 이 바뀌면 그 페이지를 보인다
     window.addEventListener('popstate', function () {
       var m = /^#s(\d+)$/.exec(location.hash);
       if (m) show(parseInt(m[1], 10) - 1);
@@ -748,7 +748,7 @@
       Array.prototype.forEach.call(document.querySelectorAll('details.fold'), function (d) { d.open = true; });
     });
 
-    // 시작 화면 결정: #last → 마지막, #s3 → 3번째, 그 외에는 저장된 진도
+    // 시작 페이지 결정: #last → 마지막, #s3 → 3번째, 그 외에는 저장된 진도
     var start = 0;
     var hash = location.hash;
     var seq = false;
@@ -768,7 +768,7 @@
       var from = JSON.parse(sessionStorage.getItem(BACK_KEY) || 'null');
       sessionStorage.removeItem(BACK_KEY);
       if (from && from.id !== chId) {
-        showBack(from.num + ' 화면 ' + from.screen, function () { location.href = from.id + '.html#s' + from.screen; });
+        showBack(from.num + ' 페이지 ' + from.screen, function () { location.href = from.id + '.html#s' + from.screen; });
       }
     } catch (e) {}
   }
@@ -789,7 +789,7 @@
         }
         var li = document.createElement('li');
         var done = progress[ch.id] && progress[ch.id].done;
-        var meta = ch.hours ? (ch.screens + '화면 · ' + ch.hours + '시간') : '';
+        var meta = ch.hours ? (ch.screens + '페이지 · ' + ch.hours + '시간') : '';
         var inner =
           '<span class="n">' + ch.num + '</span>' +
           '<span class="t">' + ch.title + (done ? ' <span class="tick">✓</span>' : '') + '</span>' +
@@ -812,7 +812,7 @@
       }
       if (last && target.id === last.id && last.screen > 0) {
         resume.href = target.id + '.html#s' + (last.screen + 1);
-        resume.textContent = '이어서 읽기 — ' + target.num + ' 화면 ' + (last.screen + 1);
+        resume.textContent = '이어서 읽기 — ' + target.num + ' 페이지 ' + (last.screen + 1);
       } else {
         resume.href = target.id + '.html';
         resume.textContent = '처음부터 읽기 — ' + target.num;

@@ -10,9 +10,9 @@
 
 <main id="book"><div class="inner">
 
-<!-- ─────────────────────────────────────────── 화면 1 -->
+<!-- ─────────────────────────────────────────── 페이지 1 -->
 <section class="screen" data-title="이 장에서 할 일">
-  <p class="kicker">4장 · 화면 1</p>
+  <p class="kicker">4장 · 페이지 1</p>
   <h1>Repository<br>도메인에서 DB를 밀어내기</h1>
 
   <p class="lead">3장에서 <code>Order</code>와 <code>InventoryItem</code>을 만들었습니다.
@@ -25,24 +25,24 @@
   <div class="box note">
     <p class="box-t">이 장의 지도</p>
     <ul>
-      <li><b>화면 2~4 · 문제와 원칙.</b> 도메인 안에 SQL이 들어가면 벌어지는 일,
+      <li><b>페이지 2~4 · 문제와 원칙.</b> 도메인 안에 SQL이 들어가면 벌어지는 일,
       <span class="term" data-term="persignorance">영속성 무지</span>와
       <span class="term" data-term="dip">의존성 역전 원칙</span>, 그리고
       <span class="term" data-term="repository">리포지토리</span> 인터페이스를 정의합니다.</li>
-      <li><b>화면 5~8 · 메모리 구현으로 규칙을 다진다.</b> 테스트가 쉬워지는 순간,
+      <li><b>페이지 5~8 · 메모리 구현으로 규칙을 다진다.</b> 테스트가 쉬워지는 순간,
       애그리게이트 단위로만 저장하는 규칙, 그리고 3장이 남긴 빚 —
       <code>Allocation</code>을 어디에 보관하는가.</li>
-      <li><b>화면 9~10 · 진짜 저장소.</b> SQLAlchemy로 실제 구현을 만들고,
+      <li><b>페이지 9~10 · 진짜 저장소.</b> SQLAlchemy로 실제 구현을 만들고,
       1장의 생 SQL이 매핑 코드로 어떻게 바뀌는지 나란히 봅니다.</li>
-      <li><b>화면 11~12 · 반대 의견과 마무리.</b> "ORM 세션이 이미 리포지토리 아닌가?"라는
+      <li><b>페이지 11~12 · 반대 의견과 마무리.</b> "ORM 세션이 이미 리포지토리 아닌가?"라는
       질문에 답하고, 이 장이 다음 장들에 남기는 것을 정리합니다.</li>
     </ul>
   </div>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 2 -->
+<!-- ─────────────────────────────────────────── 페이지 2 -->
 <section class="screen" data-title="도메인 안에 SQL이 있으면">
-  <p class="kicker">4장 · 화면 2</p>
+  <p class="kicker">4장 · 페이지 2</p>
   <h2>도메인 안에 SQL이 있으면 벌어지는 일</h2>
 
   <p>3장에서 만든 <code>Order.cancel()</code>은 메모리 안의 <code>status</code>만 바꿉니다.
@@ -84,19 +84,19 @@
     <p><code>Order.cancel()</code>을 테스트하려면 이제 <code>hanbit.db</code> 파일이
     있어야 하고, <code>orders</code> 테이블이 그 안에 있어야 하고, 테스트가 끝나면
     지운 행을 되돌려야 합니다. <b>불변식 하나(I5)를 확인하려고 DB 전체가 필요</b>해졌습니다.
-    1장 화면 13의 통증 3번이 3장에서 사라졌다가 여기서 <b>도로 생깁니다.</b></p>
+    1장 페이지 13의 통증 3번이 3장에서 사라졌다가 여기서 <b>도로 생깁니다.</b></p>
   </div>
 
   <p>그런데 애초에 <b>왜</b> 저장 코드가 도메인 메서드 안에 있으면 안 될까요?
-  다음 화면에서 이름을 붙여 봅니다.</p>
+  다음 페이지에서 이름을 붙여 봅니다.</p>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 3 -->
+<!-- ─────────────────────────────────────────── 페이지 3 -->
 <section class="screen" data-title="영속성 무지와 의존성 역전">
-  <p class="kicker">4장 · 화면 3</p>
+  <p class="kicker">4장 · 페이지 3</p>
   <h2>영속성 무지, 그리고 의존성의 방향을 뒤집기</h2>
 
-  <p>화면 2의 문제를 한 문장으로 줄이면 — <b><code>Order</code>가 자신이 어떻게 저장되는지
+  <p>페이지 2의 문제를 한 문장으로 줄이면 — <b><code>Order</code>가 자신이 어떻게 저장되는지
   알고 있다</b>는 것입니다. 이 앎을 없애는 성질에 이름이 있습니다.</p>
 
   <div class="box note">
@@ -163,13 +163,13 @@
     <p class="box-t">이 인터페이스에 붙는 이름</p>
     <p>도메인이 "나는 이런 모양의 저장소가 있으면 된다"고 정의해 두는 이 인터페이스가
     <b><span class="term" data-term="repository">리포지토리</span>(Repository)</b>입니다.
-    다음 화면에서 정의합니다.</p>
+    다음 페이지에서 정의합니다.</p>
   </div>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 4 -->
+<!-- ─────────────────────────────────────────── 페이지 4 -->
 <section class="screen" data-title="OrderRepository 정의하기">
-  <p class="kicker">4장 · 화면 4</p>
+  <p class="kicker">4장 · 페이지 4</p>
   <h2>리포지토리 인터페이스 정의하기</h2>
 
   <p>파이썬에는 자바의 <code>interface</code>가 없습니다. 대신 <code>typing.Protocol</code>을
@@ -193,7 +193,7 @@ class InventoryRepository(Protocol):
     일부이므로(정의는 도메인 계층에 있습니다) 예외도 도메인 예외입니다.</li>
 
     <li><span class="ln">3행</span> <b>새 주문 하나만</b> 받습니다. 이미 있는 주문을
-    바꾼 뒤 다시 "저장"하는 메서드가 없습니다. 왜 없는지는 화면 7의 주제입니다.</li>
+    바꾼 뒤 다시 "저장"하는 메서드가 없습니다. 왜 없는지는 페이지 7의 주제입니다.</li>
 
     <li><span class="ln">4행</span> <b>주문 번호 생성이 왜 리포지토리에 있을까요?</b>
     번호는 "오늘 날짜 + 그날의 순번"이라 <b>동시에 여러 요청이 주문을 만들 때 순번이 겹치면
@@ -203,7 +203,7 @@ class InventoryRepository(Protocol):
     포트 뒤로 넘깁니다.</li>
 
     <li><span class="ln">9행</span> <code>get_many</code>가 따로 있는 이유는
-    3장 화면 16의 그 문장 때문입니다 — "SKU마다 <code>allocate()</code>를 부르고, 가장 늦은
+    3장 페이지 16의 그 문장 때문입니다 — "SKU마다 <code>allocate()</code>를 부르고, 가장 늦은
     <code>ready_on</code>을 고른다." 라인이 5개인 주문은 SKU를 5번 조회해야 하는데,
     <code>get</code>을 5번 부르면 <b>왕복이 5번</b>입니다. <code>get_many</code>는
     <b>한 번의 왕복으로</b> 5개를 가져옵니다. 이런 문제를 흔히 <b>N+1 문제</b>라고 부릅니다.</li>
@@ -212,13 +212,13 @@ class InventoryRepository(Protocol):
   <div class="box warn">
     <p class="box-t">왜 <code>OrderLineRepository</code>는 없는가</p>
     <p>지금 눈치채셨을 수 있습니다 — <code>OrderLine</code>에는 리포지토리가 없습니다.
-    <b>이건 실수가 아닙니다.</b> 화면 6에서 이유를 정면으로 다룹니다.</p>
+    <b>이건 실수가 아닙니다.</b> 페이지 6에서 이유를 정면으로 다룹니다.</p>
   </div>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 5 -->
+<!-- ─────────────────────────────────────────── 페이지 5 -->
 <section class="screen" data-title="메모리 구현과 쉬워진 테스트">
-  <p class="kicker">4장 · 화면 5</p>
+  <p class="kicker">4장 · 페이지 5</p>
   <h2>메모리 구현 — 그리고 갑자기 쉬워지는 테스트</h2>
 
   <p>인터페이스를 만들었으니 가장 단순한 구현부터 봅니다. <b>딕셔너리 하나</b>면 됩니다.</p>
@@ -245,7 +245,7 @@ class InventoryRepository(Protocol):
   <ol class="notes">
     <li><span class="ln">7행</span> <b>키를 문자열로</b> 씁니다. <code>OrderNumber</code>는
     2장에서 <code>frozen=True</code>로 만들었으니 <code>dict</code> 키로 직접 써도 되지만,
-    <code>.value</code>로 풀어 쓰면 나중에 SQLAlchemy 구현(화면 9)의 기본 키 컬럼과
+    <code>.value</code>로 풀어 쓰면 나중에 SQLAlchemy 구현(페이지 9)의 기본 키 컬럼과
     모양이 맞습니다.</li>
 
     <li><span class="ln">12행</span> <code>order.order_number</code>를 씁니다.
@@ -284,20 +284,20 @@ class InventoryRepository(Protocol):
   </ol>
 
   <div class="box good">
-    <p class="box-t">1장 화면 13의 통증 3번이 다시 사라졌습니다</p>
+    <p class="box-t">1장 페이지 13의 통증 3번이 다시 사라졌습니다</p>
     <p>이 테스트는 <b>1밀리초 안에 끝납니다.</b> DB 컨테이너를 띄울 필요도, 테스트 뒤
     데이터를 정리할 필요도 없습니다. <code>Order</code>의 모든 불변식(I1~I5)을
     이런 식으로 <b>빠르게, 격리된 채로</b> 테스트할 수 있습니다. 진짜 DB를 쓰는 테스트는
-    화면 9의 구현을 검증하는 <b>소수의 통합 테스트</b>로 남겨 둡니다.</p>
+    페이지 9의 구현을 검증하는 <b>소수의 통합 테스트</b>로 남겨 둡니다.</p>
   </div>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 6 -->
+<!-- ─────────────────────────────────────────── 페이지 6 -->
 <section class="screen" data-title="애그리게이트 단위로만 저장한다">
-  <p class="kicker">4장 · 화면 6</p>
+  <p class="kicker">4장 · 페이지 6</p>
   <h2>애그리게이트 단위로만 저장한다</h2>
 
-  <p>화면 4에서 미뤄둔 질문 — <b>왜 <code>OrderLineRepository</code>는 없어야 할까요?</b>
+  <p>페이지 4에서 미뤄둔 질문 — <b>왜 <code>OrderLineRepository</code>는 없어야 할까요?</b>
   있다면 이런 모양일 것입니다.</p>
 
 <pre><span class="cap"># 만들지 않는다</span><code>class OrderLineRepository:
@@ -309,7 +309,7 @@ class InventoryRepository(Protocol):
 <pre><span class="cap"># 이 코드가 가능해진다면</span><code>line_repo.update_quantity(line_id, Quantity(5))
 </code></pre>
 
-  <p>낯익은 문제입니다. 3장 화면 5에서 정확히 같은 모양의 문제를 봤습니다 —
+  <p>낯익은 문제입니다. 3장 페이지 5에서 정확히 같은 모양의 문제를 봤습니다 —
   <code>order.lines[0].quantity = ...</code>가 <code>Order._ensure_modifiable()</code>를
   건너뛰던 그 코드입니다. <code>OrderLineRepository</code>는 <b>그 우회로를 코드 수준에서
   다시 열어 줍니다.</b> 결제완료된 주문의 라인 수량을 이 메서드로 바꾸면 I4를 확인하는
@@ -325,7 +325,7 @@ class InventoryRepository(Protocol):
 
   <h3>이제 3장의 마지막 질문에 답할 수 있습니다</h3>
 
-  <p>3장 화면 2의 사고 2번을 기억하시나요 — 프로모션 배치가
+  <p>3장 페이지 2의 사고 2번을 기억하시나요 — 프로모션 배치가
   <code>UPDATE orders SET discount = ...</code>만 실행하고 <code>total</code> 컬럼은
   그대로 둬서 금액이 어긋난 사고입니다. 이 사고가 <b>4장 이후에는 구조적으로 불가능</b>합니다.
   이유가 셋 겹쳐 있습니다.</p>
@@ -335,7 +335,7 @@ class InventoryRepository(Protocol):
       <tr><th style="width:10rem">막는 장치</th><th>어떻게 막는가</th></tr>
       <tr><td><b>계산값은 컬럼이 아니다</b></td>
         <td><code>total_amount</code>는 3장에서 이미 <code>@property</code>가 됐습니다
-        (저장되는 값이 아니라 계산되는 값). 화면 9에서 매핑할 때 <b>이 값은 테이블에
+        (저장되는 값이 아니라 계산되는 값). 페이지 9에서 매핑할 때 <b>이 값은 테이블에
         컬럼조차 없습니다.</b> 어긋날 곳 자체가 없습니다.</td></tr>
       <tr><td><b>저장 경로가 하나뿐이다</b></td>
         <td><code>OrderRepository</code>에는 <code>get</code>과 <code>add</code>만
@@ -344,25 +344,25 @@ class InventoryRepository(Protocol):
         없습니다.</td></tr>
       <tr><td><b>SQL을 쓸 길이 없다</b></td>
         <td>배치 스크립트가 <code>OrderRepository</code>를 거치는 한, 원시 SQL을 쓸 일이
-        없습니다. 화면 2에서 본 것과 반대로, 이제는 <b>SQL을 쓰려면 일부러 리포지토리를
+        없습니다. 페이지 2에서 본 것과 반대로, 이제는 <b>SQL을 쓰려면 일부러 리포지토리를
         건너뛰어야</b> 합니다.</td></tr>
     </table>
   </div>
 
   <div class="box good">
     <p class="box-t">3장이 남긴 빚 — 갚았습니다</p>
-    <p>3장 화면 15의 "이 장이 남긴 빚" 표는 4장 몫으로 <b>"애그리게이트를 통째로 저장하고
+    <p>3장 페이지 15의 "이 장이 남긴 빚" 표는 4장 몫으로 <b>"애그리게이트를 통째로 저장하고
     꺼내는 방법"과 "<code>UPDATE orders SET ...</code>를 막는 마지막 통로"</b>를 남겼습니다.
     위 표가 그 답입니다.</p>
   </div>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 7 -->
+<!-- ─────────────────────────────────────────── 페이지 7 -->
 <section class="screen" data-title="수정은 어떻게 반영되나">
-  <p class="kicker">4장 · 화면 7</p>
+  <p class="kicker">4장 · 페이지 7</p>
   <h2>그런데 "저장"하는 메서드가 왜 없을까</h2>
 
-  <p>화면 5의 테스트를 다시 보면 이상한 점이 있습니다. <code>again.cancel()</code>을 부른 뒤
+  <p>페이지 5의 테스트를 다시 보면 이상한 점이 있습니다. <code>again.cancel()</code>을 부른 뒤
   <b>"다시 저장해라"는 코드가 없습니다.</b> 그런데도 <code>order.status</code>가 바뀌어 있었습니다.
   이유는 단순합니다 — <code>InMemoryOrderRepository</code>는 <b>객체를 직렬화하지 않습니다.</b>
   파이썬 참조를 그대로 들고 있을 뿐이라, 객체를 바꾸면 "저장된 것"도 그냥 바뀝니다.</p>
@@ -401,12 +401,12 @@ uow.commit()                              # 2
   </div>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 8 -->
+<!-- ─────────────────────────────────────────── 페이지 8 -->
 <section class="screen" data-title="Allocation을 어디에 보관하는가">
-  <p class="kicker">4장 · 화면 8</p>
+  <p class="kicker">4장 · 페이지 8</p>
   <h2>3장의 마지막 과제 — <code>Allocation</code>을 어디에 보관하는가</h2>
 
-  <p>3장 화면 16의 과제 답에 이런 문장이 있었습니다 — "<code>Allocation</code>을 어디에
+  <p>3장 페이지 16의 과제 답에 이런 문장이 있었습니다 — "<code>Allocation</code>을 어디에
   보관해 뒀다가 취소 때 꺼내는지도 아직 정하지 않았습니다. 그건 4장의 문제입니다."
   저장 단위를 정하고 나니 이제 답할 수 있습니다.</p>
 
@@ -418,7 +418,7 @@ uow.commit()                              # 2
   <div class="box warn">
     <p class="box-t">재고 애그리게이트에 보관하면 안 되는 이유</p>
     <p>"그럼 <code>InventoryItem</code>이 자기가 어느 주문에 할당했는지 기억하면 되지
-    않나요?" — 3장 화면 16의 모범답안이 이미 이 길을 막았습니다. 배치에
+    않나요?" — 3장 페이지 16의 모범답안이 이미 이 길을 막았습니다. 배치에
     <code>{주문번호: 수량}</code>을 적어 두면 <b>재고가 주문의 생애주기를 알아야</b>
     합니다("이 주문이 취소됐나, 아직 살아있나"). 재고의 관심사가 아닌 것이 재고 안으로
     들어옵니다.</p>
@@ -436,7 +436,7 @@ uow.commit()                              # 2
 
   <ol class="notes">
     <li><span class="ln">2행</span> <code>promise</code>와 나란히 놓이는 필드입니다.
-    <code>Allocation</code>은 <b>식별자가 없는 값 객체</b>이므로(3장 화면 14), 이걸
+    <code>Allocation</code>은 <b>식별자가 없는 값 객체</b>이므로(3장 페이지 14), 이걸
     <code>Order</code>가 들고 있어도 재고를 바꿀 방법이 여전히 없습니다 — 3장의 규칙이
     깨지지 않습니다.</li>
   </ol>
@@ -461,14 +461,14 @@ uow.commit()                              # 2
     모인 것이라 표준적인 관계 매핑과 잘 맞지 않습니다. 실전에서는 커스텀 컬렉션이나
     <code>composite()</code>, 혹은 그냥 JSON 컬럼에 직렬화하는 방법을 씁니다.
     여기서는 <b>스키마와 저장 위치까지만</b> 정하고, 매핑 코드의 세부 구현은 이 교재의
-    범위 밖으로 남겨 둡니다 — 어느 쪽을 고르든 화면 6의 규칙(애그리게이트 루트를 통해서만
+    범위 밖으로 남겨 둡니다 — 어느 쪽을 고르든 페이지 6의 규칙(애그리게이트 루트를 통해서만
     접근)은 지켜집니다.</p>
   </div>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 9 -->
+<!-- ─────────────────────────────────────────── 페이지 9 -->
 <section class="screen" data-title="SQLAlchemy로 진짜 저장소 만들기">
-  <p class="kicker">4장 · 화면 9</p>
+  <p class="kicker">4장 · 페이지 9</p>
   <h2>SQLAlchemy로 진짜 저장소 만들기</h2>
 
   <p>메모리 구현과 <b>정확히 같은 인터페이스</b>를 진짜 DB로 구현합니다. 방법은
@@ -507,7 +507,7 @@ def start_mappers() -&gt; None:
 </code></pre>
 
   <ol class="notes">
-    <li><span class="ln">5행</span> <code>orders</code> 테이블 정의는 <b>1장 화면 3에서
+    <li><span class="ln">5행</span> <code>orders</code> 테이블 정의는 <b>1장 페이지 3에서
     본 그 테이블</b>과 컬럼이 거의 같습니다 — <code>customer_id</code>,
     <code>zipcode</code>·<code>road</code> 같은 배송지 컬럼들입니다. 다른 점은
     기본 키가 정수 <code>id</code>가 아니라 <code>order_number</code> 문자열이라는 것,
@@ -515,7 +515,7 @@ def start_mappers() -&gt; None:
 
     <li><span class="ln">11행</span> <code>promise_ship_on</code>처럼 3장에서 추가된
     필드도 그냥 컬럼입니다. <code>Money</code>·<code>Address</code> 같은 값 객체는
-    <b>자기 테이블 없이 부모 테이블의 컬럼으로 펼쳐진다</b>고 2장 화면 13에서 이미
+    <b>자기 테이블 없이 부모 테이블의 컬럼으로 펼쳐진다</b>고 2장 페이지 13에서 이미
     다뤘습니다. <code>discount_amount</code>가 그 예입니다 — <code>Money</code> 하나가
     정수 컬럼 하나가 됩니다.</li>
 
@@ -552,12 +552,12 @@ def start_mappers() -&gt; None:
   코드가 거의 반복이라 여기서는 생략합니다.</p>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 10 -->
+<!-- ─────────────────────────────────────────── 페이지 10 -->
 <section class="screen" data-title="1장의 생 SQL이 매핑 코드로">
-  <p class="kicker">4장 · 화면 10</p>
+  <p class="kicker">4장 · 페이지 10</p>
   <h2>1장의 생 SQL이 매핑 코드로 바뀌는 대응 관계</h2>
 
-  <p>1장 화면 5~7의 <code>place_order()</code>는 재고를 확인하고 주문을 저장하는 데
+  <p>1장 페이지 5~7의 <code>place_order()</code>는 재고를 확인하고 주문을 저장하는 데
   SQL을 <b>여섯 번</b> 직접 실행했습니다. 지금 이 코드가 최종적으로 어떻게 바뀌었는지
   나란히 봅니다. (조립 코드 자체는 5장의 주제이므로, 여기서는 <b>저장 부분</b>만 봅니다.)</p>
 
@@ -610,7 +610,7 @@ session.commit()
         <td><code>repo.add(order)</code> 한 번. 몇 개의 <code>INSERT</code>가 나갈지는
         <b>객체 그래프의 모양</b>이 결정</td></tr>
       <tr><td><code>total</code> 컬럼을 <b>계산해서 직접 채워 넣어야</b> 함</td>
-        <td>애초에 그런 컬럼이 <b>없음</b>(화면 6)</td></tr>
+        <td>애초에 그런 컬럼이 <b>없음</b>(페이지 6)</td></tr>
     </table>
   </div>
 
@@ -624,9 +624,9 @@ session.commit()
   </div>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 11 -->
+<!-- ─────────────────────────────────────────── 페이지 11 -->
 <section class="screen" data-title="반대 의견과 남은 것">
-  <p class="kicker">4장 · 화면 11</p>
+  <p class="kicker">4장 · 페이지 11</p>
   <h2>반대 의견 — "ORM 세션이 이미 리포지토리 아닌가?"</h2>
 
   <div class="dialog">
@@ -637,20 +637,20 @@ session.commit()
   </div>
 
   <p>일리 있는 지적입니다. 실제로 <code>Session</code>은 Unit of Work와 Identity Map을
-  이미 구현하고 있어서, 화면 9의 <code>SqlAlchemyOrderRepository</code>는 <b>얇은
+  이미 구현하고 있어서, 페이지 9의 <code>SqlAlchemyOrderRepository</code>는 <b>얇은
   래퍼</b>에 가깝습니다. 그래서 이 추상화가 <b>정당화되는 경우</b>와 <b>과할 수 있는 경우</b>를
   나눠 봅니다.</p>
 
   <div class="table-wrap">
     <table>
       <tr><th style="width:11.5rem">리포지토리가 갚는 것</th><th>대가로 치르는 것</th></tr>
-      <tr><td><b>테스트가 DB 없이 돈다</b>(화면 5)</td>
+      <tr><td><b>테스트가 DB 없이 돈다</b>(페이지 5)</td>
         <td>인터페이스와 두 가지 구현(메모리·SQLAlchemy)을 유지해야 한다</td></tr>
       <tr><td><b>ORM을 나중에 바꿔도 도메인이 안 바뀐다</b>
         (예: SQLAlchemy → 원시 SQL, 또는 다른 ORM)</td>
         <td>그런 교체가 실제로 일어날 일이 거의 없다면, 이 이득은 <b>실현되지 않는
         보험료</b>다</td></tr>
-      <tr><td><b>도메인에 SQL/세션 코드가 새지 않는다</b>(화면 6)</td>
+      <tr><td><b>도메인에 SQL/세션 코드가 새지 않는다</b>(페이지 6)</td>
         <td>작은 프로젝트에서는 <code>Session</code>을 응용 서비스에서 직접 써도
         같은 규율을 지킬 수 있다</td></tr>
     </table>
@@ -662,7 +662,7 @@ session.commit()
       <li><b>ORM을 바꿀 계획이 전혀 없고</b>, 팀 전체가 SQLAlchemy에 익숙하다.
       추상화의 가장 큰 이득(교체 가능성)이 애초에 필요 없다.</li>
       <li><b>애그리게이트가 단순하고 적다.</b> 조회 화면이 대부분이고 쓰기 규칙이
-      거의 없는 CRUD 근처 도메인이라면(1장 화면 16의 판단 기준과 같습니다),
+      거의 없는 CRUD 근처 도메인이라면(1장 페이지 16의 판단 기준과 같습니다),
       <code>Session</code>을 바로 쓰는 편이 코드가 짧다.</li>
       <li><b>혼자 또는 아주 작은 팀.</b> 인터페이스를 유지하는 비용을 나눠 낼 사람이
       적으면 그 비용이 상대적으로 커진다.</li>
@@ -685,14 +685,14 @@ session.commit()
       <tr><td><b>9장</b></td><td><code>InventoryRepository.get_many</code>가 SKU
         문자열로 조회하는 전제("상품 1개 = SKU 1개")도 그때 깨집니다</td></tr>
       <tr><td><b>12장</b></td><td><code>next_order_number</code>를 두 요청이 동시에
-        부르면? 화면 5의 메모리 구현은 이 경합을 막지 않습니다</td></tr>
+        부르면? 페이지 5의 메모리 구현은 이 경합을 막지 않습니다</td></tr>
     </table>
   </div>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 12 -->
+<!-- ─────────────────────────────────────────── 페이지 12 -->
 <section class="screen" data-title="요약 · 퀴즈 · 과제">
-  <p class="kicker">4장 · 화면 12</p>
+  <p class="kicker">4장 · 페이지 12</p>
   <h2>4장 마무리</h2>
 
   <div class="summary">
@@ -734,10 +734,10 @@ session.commit()
     </ol>
     <div class="explain">
       <p><b class="lbl">해설</b> "성능이 필요하다"는 요구는 정당하지만, 그 해법이
-      <b>애그리게이트 경계를 뚫는 것</b>이면 안 됩니다. 화면 6의 논리가 재고에도 그대로
+      <b>애그리게이트 경계를 뚫는 것</b>이면 안 됩니다. 페이지 6의 논리가 재고에도 그대로
       적용됩니다.</p>
       <p>정말 배치 단위 조회가 필요하다면(예: 창고 대시보드), 그건 <b>쓰기 모델을 위한
-      리포지토리가 아니라 읽기 전용 쿼리</b>로 풀어야 합니다. 3장 화면 16의 퀴즈에서 이미
+      리포지토리가 아니라 읽기 전용 쿼리</b>로 풀어야 합니다. 3장 페이지 16의 퀴즈에서 이미
       나온 논리입니다 — 애그리게이트는 쓰기 단위이지 읽기 단위가 아닙니다. 13장에서
       이 읽기 전용 경로를 정식으로 다룹니다.</p>
     </div>
@@ -752,13 +752,13 @@ session.commit()
         <code>OrderRepository</code> 인터페이스 자체가 잘못됐다</li>
       <li data-why="cancel()의 상태 검사 로직은 3장 그대로이며 저장 방식과 무관합니다.">
         <code>Order.cancel()</code>의 상태 검사 로직에 버그가 있다</li>
-      <li data-why="맞습니다. 화면 7에서 본 대로 SQLAlchemy는 세션 commit 시점에 변경을 반영합니다. commit을 부르지 않았다면 메모리 안 객체만 바뀌고 DB는 그대로입니다.">
+      <li data-why="맞습니다. 페이지 7에서 본 대로 SQLAlchemy는 세션 commit 시점에 변경을 반영합니다. commit을 부르지 않았다면 메모리 안 객체만 바뀌고 DB는 그대로입니다.">
         <code>session.commit()</code>을 부르지 않았다</li>
       <li data-why="order_number를 기본 키로 쓰는 것 자체는 문제가 아닙니다. 오히려 자연스러운 키입니다.">
         <code>order_number</code>를 기본 키로 쓴 것이 문제다</li>
     </ol>
     <div class="explain">
-      <p><b class="lbl">해설</b> 이 문제가 바로 화면 7의 경고입니다 — 메모리 구현에서는
+      <p><b class="lbl">해설</b> 이 문제가 바로 페이지 7의 경고입니다 — 메모리 구현에서는
       "저장을 잊는다"는 실수가 <b>애초에 존재하지 않습니다</b>(직렬화가 없으니까요).
       SQLAlchemy로 바꾸는 순간 <b>새로운 실수 종류</b>가 생깁니다. 두 구현이
       "저장 호출이 안 보인다"는 점에서 비슷해 보이지만, 그 이유가 다르다는 것을
@@ -771,7 +771,7 @@ session.commit()
   </div>
 
   <div class="quiz" data-answer="1">
-    <p class="q">화면 11의 반대 의견 논의에서, <b>리포지토리를 만드는 비용이 이득보다 큰</b>
+    <p class="q">페이지 11의 반대 의견 논의에서, <b>리포지토리를 만드는 비용이 이득보다 큰</b>
     상황으로 가장 적절한 것은?</p>
     <ol class="options">
       <li data-why="맞습니다. 규칙이 거의 없고 ORM 교체 계획도 없다면 인터페이스와 구현 두 벌을 유지하는 비용이 그대로 남습니다.">
@@ -796,11 +796,11 @@ session.commit()
 
   <div class="task">
     <h3>직접 해보기</h3>
-    <p><code>InMemoryInventoryRepository</code>를 직접 짜 보세요. 힌트: 화면 5의
+    <p><code>InMemoryInventoryRepository</code>를 직접 짜 보세요. 힌트: 페이지 5의
     <code>InMemoryOrderRepository</code>와 거의 같은 모양이지만, 키가
     <code>OrderNumber</code>가 아니라 <b>SKU 문자열</b>입니다.</p>
     <ul>
-      <li><code>get(sku)</code>는 없는 SKU면 무엇을 해야 할까요? 화면 4의
+      <li><code>get(sku)</code>는 없는 SKU면 무엇을 해야 할까요? 페이지 4의
       <code>OrderNotFound</code>와 같은 패턴을 SKU에도 적용해 보세요.</li>
       <li><code>get_many(skus)</code>를 <code>get</code> 여러 번으로 구현하고 싶어질
       것입니다. <b>메모리 구현에서는 그래도 괜찮을까요?</b> SQLAlchemy 구현이라면
@@ -842,7 +842,7 @@ class InMemoryInventoryRepository:
         복사하면 N+1 문제가 재발합니다.</b> 진짜 구현에서는
         <code>session.query(InventoryItem).filter(sku.in_(skus))</code>처럼
         <b>한 번의 쿼리</b>로 바꿔야 합니다. 인터페이스가 같다고 구현 전략까지
-        그대로 옮겨도 되는 것은 아닙니다 — 이것이 화면 4에서
+        그대로 옮겨도 되는 것은 아닙니다 — 이것이 페이지 4에서
         <code>get_many</code>를 <b>처음부터 별도 메서드로</b> 정의해 둔 이유이기도
         합니다. 시그니처를 미리 분리해 두면, 나중에 최적화할 때 호출하는
         쪽의 코드를 바꿀 필요가 없습니다.</li>
@@ -856,7 +856,7 @@ class InMemoryInventoryRepository:
     아무도 <code>OrderRepository</code>와 <code>InventoryRepository</code>를
     <b>동시에</b> 다루지 않습니다. 주문을 만들려면 재고를 할당해야 하고, 그러려면
     두 리포지토리를 같이 열어 트랜잭션 하나로 묶어야 합니다.</p>
-    <p>5장에서 <b>응용 서비스</b>와 <b>Unit of Work</b>를 만듭니다. 화면 7에서 미리 본
+    <p>5장에서 <b>응용 서비스</b>와 <b>Unit of Work</b>를 만듭니다. 페이지 7에서 미리 본
     <code>uow.commit()</code>의 정체가 거기서 밝혀집니다.</p>
   </div>
 

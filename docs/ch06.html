@@ -10,12 +10,12 @@
 
 <main id="book"><div class="inner">
 
-<!-- ─────────────────────────────────────────── 화면 1 -->
+<!-- ─────────────────────────────────────────── 페이지 1 -->
 <section class="screen" data-title="이 장에서 할 일">
-  <p class="kicker">6장 · 화면 1</p>
+  <p class="kicker">6장 · 페이지 1</p>
   <h1>Domain Service, Factory<br>그리고 스냅샷</h1>
 
-  <p class="lead">5장 화면 11에서 남긴 문제가 있습니다 — 등급별 할인율과 배송비 계산이
+  <p class="lead">5장 페이지 11에서 남긴 문제가 있습니다 — 등급별 할인율과 배송비 계산이
   <code>OrderingService.place_order()</code> 안에 그대로 있습니다. 업무 규칙인데
   응용 계층에 있습니다. 그런데 이 규칙은 <code>Order</code> 안에도, <code>MemberGrade</code>
   안에도 자연스럽게 넣을 수 없습니다. 이 장은 그 규칙이 살 <b>세 번째 자리</b>를 만듭니다.</p>
@@ -28,28 +28,28 @@
   <div class="box note">
     <p class="box-t">이 장의 지도</p>
     <ul>
-      <li><b>화면 2~4 · 어디에도 안 맞는 규칙.</b> 5장이 남긴 문제를 다시 보고,
+      <li><b>페이지 2~4 · 어디에도 안 맞는 규칙.</b> 5장이 남긴 문제를 다시 보고,
       <code>Order</code>·<code>MemberGrade</code>·응용 서비스가 왜 이 규칙의 자리가
       아닌지 확인한 뒤 이름을 붙입니다.</li>
-      <li><b>화면 5~6 · 리팩터와 판별.</b> <code>place_order()</code>를 다시 조립하고,
+      <li><b>페이지 5~6 · 리팩터와 판별.</b> <code>place_order()</code>를 다시 조립하고,
       도메인 서비스와 응용 서비스를 가르는 질문 3개를 봅니다.</li>
-      <li><b>화면 7~9 · 팩토리와 재구성.</b> 생성자 직접 호출의 위험을 보고
+      <li><b>페이지 7~9 · 팩토리와 재구성.</b> 생성자 직접 호출의 위험을 보고
       <code>Order.place()</code>를 만든 뒤, 리포지토리가 왜 이 팩토리를 쓰지
       <b>않는지</b>를 봅니다.</li>
-      <li><b>화면 10~12 · 스냅샷.</b> 기획서 I6과 I22에 이름을 붙이고 마무리합니다.</li>
+      <li><b>페이지 10~12 · 스냅샷.</b> 기획서 I6과 I22에 이름을 붙이고 마무리합니다.</li>
     </ul>
   </div>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 2 -->
+<!-- ─────────────────────────────────────────── 페이지 2 -->
 <section class="screen" data-title="5장이 남긴 문제, 다시 보기">
-  <p class="kicker">6장 · 화면 2</p>
+  <p class="kicker">6장 · 페이지 2</p>
   <h2>5장이 남긴 문제, 다시 보기</h2>
 
-  <p>5장 화면 11의 표를 한 줄로 요약하면 이렇습니다 — <code>place_order()</code> 안의
+  <p>5장 페이지 11의 표를 한 줄로 요약하면 이렇습니다 — <code>place_order()</code> 안의
   네 가지 코드 중 두 개는 <b>업무 규칙</b>이고 두 개는 <b>조립 순서</b>입니다.</p>
 
-<pre><span class="cap"># application/ordering.py — 5장 화면 10 그대로, 문제의 두 줄</span><code>            order.discount = order.amounts.subtotal.percent(
+<pre><span class="cap"># application/ordering.py — 5장 페이지 10 그대로, 문제의 두 줄</span><code>            order.discount = order.amounts.subtotal.percent(
                 grade.discount_rate)                              # 1
             order.shipping_fee = (Money.won(0) if grade.free_shipping
                                    else Money.won(3_000))          # 2
@@ -75,9 +75,9 @@
   <p>이 규칙을 어디로 옮겨야 할지, 후보를 하나씩 살펴봅니다.</p>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 3 -->
+<!-- ─────────────────────────────────────────── 페이지 3 -->
 <section class="screen" data-title="누구 것도 아닌 규칙">
-  <p class="kicker">6장 · 화면 3</p>
+  <p class="kicker">6장 · 페이지 3</p>
   <h2>후보 셋을 검토한다</h2>
 
   <div class="table-wrap">
@@ -86,7 +86,7 @@
       <tr>
         <td><code>Order</code> 안에 메서드로</td>
         <td><code>Order</code>는 <code>customer_id: UUID</code>만 알 뿐, 회원의 등급을
-        모릅니다(3장 화면 7 — 애그리게이트는 ID로만 참조). 등급을 알아야 계산되는 규칙을
+        모릅니다(3장 페이지 7 — 애그리게이트는 ID로만 참조). 등급을 알아야 계산되는 규칙을
         <code>Order</code>에 넣으려면 <code>Order</code>가 회원 애그리게이트를 통째로
         참조해야 하는데, 그건 3장이 막은 바로 그 문제입니다.</td>
       </tr>
@@ -101,7 +101,7 @@
       </tr>
       <tr>
         <td>응용 서비스(<code>OrderingService</code>)에 그대로</td>
-        <td>지금 상태입니다. 화면 2에서 본 문제 그대로입니다 — 재사용도 단위
+        <td>지금 상태입니다. 페이지 2에서 본 문제 그대로입니다 — 재사용도 단위
         테스트도 어렵고, 업무 규칙이 조립 코드와 뒤섞입니다.</td>
       </tr>
     </table>
@@ -118,9 +118,9 @@
   </div>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 4 -->
+<!-- ─────────────────────────────────────────── 페이지 4 -->
 <section class="screen" data-title="이름 붙이기 — 도메인 서비스">
-  <p class="kicker">6장 · 화면 4</p>
+  <p class="kicker">6장 · 페이지 4</p>
   <h2>이름 붙이기 — <span class="term" data-term="domainservice">도메인 서비스</span></h2>
 
   <p>어느 엔티티·값 객체에도 속하지 않지만 업무 규칙인 계산을 위한 자리를
@@ -157,7 +157,7 @@ class GradeDiscountPolicy:                 # DiscountPolicy 구현           # 4
     <li><span class="ln">2~3행, 7~8행</span> 두 프로토콜 모두 인자가
     <code>Sequence[OrderItemSnapshot]</code>인 것에 주의하십시오.
     <code>Sequence[OrderLine]</code>이 아닙니다. 이 정책은
-    <code>Order.place()</code>(화면 8)가 호출되기 <b>전에</b> 값을 만들어 넘겨야 하는데,
+    <code>Order.place()</code>(페이지 8)가 호출되기 <b>전에</b> 값을 만들어 넘겨야 하는데,
     그 시점에는 아직 <code>OrderLine</code>이 없습니다 — 있는 것은 5장에서
     <code>CatalogPort.snapshot()</code>이 돌려준 스냅샷뿐입니다.</li>
 
@@ -171,7 +171,7 @@ class GradeDiscountPolicy:                 # DiscountPolicy 구현           # 4
     되게 하기 위해서입니다 — 호출하는 쪽(응용 서비스)의 코드는 한 줄도 안
     바뀝니다.</li>
 
-    <li><span class="ln">19~24행</span> 2장 화면 13~14에서 <code>MemberGrade</code>가
+    <li><span class="ln">19~24행</span> 2장 페이지 13~14에서 <code>MemberGrade</code>가
     스스로 갖고 있던 <code>discount_rate</code>를, 이제 <b>여러 라인에 걸쳐</b> 적용하는
     자리입니다. <code>MemberGrade</code>는 "몇 %인지"만 알고, "몇 %를 무엇에" 적용할지는
     이 도메인 서비스가 압니다.</li>
@@ -179,7 +179,7 @@ class GradeDiscountPolicy:                 # DiscountPolicy 구현           # 4
 
   <div class="box warn">
     <p class="box-t">이름이 비슷한 것 — <code>ShippingPolicy</code>와 헷갈리지 마십시오</p>
-    <p>5장 화면 9의 <code>ShippingPolicy</code>(<code>lead_time</code>을 갖고 있던 그것)는
+    <p>5장 페이지 9의 <code>ShippingPolicy</code>(<code>lead_time</code>을 갖고 있던 그것)는
     <b>포트</b>입니다 — 배송이라는 <b>다른 컨텍스트</b>에 값을 묻는 창구이고, 응용
     계층이 소유합니다. 반면 <code>ShippingFeePolicy</code>는 <b>도메인 서비스</b>입니다
     — 주문 컨텍스트 <b>자신의</b> 규칙(배송비를 얼마로 매길지)이고, 도메인 계층이
@@ -189,9 +189,9 @@ class GradeDiscountPolicy:                 # DiscountPolicy 구현           # 4
   </div>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 5 -->
+<!-- ─────────────────────────────────────────── 페이지 5 -->
 <section class="screen" data-title="place_order() 다시 조립하기">
-  <p class="kicker">6장 · 화면 5</p>
+  <p class="kicker">6장 · 페이지 5</p>
   <h2><code>place_order()</code> 다시 조립하기</h2>
 
   <p>도메인 서비스를 <code>OrderingService</code>에 주입하고, 계산을 통째로
@@ -215,7 +215,7 @@ class GradeDiscountPolicy:                 # DiscountPolicy 구현           # 4
         order.shipping_fee = (Money.won(0) if grade.free_shipping
                                else Money.won(3_000))
 
-        # ... 할당·약속일 조립은 그대로(5장 화면 10)
+        # ... 할당·약속일 조립은 그대로(5장 페이지 10)
 </code></pre>
     </div>
     <div class="tab" data-label="6장 — 도메인 서비스에 위임">
@@ -242,7 +242,7 @@ def place_order(self, cmd: PlaceOrderCommand) -&gt; OrderNumber:
                 snapshots, cmd.shipping_address, grade),
             discount=self._discount_policy.calculate(snapshots, grade))
 
-        # ... 할당·약속일 조립은 그대로(5장 화면 10)
+        # ... 할당·약속일 조립은 그대로(5장 페이지 10)
 </code></pre>
     </div>
   </div>
@@ -256,25 +256,25 @@ def place_order(self, cmd: PlaceOrderCommand) -&gt; OrderNumber:
         끼워 넣던 2단계 구성.</td>
         <td>생성자 인자 2개(<code>fee_policy</code>, <code>discount_policy</code>).
         <code>Order.place()</code> 한 번의 호출로 끝나는 <b>1단계 구성</b>
-        (화면 7~8에서 다룹니다).</td>
+        (페이지 7~8에서 다룹니다).</td>
       </tr>
     </table>
   </div>
 
   <div class="box good">
     <p class="box-t">5장이 남긴 빚 — 갚았습니다</p>
-    <p>5장 화면 11의 표: "6장 — 할인·배송비 계산이 응용 서비스 안에 있습니다.
+    <p>5장 페이지 11의 표: "6장 — 할인·배송비 계산이 응용 서비스 안에 있습니다.
     어느 엔티티에도 넣기 애매한 이 규칙을 도메인 서비스로 뽑아냅니다." —
     <code>GradeShippingFeePolicy</code>·<code>GradeDiscountPolicy</code>가 그
-    답입니다. 3장 화면 3이 남긴 문제("할인 계산을 누가 언제 하는가")도 같은
+    답입니다. 3장 페이지 3이 남긴 문제("할인 계산을 누가 언제 하는가")도 같은
     답으로 갚았습니다 — <b>누가</b>는 도메인 서비스, <b>언제</b>는 주문을
-    만드는 바로 그 순간(화면 8의 <code>Order.place()</code> 안)입니다.</p>
+    만드는 바로 그 순간(페이지 8의 <code>Order.place()</code> 안)입니다.</p>
   </div>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 6 -->
+<!-- ─────────────────────────────────────────── 페이지 6 -->
 <section class="screen" data-title="도메인 서비스 vs 응용 서비스 — 판별 질문 3개">
-  <p class="kicker">6장 · 화면 6</p>
+  <p class="kicker">6장 · 페이지 6</p>
   <h2>도메인 서비스 vs 응용 서비스 — 판별 질문 3개</h2>
 
   <p>둘 다 "서비스"라는 이름이 붙어서 가장 헷갈리는 지점입니다. 질문 세 개로
@@ -332,12 +332,12 @@ def place_order(self, cmd: PlaceOrderCommand) -&gt; OrderNumber:
   </div>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 7 -->
+<!-- ─────────────────────────────────────────── 페이지 7 -->
 <section class="screen" data-title="생성자를 직접 부르는 위험">
-  <p class="kicker">6장 · 화면 7</p>
+  <p class="kicker">6장 · 페이지 7</p>
   <h2>생성자를 직접 부르는 위험</h2>
 
-  <p>화면 5의 "5장" 탭 코드를 다시 보십시오. <code>Order</code> 하나를 만드는 데
+  <p>페이지 5의 "5장" 탭 코드를 다시 보십시오. <code>Order</code> 하나를 만드는 데
   <b>세 단계</b>를 거칩니다 — 생성자 호출, 라인 추가 반복, 할인·배송비 대입.
   세 단계가 <b>항상 이 순서로, 전부</b> 실행돼야 유효한 주문이 됩니다.</p>
 
@@ -368,9 +368,9 @@ order.shipping_fee = ...                              # 3단계: 금액
   사실(세 단계가 하나라는 것)을 기억하고 있어야만 안전합니다.</p>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 8 -->
+<!-- ─────────────────────────────────────────── 페이지 8 -->
 <section class="screen" data-title="이름 붙이기 — 팩토리">
-  <p class="kicker">6장 · 화면 8</p>
+  <p class="kicker">6장 · 페이지 8</p>
   <h2>이름 붙이기 — <span class="term" data-term="factory">팩토리</span></h2>
 
   <p>여러 단계를 거쳐야 완성되는 객체를, <b>한 번의 호출로 항상 유효한 상태로만</b>
@@ -397,7 +397,7 @@ order.shipping_fee = ...                              # 3단계: 금액
   <ol class="notes">
     <li><span class="ln">7~8행</span> <b>I1이 마침내 생성 시점에 지켜집니다.</b>
     <code>EmptyOrder</code>는 3장에서 이미 정의됐지만,
-    <code>remove_line()</code> 한 곳만 지키고 있었습니다(화면 7의 문제). 이제
+    <code>remove_line()</code> 한 곳만 지키고 있었습니다(페이지 7의 문제). 이제
     "주문이 태어나는 단 하나의 문"에서도 지킵니다.</li>
 
     <li><span class="ln">10~11행</span> <code>__init__</code>이 이미 갖고 있던
@@ -405,7 +405,7 @@ order.shipping_fee = ...                              # 3단계: 금액
     씁니다. 새 생성 경로를 만든 게 아니라, <b>생성자를 부르는 방법을 한 곳으로
     모았을 뿐</b>입니다.</li>
 
-    <li><span class="ln">12~14행</span> 화면 7의 2단계(라인 추가 반복)를 그대로
+    <li><span class="ln">12~14행</span> 페이지 7의 2단계(라인 추가 반복)를 그대로
     가져왔습니다. 호출하는 쪽(<code>OrderingService</code>)은 이제 이 반복문을
     볼 필요가 없습니다.</li>
   </ol>
@@ -414,21 +414,21 @@ order.shipping_fee = ...                              # 3단계: 금액
     <p class="box-t">팩토리가 주는 것</p>
     <p><code>Order.place(...)</code> 한 줄은 <b>성공하면 항상 유효한 주문</b>이고,
     <b>실패하면 아예 주문이 생기지 않습니다.</b> "3단계 중 2단계까지만 실행된"
-    중간 상태가 코드로 표현될 방법 자체가 없어졌습니다. 화면 5의 "6장" 탭
+    중간 상태가 코드로 표현될 방법 자체가 없어졌습니다. 페이지 5의 "6장" 탭
     코드가 이미 이 팩토리를 쓰고 있었습니다.</p>
   </div>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 9 -->
+<!-- ─────────────────────────────────────────── 페이지 9 -->
 <section class="screen" data-title="재구성은 다른 문제다">
-  <p class="kicker">6장 · 화면 9</p>
+  <p class="kicker">6장 · 페이지 9</p>
   <h2>재구성(reconstitution)은 다른 문제다</h2>
 
   <p>질문 하나를 던져 봅니다 — <b>4장에서 만든 <code>SqlAlchemyOrderRepository.get()</code>은
-  왜 <code>Order.place()</code>를 안 쓸까요?</b> 답을 이미 알고 있습니다. 4장 화면
+  왜 <code>Order.place()</code>를 안 쓸까요?</b> 답을 이미 알고 있습니다. 4장 페이지
   9로 돌아가 보십시오.</p>
 
-<pre><span class="cap"># infra/sqlalchemy_repository.py — 4장 화면 9 그대로</span><code>def get(self, order_number: OrderNumber) -&gt; Order:
+<pre><span class="cap"># infra/sqlalchemy_repository.py — 4장 페이지 9 그대로</span><code>def get(self, order_number: OrderNumber) -&gt; Order:
     order = self._session.get(Order, order_number.value)   # 1
     if order is None:
         raise OrderNotFound(order_number.value)
@@ -438,7 +438,7 @@ order.shipping_fee = ...                              # 3단계: 금액
   <ol class="notes">
     <li><span class="ln">2행</span> <code>session.get()</code>은
     <code>Order(...)</code>도 <code>Order.place(...)</code>도 부르지 않습니다.
-    4장 화면 9가 "임퍼러티브 매핑"이라고 부른 방식은 <b><code>__new__</code>로
+    4장 페이지 9가 "임퍼러티브 매핑"이라고 부른 방식은 <b><code>__new__</code>로
     빈 객체를 만들고 컬럼 값을 속성에 직접 채워 넣습니다.</b> 파이썬 생성자를
     거치지 않습니다.</li>
   </ol>
@@ -468,7 +468,7 @@ order.shipping_fee = ...                              # 3단계: 금액
         <td><code>place()</code>의 <code>discount</code>·<code>shipping_fee</code>는
         <b>정책이 그 순간 계산해 준 값</b>입니다. 재구성 시점에 정책을 다시 불러
         재계산하면, <b>할인율이 그 사이 바뀐 경우 과거 주문의 금액이 조용히
-        바뀌는 사고</b>가 납니다 — 화면 10에서 다룰 문제와 <b>정확히 같은
+        바뀌는 사고</b>가 납니다 — 페이지 10에서 다룰 문제와 <b>정확히 같은
         유형</b>입니다.</td>
       </tr>
     </table>
@@ -476,7 +476,7 @@ order.shipping_fee = ...                              # 3단계: 금액
 
   <div class="box warn">
     <p class="box-t">그래서 discount_amount는 DB 컬럼이다</p>
-    <p>4장 화면 9의 <code>orders</code> 테이블에 <code>discount_amount</code> 컬럼이
+    <p>4장 페이지 9의 <code>orders</code> 테이블에 <code>discount_amount</code> 컬럼이
     있었습니다. 계산식이 아니라 <b>이미 계산된 값 그 자체</b>를 저장합니다.
     재구성은 이 컬럼값을 <code>order.discount</code>에 그대로 옮겨 담을 뿐,
     <code>DiscountPolicy</code>를 다시 부르지 않습니다. 정책은 <b>새 주문을 만들
@@ -484,19 +484,19 @@ order.shipping_fee = ...                              # 3단계: 금액
   </div>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 10 -->
+<!-- ─────────────────────────────────────────── 페이지 10 -->
 <section class="screen" data-title="I6 — 스냅샷이라는 이름">
-  <p class="kicker">6장 · 화면 10</p>
+  <p class="kicker">6장 · 페이지 10</p>
   <h2>I6 — 이 패턴에 이름을 붙인다: 스냅샷</h2>
 
-  <p>3장 화면 7이 "왜 <code>Order</code>가 <code>Product</code>를 참조하지 않고
+  <p>3장 페이지 7이 "왜 <code>Order</code>가 <code>Product</code>를 참조하지 않고
   <code>product_name</code>·<code>unit_price</code>를 복사하는가"에 이미 답했습니다
-  — 참조하면 <b>과거 주문 금액이 상품 가격을 따라 바뀝니다</b>. 5장 화면 9~10이
+  — 참조하면 <b>과거 주문 금액이 상품 가격을 따라 바뀝니다</b>. 5장 페이지 9~10이
   "누가 언제 복사하는가"(<code>CatalogPort.snapshot()</code>, 트랜잭션을 열기
   전)에 답했습니다. 이 장이 붙이는 것은 <b>이름</b>뿐입니다 — 이 패턴을
   <b>스냅샷</b>이라고 부릅니다.</p>
 
-  <p>그리고 화면 9에서 <b>세 번째 스냅샷</b>을 하나 더 찾았습니다 —
+  <p>그리고 페이지 9에서 <b>세 번째 스냅샷</b>을 하나 더 찾았습니다 —
   <code>order.discount</code>와 <code>order.shipping_fee</code>도 스냅샷입니다.
   가격만 스냅샷이 아니라, <b>정책이 계산해 준 결과값 전부</b>가 스냅샷입니다.</p>
 
@@ -506,9 +506,9 @@ order.shipping_fee = ...                              # 3단계: 금액
     하나입니다: <b>"이 값이 바뀌면, 이미 확정된 과거 주문도 따라 바뀌어야
     하는가?"</b></p>
     <p>아니라면(가격, 할인액, 배송비 — 전부 "그 순간 그렇게 계산됐다"는 사실)
-    <b>스냅샷</b>입니다. 그렇다면(예: 회원 이름 — 3장 화면 16 퀴즈에서 이미
+    <b>스냅샷</b>입니다. 그렇다면(예: 회원 이름 — 3장 페이지 16 퀴즈에서 이미
     확인했듯, 개명하면 주문 내역도 최신 이름으로 보여도 무방한 값) <b>스냅샷하지
-    않고 그때그때 조회</b>합니다. 5장 화면 9의 <code>MembershipPort.name_of()</code>가
+    않고 그때그때 조회</b>합니다. 5장 페이지 9의 <code>MembershipPort.name_of()</code>가
     그 조회 창구입니다.</p>
   </div>
 
@@ -518,22 +518,22 @@ order.shipping_fee = ...                              # 3단계: 금액
       <tr><td>상품명·단가</td><td>예 (I6)</td>
         <td>가격 인상이 과거 주문에 번지면 안 됨</td></tr>
       <tr><td>할인액·배송비</td><td>예</td>
-        <td>정책이 바뀌어도 이미 계산된 금액은 그대로여야 함(화면 9)</td></tr>
+        <td>정책이 바뀌어도 이미 계산된 금액은 그대로여야 함(페이지 9)</td></tr>
       <tr><td>회원 이름</td><td>아니오</td>
         <td>개명해도 과거 주문에 옛 이름이 남을 이유가 없음</td></tr>
     </table>
   </div>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 11 -->
+<!-- ─────────────────────────────────────────── 페이지 11 -->
 <section class="screen" data-title="I22 — 약속도 스냅샷이다">
-  <p class="kicker">6장 · 화면 11</p>
+  <p class="kicker">6장 · 페이지 11</p>
   <h2>I22 — 출고 예정일도 같은 이유로 스냅샷이다</h2>
 
-  <p>3장 화면 14가 이미 <code>Promise</code> 값 객체와
+  <p>3장 페이지 14가 이미 <code>Promise</code> 값 객체와
   <code>promise_delivery()</code>를 만들었습니다 — <b>최초 약속은 한 번뿐</b>이고,
   <code>InventoryItem</code>의 배치 ETA가 나중에 바뀌어도 <code>Order.promise</code>는
-  <b>조용히 따라 바뀌지 않습니다.</b> 화면 10과 같은 원리인데, 이번에는 가격이
+  <b>조용히 따라 바뀌지 않습니다.</b> 페이지 10과 같은 원리인데, 이번에는 가격이
   아니라 <b>"약속"이라는 업무 개념</b>이 하나 더 붙습니다.</p>
 
   <div class="box note">
@@ -565,9 +565,9 @@ order.shipping_fee = ...                              # 3단계: 금액
   것뿐입니다.</p>
 </section>
 
-<!-- ─────────────────────────────────────────── 화면 12 -->
+<!-- ─────────────────────────────────────────── 페이지 12 -->
 <section class="screen" data-title="요약 · 퀴즈 · 과제">
-  <p class="kicker">6장 · 화면 12</p>
+  <p class="kicker">6장 · 페이지 12</p>
   <h2>6장 마무리</h2>
 
   <div class="summary">
@@ -603,7 +603,7 @@ order.shipping_fee = ...                              # 3단계: 금액
       <li data-why="맞습니다. 프로모션 값 조회(인프라)는 응용 서비스나 포트가 맡고, ShippingFeePolicy는 그 값을 인자로 받아 순수 계산만 합니다. 도메인 서비스는 무엇을 계산할지만 알고, 값을 어디서 가져오는지는 몰라도 됩니다.">
         조회는 응용 서비스(또는 포트)가 먼저 하고, 결과 값을
         <code>ShippingFeePolicy.calculate()</code>의 인자로 넘긴다</li>
-      <li data-why="업무 규칙(얼마를 할인·매길지)이 여전히 응용 계층에 남습니다. 화면 2~4가 이미 이 문제를 도메인 서비스로 뽑아낸 이유와 같은 문제가 재발합니다.">
+      <li data-why="업무 규칙(얼마를 할인·매길지)이 여전히 응용 계층에 남습니다. 페이지 2~4가 이미 이 문제를 도메인 서비스로 뽑아낸 이유와 같은 문제가 재발합니다.">
         <code>OrderingService</code> 안에 <code>if</code>로 프로모션 규칙을
         직접 구현한다</li>
       <li data-why="프로모션 값은 여러 라인 전체(그리고 이번엔 DB 조회 결과)에 걸친 규칙이라 Order 하나에 넣기 어렵습니다. 판별 질문 ①에서 걸립니다.">
@@ -631,7 +631,7 @@ order.shipping_fee = ...                              # 3단계: 금액
         <code>discount</code>·<code>shipping_fee</code> 계산이 실패한다</li>
     </ol>
     <div class="explain">
-      <p><b class="lbl">해설</b> 화면 7에서 본 문제 그대로입니다 — <code>EmptyOrder</code>는
+      <p><b class="lbl">해설</b> 페이지 7에서 본 문제 그대로입니다 — <code>EmptyOrder</code>는
       3장에서 정의는 됐지만 "주문이 태어나는 자리"를 지키고 있지 않았습니다.
       팩토리가 그 자리를 만들어 준 뒤에야 비로소 I1이 <b>생성 시점부터</b>
       지켜집니다.</p>
@@ -657,7 +657,7 @@ order.shipping_fee = ...                              # 3단계: 금액
     </ol>
     <div class="explain">
       <p><b class="lbl">해설</b> 4번 선택지가 함정인 이유 — <code>EmptyOrder</code>
-      검사 자체는 이미 라인이 있는 주문에는 걸리지 않습니다. 진짜 이유는 화면
+      검사 자체는 이미 라인이 있는 주문에는 걸리지 않습니다. 진짜 이유는 페이지
       9의 표에 있는 두 가지, 특히 <b>"계산된 값이 아니라 확정된 값을 복원해야
       한다"</b>는 것입니다. 이것이 이 장 전체(도메인 서비스·팩토리·스냅샷)를
       잇는 하나의 줄기입니다 — <b>"지금 계산할 것"과 "예전에 확정된 것"을
@@ -700,9 +700,9 @@ order.shipping_fee = ...                              # 3단계: 금액
         아니면 그대로 위임합니다.</li>
 
         <li><span class="ln">7~9행</span> <code>calculate()</code>는 여전히
-        <code>ShippingFeePolicy</code> 프로토콜(화면 4)과 똑같이
+        <code>ShippingFeePolicy</code> 프로토콜(페이지 4)과 똑같이
         <code>items</code>·<code>address</code>·<code>grade</code> 세 인자만
-        받습니다 — <code>today</code>를 여기에 추가하면 화면 5의
+        받습니다 — <code>today</code>를 여기에 추가하면 페이지 5의
         <code>place_order()</code>가 부르는
         <code>self._fee_policy.calculate(snapshots, address, grade)</code>와
         더 이상 맞지 않습니다. 대신 "지금이 몇 월인가"를 알아내는 방법
@@ -711,7 +711,7 @@ order.shipping_fee = ...                              # 3단계: 금액
         안에서 <code>date.today()</code>를 직접 부르면, 테스트가 실행되는
         <b>그날그날</b>에 따라 통과하거나 실패합니다 — 7월에 짠 테스트가
         1월에는 다르게 동작합니다. 도메인 서비스는 <b>같은 입력이면 항상
-        같은 출력</b>이어야 합니다(화면 6의 판별 질문 ③).</li>
+        같은 출력</b>이어야 합니다(페이지 6의 판별 질문 ③).</li>
       </ol>
       <p><b>흔히 이렇게도 풀지만 — </b> 이 클래스 안에 직접
       <code>if grade.free_shipping or date.today().month in (6,7,8):</code>처럼
@@ -726,7 +726,7 @@ order.shipping_fee = ...                              # 3단계: 금액
     <p>이 장 곳곳에 <code>Order</code>와 <code>InventoryItem</code>이 여전히
     <b>같은 트랜잭션 안에서 직접 조립되고 있다</b>는 사실이 남아 있었습니다.
     <code>place_order()</code>가 재고를 할당하고 약속일을 정하는 것까지
-    한 번에 처리합니다. 그리고 화면 11에서 미뤄 둔
+    한 번에 처리합니다. 그리고 페이지 11에서 미뤄 둔
     <code>repromise()</code>도 아직 몸통이 없습니다.</p>
     <p>7장은 두 애그리게이트가 서로를 몰라도 되게 만드는 방법 —
     <b>도메인 이벤트</b>를 다룹니다. 재고 할당은 <code>주문됨</code> 이벤트를
