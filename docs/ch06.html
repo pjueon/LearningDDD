@@ -359,7 +359,7 @@ order.shipping_fee = ...                              # 3단계: 금액
     못합니다 — <b>유효하지 않은 상태를 표현할 수 있는 API</b>이기 때문입니다.</p>
     <p>더 흔한 실수: 라인을 하나도 안 넣고 저장하는 것. I1("주문 라인이 최소
     1개")을 어기는 주문이 지금 이 경로로는 <b>아무 예외 없이</b> 통과합니다.
-    <code>remove_line()</code>은 화면을 지키지만(3장), <code>Order</code>를
+    <code>remove_line()</code>은 I1을 지키지만(3장), <code>Order</code>를
     처음 만드는 이 경로는 아무도 지키지 않습니다.</p>
   </div>
 
