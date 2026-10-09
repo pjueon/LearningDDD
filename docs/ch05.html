@@ -24,7 +24,7 @@
   그럼 누가 하나?" — 에 이 장이 답합니다.</p>
 
   <div class="box note">
-    <p class="box-t">이 장의 지도</p>
+    <p class="box-t">이 장의 구성</p>
     <ul>
       <li><b>페이지 2~3 · 문제와 계층.</b> 표현 계층이 조립까지 떠맡을 때 벌어지는 일,
       그리고 도메인·응용·인프라·표현 네 계층과 의존 방향의 규칙.</li>
@@ -41,9 +41,9 @@
 </section>
 
 <!-- ─────────────────────────────────────────── 페이지 2 -->
-<section class="screen" data-title="누가 두 리포지토리를 여는가">
+<section class="screen" data-title="표현 계층에 몰린 조립 코드">
   <p class="kicker">5장 · 페이지 2</p>
-  <h2>표현 계층이 조립까지 떠맡으면</h2>
+  <h2>표현 계층에 몰린 조립 코드</h2>
 
   <p>4장에서 만든 리포지토리를 실제로 써야 합니다. 가장 빠른 방법은 HTTP 요청을 받는
   함수 안에서 바로 쓰는 것입니다.</p>
@@ -80,22 +80,23 @@
     <li><span class="ln">16행</span> 이 커밋이 실패하면 무슨 일이 일어날까요?
     <code>inventory_repo.get(...).allocate(...)</code>는 이미 실행돼 배치의
     <code>reserved</code>가 늘어난 채입니다. 4장 페이지 2가 경고한 문제 —
-    "상태와 저장된 값이 어긋날 수 있다" — 가 두 애그리게이트로 규모만 커져 돌아왔습니다.
-    이 문제는 페이지 6에서 정면으로 다룹니다.</li>
+    상태와 저장된 값이 어긋날 수 있다는 것 — 가 두 애그리게이트로 규모만 커져 돌아왔습니다.
+    이 문제는 페이지 6에서 자세히 다룹니다.</li>
   </ol>
 
   <div class="box bad">
-    <p class="box-t">이 함수를 테스트하려면</p>
+    <p class="box-t">이 함수의 테스트 비용</p>
     <p><code>request</code> 객체 전체, JSON 본문 형식, 진짜 DB 세션,
     <code>CatalogModel</code>이 어디서 응답하는지까지 다 갖춰야 합니다.
-    <b>1장 페이지 13의 통증 3번이 형태를 바꿔 다시 나타났습니다.</b> 4장이 리포지토리로
+    <b>1장 페이지 13의 문제 3번이 형태를 바꿔 다시 나타났습니다.</b> 4장이 리포지토리로
     한 번 없앤 문제인데, 이번엔 리포지토리 <i>자체</i>가 아니라 그것을 조립하는 코드가
     문제입니다.</p>
   </div>
 
   <p>더 근본적인 문제는 <b>이름</b>입니다. <code>place_order_view</code>가 실제로 하는 일은
   "HTTP 요청을 처리하는 것"이 아니라 "<b>주문하기 유스케이스를 조립하는 것</b>"입니다.
-  서로 다른 두 책임이 한 함수 안에 있습니다. 이 둘을 가르는 것이 <b>계층</b>입니다.</p>
+  유스케이스는 사용자가 시스템으로 하는 일 하나(여기서는 주문하기)를 뜻합니다.
+  서로 다른 두 책임이 한 함수 안에 있습니다. 이 둘을 나누는 것이 <b>계층</b>입니다.</p>
 </section>
 
 <!-- ─────────────────────────────────────────── 페이지 3 -->
@@ -103,8 +104,8 @@
   <p class="kicker">5장 · 페이지 3</p>
   <h2>네 계층과 의존 방향</h2>
 
-  <p>1장 페이지 17의 마지막 퀴즈 해설이 이미 이 문장을 예고했습니다 — "계층 구조(5장)는
-  규칙을 지키는 통로가 기술 코드에 오염되지 않게 지킨다." 그 계층을 지금 정의합니다.</p>
+  <p>1장 페이지 17의 두 번째 퀴즈 해설이 이미 이 역할을 예고했습니다 — 계층 구조(5장)가
+  규칙을 지키는 통로를 기술 코드의 오염에서 지킨다는 내용입니다. 그 계층을 지금 정의합니다.</p>
 
   <figure class="fig">
     <svg viewBox="0 0 700 200" role="img" aria-label="표현, 응용, 도메인, 인프라 네 계층과 의존 방향">
@@ -146,7 +147,7 @@
   <div class="table-wrap">
     <table>
       <tr><th style="width:5rem">계층</th><th>책임</th><th>이 장 기준 담당 클래스</th></tr>
-      <tr><td><b>표현</b></td><td>요청 파싱, 인증, 커맨드로 변환, 응답 직렬화</td>
+      <tr><td><b>표현</b></td><td>요청 파싱, 인증, 입력을 값 객체(커맨드, 페이지 7)로 변환, 응답 직렬화</td>
         <td><code>place_order_view</code>(얇아야 한다)</td></tr>
       <tr><td><b>응용</b></td><td>유스케이스 조합, 트랜잭션 경계, 포트 호출 순서 결정</td>
         <td><code>OrderingService</code></td></tr>
@@ -158,7 +159,7 @@
   </div>
 
   <div class="box note">
-    <p class="box-t">응용 서비스는 규칙을 갖지 않는다</p>
+    <p class="box-t">응용 서비스와 업무 규칙</p>
     <p>1장 페이지 16에서 이미 이 문장을 스쳐 지나갔습니다 — <i>"응용 서비스 — 유스케이스를
     조립할 뿐, 규칙은 갖지 않는다."</i> 페이지 2의 코드가 문제였던 이유를 이 문장으로
     다시 말할 수 있습니다: <b>규칙(카탈로그 조회 방법, 커밋 시점)이 응용도 아니고 도메인도
@@ -172,9 +173,9 @@
 </section>
 
 <!-- ─────────────────────────────────────────── 페이지 4 -->
-<section class="screen" data-title="트랜잭션 경계와 Unit of Work">
+<section class="screen" data-title="응용 계층의 트랜잭션 경계">
   <p class="kicker">5장 · 페이지 4</p>
-  <h2>트랜잭션 경계는 응용 계층에</h2>
+  <h2>응용 계층의 트랜잭션 경계</h2>
 
   <p>유스케이스 하나는 <b>트랜잭션 하나</b>여야 합니다. 주문 저장과 재고 할당은 둘 다
   성공하거나 둘 다 실패해야지, 하나만 반영되면 안 됩니다. 그런데 이 "하나로 묶기"는
@@ -192,11 +193,11 @@
   <b><span class="term" data-term="uow">Unit of Work</span></b>(UoW)입니다.</p>
 
 <pre><span class="cap"># application/unit_of_work.py</span><code>class UnitOfWork(Protocol):
-    orders: OrderRepository
+    orders: OrderRepository                          # 1
     inventory: InventoryRepository
 
     def __enter__(self) -&gt; "UnitOfWork": ...
-    def __exit__(self, *args: object) -&gt; None: ...   # 1
+    def __exit__(self, *args: object) -&gt; None: ...   # 2
     def commit(self) -&gt; None: ...
     def rollback(self) -&gt; None: ...
 </code></pre>
@@ -214,10 +215,10 @@
   </ol>
 
   <div class="box warn">
-    <p class="box-t">경계 안에는 무엇을 두는가 — 1장 페이지 8을 기억하시나요</p>
+    <p class="box-t">트랜잭션 경계 안에 둘 작업</p>
     <p>1장 페이지 8에서 본 사고를 떠올려 보세요 — PG 승인 호출이 DB 트랜잭션 <b>안에서</b>
-    일어나서, 트랜잭션이 3초 동안 붙잡혀 있었고, 승인이 성공한 뒤 우리 DB가 실패하면
-    <b>롤백이 카드 결제까지 되돌리지 못했습니다.</b></p>
+    일어났습니다. 응답이 3초 걸리면 트랜잭션도 그만큼 열려 있고, 승인이 성공한 뒤 우리 DB가 실패하면
+    <b>롤백이 카드 결제까지 되돌리지 못합니다.</b></p>
     <p>같은 원리로 규칙을 하나 세웁니다 — <b><code>with uow:</code> 블록 안에는 우리 DB에
     대한 작업만 둔다.</b> 카탈로그·회원처럼 다른 컨텍스트에 값을 묻는 호출은 트랜잭션을
     <b>열기 전에</b> 끝냅니다. 오래 걸리거나 실패해도, 아직 시작하지 않은 트랜잭션은
@@ -242,7 +243,7 @@
     def __init__(self) -&gt; None:
         self.orders = InMemoryOrderRepository()
         self.inventory = InMemoryInventoryRepository()
-        self.committed = False
+        self.committed = False                               # 1
 
     def __enter__(self) -&gt; "InMemoryUnitOfWork":
         return self
@@ -263,17 +264,17 @@
         self._session_factory = session_factory
 
     def __enter__(self) -&gt; "SqlAlchemyUnitOfWork":
-        self.session = self._session_factory()               # 1
+        self.session = self._session_factory()               # 2
         self.orders = SqlAlchemyOrderRepository(self.session)
         self.inventory = SqlAlchemyInventoryRepository(self.session)
         return self
 
     def __exit__(self, *args: object) -&gt; None:
-        self.rollback()                                       # 2
+        self.rollback()                                       # 3
         self.session.close()
 
     def commit(self) -&gt; None:
-        self.session.commit()                                 # 3
+        self.session.commit()                                 # 4
 
     def rollback(self) -&gt; None:
         self.session.rollback()
@@ -294,8 +295,8 @@
     롤백입니다.</b> 커밋을 명시적으로 부르지 않았다면 아무것도 저장되지 않습니다.
     페이지 6에서 이 한 줄이 왜 안전장치인지 봅니다.</li>
 
-    <li><span class="ln">(SQLAlchemy) 16행</span> 4장 페이지 7의
-    <span class="later">5장에서 다시 볼 문제</span>가 바로 이것입니다 — <b>Identity
+    <li><span class="ln">(SQLAlchemy) 16행</span> 4장 페이지 7에서
+    5장으로 미뤄 둔 문제가 바로 이것입니다 — <b>Identity
     Map</b>입니다. <code>session.get()</code>으로 꺼내 온 <code>Order</code>나
     <code>InventoryItem</code>을 세션이 계속 추적하다가, <code>commit()</code>이 불리는
     순간 <b>바뀐 속성을 스스로 찾아</b> <code>UPDATE</code> 문을 만듭니다. 이미 있는
@@ -304,7 +305,7 @@
   </ol>
 
   <div class="box warn">
-    <p class="box-t">정직하게 남겨두는 것 — 메모리 구현의 <code>rollback()</code>은 빈 껍데기다</p>
+    <p class="box-t">메모리 구현의 한계: 동작하지 않는 <code>rollback()</code></p>
     <p><code>InMemoryUnitOfWork.rollback()</code>은 아무것도 되돌리지 못합니다.
     <code>InMemoryInventoryRepository.get()</code>이 애그리게이트를 <b>직접 참조</b>로
     돌려주기 때문에(4장 페이지 5), <code>allocate()</code>가 이미 바꾼 <code>reserved</code>
@@ -317,16 +318,16 @@
 </section>
 
 <!-- ─────────────────────────────────────────── 페이지 6 -->
-<section class="screen" data-title="커밋을 잊으면">
+<section class="screen" data-title="커밋 누락과 중간 실패">
   <p class="kicker">5장 · 페이지 6</p>
-  <h2>커밋을 잊으면, 또는 중간에 실패하면</h2>
+  <h2>커밋 누락과 중간 실패</h2>
 
   <p>4장 페이지 2는 원시 <code>sqlite3</code> 코드로 이 문제를 처음 보였습니다 —
-  "<code>conn.commit()</code>이 실패하면 <code>self.status</code>는 이미 바뀌었는데
-  DB는 그대로다." <code>with uow:</code>가 이 문제를 어떻게 다루는지 두 시나리오로
+  <code>conn.commit()</code>이 실패하면 <code>self.status</code>는 이미 바뀌었는데
+  DB는 그대로인 문제입니다. <code>with uow:</code>가 이 문제를 어떻게 다루는지 두 시나리오로
   확인합니다.</p>
 
-  <h3>시나리오 1 — 취소 도중 커밋이 실패한다면</h3>
+  <h3>시나리오 1: 취소 중 커밋 실패</h3>
 
 <pre><span class="cap"># application/ordering.py — cancel_order() 의 뼈대</span><code>def cancel_order(self, order_number: OrderNumber) -&gt; None:
     with self._uow as uow:
@@ -342,21 +343,23 @@
 
     <li><span class="ln">5행</span> <code>commit()</code>이 실패하면(DB 오류 등)
     예외가 <code>__exit__</code>로 전달되고 <code>rollback()</code>이 불립니다. DB는
-    안전합니다. <b>다만 이 특정 <code>order</code> 객체는</b> 메모리 안에서 이미
-    <code>취소됨</code> 상태로 남은 채 함수가 예외로 끝납니다.</li>
+    안전합니다. SQLAlchemy 세션은 <code>rollback()</code> 때 이 <code>order</code>
+    객체의 값을 비우고, 블록을 나가며 닫힙니다. 잘못된 <code>취소됨</code> 값이 블록 밖으로
+    새어 나갈 길이 없습니다.</li>
   </ol>
 
   <div class="box good">
     <p class="box-t">4장의 사고와 다른 점</p>
-    <p>4장 페이지 2의 사고는 <b>같은 객체가 다음 요청에서도 계속 쓰였기 때문에</b> 위험했습니다.
+    <p>4장 페이지 2는 객체의 상태와 DB 값이 어긋날 수 있다고 짚었습니다. 이 어긋남은
+    어긋난 객체를 누군가 계속 쓸 때 문제가 됩니다.
     여기서는 다릅니다 — 이 <code>order</code> 인스턴스는 함수가 끝나면 버려지고,
     다음 요청은 <code>uow.orders.get()</code>으로 <b>DB에서 다시 읽어옵니다.</b> DB가
-    진실을 담고 있는 한, 메모리에 잠깐 남은 어긋남은 아무에게도 보이지 않습니다.
+    진실을 담고 있는 한, 취소되지 않은 주문이 취소된 것으로 보이는 일은 없습니다.
     "저장되지 않은 변경은 다음 요청에 영향을 주지 않는다"가 4장 페이지 2의 문제에 대한
     실질적인 답입니다.</p>
   </div>
 
-  <h3>시나리오 2 — 여러 애그리게이트 중 하나가 실패한다면</h3>
+  <h3>시나리오 2: 여러 애그리게이트 중 일부 실패</h3>
 
   <p>더 중요한 경우는 <b>주문 한 건이 SKU 두 개를 담고 있을 때</b>입니다.</p>
 
@@ -374,12 +377,12 @@
     <li><span class="ln">4행</span> <code>SKU-002</code>에서 <code>InsufficientStock</code>이
     납니다. 예외가 <code>with</code> 블록을 빠져나가며 <code>__exit__</code>를 부르고,
     <code>rollback()</code>이 실행됩니다. <b>3행에서 이미 성공한
-    <code>SKU-001</code>의 변경까지 함께 버려집니다</b> — <code>commit()</code>을 한
-    번도 부르지 않았으므로 세션에는 아직 아무것도 확정되지 않은 상태였기 때문입니다.</li>
+    <code>SKU-001</code>의 변경까지 함께 버려집니다</b>. <code>commit()</code>을 한
+    번도 부르지 않았으므로 세션에는 확정된 것이 없었습니다.</li>
   </ol>
 
   <div class="box good">
-    <p class="box-t">이것이 Unit of Work 가 사는 이유</p>
+    <p class="box-t">Unit of Work가 필요한 이유</p>
     <p>두 애그리게이트에 걸친 변경이 <b>전부 반영되거나, 전부 반영되지 않거나</b> 둘 중
     하나입니다. "SKU-001은 반영됐는데 SKU-002는 실패한" 어중간한 상태는 나오지 않습니다.
     4장 페이지 2가 하나의 애그리게이트로 보여준 문제를, 여기서는 <b>두 애그리게이트로
@@ -435,7 +438,7 @@ class PlaceOrderCommand:
   </ol>
 
   <div class="box note">
-    <p class="box-t">왜 등급을 커맨드에 넣지 않는가</p>
+    <p class="box-t">커맨드에 등급을 넣지 않는 이유</p>
     <p><code>PlaceOrderCommand</code>에 <code>grade</code> 필드가 없습니다. 등급은
     클라이언트가 "저는 골드 회원입니다"라고 <b>주장할 값이 아니라</b>, 회원 컨텍스트에
     <b>물어봐야 할</b> 값이기 때문입니다. 페이지 9에서 <code>MembershipPort</code>로
@@ -492,26 +495,32 @@ def to_summary(order: Order) -&gt; OrderSummary:
     내보냅니다 — 이 변환이 일어나는 곳이 DTO 조립 지점입니다.</li>
   </ol>
 
-  <p>3장 페이지 16의 마지막 퀴즈를 기억하시나요 — "주문 화면에 회원 이름을 보여줘야 한다"는
+  <p>3장 페이지 16의 첫 번째 퀴즈를 기억하시나요 — "주문 목록 화면에 회원 이름을 보여줘야 한다"는
   요구였습니다. 그 해설이 예고한 첫 번째 방법이 바로 이것입니다 — <b>"응용 서비스가 두
   리포지토리에서 각각 읽어 DTO로 조립한다."</b></p>
 
 <pre><span class="cap"># 3장 페이지 16의 요구를 실제로 풀면</span><code>def get_order_detail(self, order_number: OrderNumber) -&gt; "OrderDetail":
     with self._uow as uow:                                  # 1
         order = uow.orders.get(order_number)                # 2  주문 컨텍스트
-    name = self._members.name_of(order.customer_id)         # 3  회원 컨텍스트
-    return OrderDetail(order_number=order.order_number.value,
-                        customer_name=name,
-                        total_amount=int(order.total_amount.amount))
+        number = order.order_number.value
+        customer_id = order.customer_id
+        total = int(order.total_amount.amount)
+    name = self._members.name_of(customer_id)               # 3  회원 컨텍스트
+    return OrderDetail(order_number=number, customer_name=name,
+                       total_amount=total)
 </code></pre>
 
   <ol class="notes">
-    <li><span class="ln">1~2행</span> 읽기만 하는데도 <code>with self._uow:</code>로
+    <li><span class="ln">2행</span> 읽기만 하는데도 <code>with self._uow:</code>로
     감쌌습니다. <b>트랜잭션 경계가 필요해서가 아니라</b>, 페이지 5의 <code>SqlAlchemyUnitOfWork</code>가
     세션을 <code>__enter__</code> 안에서만 만들기 때문입니다 — 세션을 얻으려면 이 블록을
     거쳐야 합니다. <code>commit()</code>을 부르지 않으므로 아무것도 확정되지 않습니다.</li>
 
-    <li><span class="ln">3~4행</span> 두 컨텍스트에서 각각 읽어 <b>DTO 하나로 합칩니다.</b>
+    <li><span class="ln">3~6행</span> 주문에서 필요한 값을 <b>블록 안에서</b> 꺼내 둡니다.
+    블록을 나가면 <code>rollback()</code>이 객체의 값을 비우고 세션이 닫히므로,
+    DTO로 옮기는 일은 블록 안에서 끝냅니다.</li>
+
+    <li><span class="ln">7~9행</span> 두 컨텍스트에서 각각 읽어 <b>DTO 하나로 합칩니다.</b>
     <code>Order</code>는 여전히 회원 이름을 모릅니다 — 그 값은 DTO를 조립하는 이
     코드만 압니다. 애그리게이트의 경계는 그대로 지켜지면서, 화면이 필요로 하는 모양은
     자유롭게 만들 수 있습니다.</li>
@@ -519,9 +528,9 @@ def to_summary(order: Order) -&gt; OrderSummary:
 </section>
 
 <!-- ─────────────────────────────────────────── 페이지 9 -->
-<section class="screen" data-title="다른 컨텍스트에 묻기">
+<section class="screen" data-title="다른 컨텍스트에 묻는 포트 세 개">
   <p class="kicker">5장 · 페이지 9</p>
-  <h2>다른 컨텍스트에 묻기 — 포트 세 개</h2>
+  <h2>다른 컨텍스트에 묻는 포트 세 개</h2>
 
   <p>4장에서 리포지토리를 만들 때 쓴 논리를 그대로 씁니다 — <b>인터페이스는 그것을
   쓰는 쪽(도메인·응용)이 정의</b>하고, 구현은 인프라가 그 인터페이스를 향해 만듭니다.
@@ -560,15 +569,15 @@ class ShippingPolicy(Protocol):
     필요합니다 — 응용 서비스가 목적에 따라 <b>같은 포트의 다른 메서드</b>를 골라
     씁니다.</li>
 
-    <li><span class="ln">21행</span> 3장 페이지 14가 못박은 값입니다 — "배송 리드타임은
-    배송 컨텍스트의 것이므로 상수로 박지 않고 정책 객체로 받는다." 지금 이 값을 쓰는 곳은
+    <li><span class="ln">21행</span> 3장 페이지 14가 정한 값입니다. 배송 리드타임은
+    배송 컨텍스트의 것이므로 상수로 박지 않고 밖에서 받는 값으로 둡니다. 지금 이 값을 쓰는 곳은
     <code>lead_time</code> 하나뿐이라 어색해 보일 수 있지만, 상수 하나를 하드코딩하는
     순간 배송 정책이 바뀔 때마다 <code>domain/</code>이나 <code>application/</code>
     코드를 고쳐야 합니다.</li>
   </ol>
 
   <div class="box note">
-    <p class="box-t">이 포트는 5장에서만 이 모양이다</p>
+    <p class="box-t">5장 한정의 <code>ShippingPolicy</code> 위치</p>
     <p><code>ShippingPolicy</code>는 지금 <code>OrderingService</code>의 생성자로
     직접 주입됩니다. 7장에서 재고 할당이 이벤트 핸들러로 옮겨가면, <code>lead_time</code>이
     필요한 코드도 함께 옮겨가면서 이 의존성은 <code>OrderingService</code>에서
@@ -578,7 +587,7 @@ class ShippingPolicy(Protocol):
 
   <p>세 포트 모두 지금은 우리 코드베이스 안의 클래스가 구현합니다. 10장에서 카탈로그가
   진짜 다른 프로세스로 분리되면, 이 인터페이스는 그대로 두고 구현만 HTTP 클라이언트로
-  바뀝니다(<b>ACL</b> — 부패 방지 계층 — 로 확장됩니다).</p>
+  바뀝니다. 10장에서 이 관계의 이름을 정합니다.</p>
 </section>
 
 <!-- ─────────────────────────────────────────── 페이지 10 -->
@@ -610,13 +619,13 @@ class ShippingPolicy(Protocol):
             order.discount = order.amounts.subtotal.percent(        # 2
                 grade.discount_rate)
             order.shipping_fee = (Money.won(0) if grade.free_shipping
-                                   else Money.won(3_000))            # 3
+                                   else Money.won(3_000))
 
-            items = uow.inventory.get_many([l.sku for l in order.lines])  # 4
-            order.allocation = {                                    # 5
+            items = uow.inventory.get_many([l.sku for l in order.lines])  # 3
+            order.allocation = {                                    # 4
                 l.sku: items[l.sku].allocate(l.quantity.value, date.today())
                 for l in order.lines}
-            ready_on = max(a.ready_on for a in order.allocation.values())  # 6
+            ready_on = max(a.ready_on for a in order.allocation.values())  # 5
             order.promise_delivery(Promise(
                 ship_on=ready_on,
                 arrive_by=ready_on + self._shipping.lead_time,
@@ -656,7 +665,7 @@ class ShippingPolicy(Protocol):
   </ol>
 
   <div class="box warn">
-    <p class="box-t">같은 SKU가 두 라인에 나뉘어 있다면</p>
+    <p class="box-t">같은 SKU가 두 라인에 나뉜 경우</p>
     <p><code>Order.add_line()</code>은 3장에서 항상 <b>새 라인을 추가</b>할 뿐, 같은
     SKU를 합치지 않습니다(3장 페이지 3). 그런데 위 코드는 <code>{sku: ...}</code>로
     담으므로, 라인 두 개가 같은 SKU라면 <b>나중 라인의 <code>Allocation</code>이
@@ -668,7 +677,7 @@ class ShippingPolicy(Protocol):
   </div>
 
   <div class="box good">
-    <p class="box-t">3장이 남긴 두 개의 빚 — 갚았습니다</p>
+    <p class="box-t">3장에서 미뤄 둔 두 문제의 해결</p>
     <p>3장 페이지 14: "이 조립 코드는 지금 어느 클래스에도 없다." — <code>place_order()</code>가
     그 자리입니다. 3장 페이지 15의 표: "5장 — 3장 페이지 14의 조립 코드가 살 곳. 트랜잭션 경계."
     — 위 코드와 <code>with self._uow:</code>가 그 답입니다.</p>
@@ -676,17 +685,17 @@ class ShippingPolicy(Protocol):
 </section>
 
 <!-- ─────────────────────────────────────────── 페이지 11 -->
-<section class="screen" data-title="다시 뚱뚱해지는 응용 서비스">
+<section class="screen" data-title="반대 의견: 다시 커지는 응용 서비스">
   <p class="kicker">5장 · 페이지 11</p>
-  <h2>반대 의견 — "이거 1장에서 본 그 함수 아닌가요?"</h2>
+  <h2>반대 의견: 다시 커지는 응용 서비스</h2>
 
   <div class="dialog">
     <div class="line"><div class="who">팀원</div><div class="say">
-      <p><code>place_order()</code>가 30줄이 넘습니다. 할인 계산, 배송비 계산, 할당
+      <p><code>place_order()</code>가 30줄 가까이 됩니다. 할인 계산, 배송비 계산, 할당
       루프, 약속일 계산까지 — 이거 1장에서 본 그 뚱뚱한 함수 아닌가요?</p></div></div>
   </div>
 
-  <p>날카로운 지적입니다. 다만 <b>모든 줄이 같은 이유로 문제인 것은 아닙니다.</b> 판별
+  <p>다만 <b>모든 줄이 같은 이유로 문제인 것은 아닙니다.</b> 판별
   질문은 하나입니다 — <b>이 코드가 업무 규칙을 담고 있는가, 아니면 순서를 정할 뿐인가?</b></p>
 
   <div class="table-wrap">
@@ -719,11 +728,11 @@ class ShippingPolicy(Protocol):
   이 두 줄을 <code>ShippingFeePolicy</code>·<code>DiscountPolicy</code>라는 도메인
   서비스로 뽑아냅니다.</p>
 
-  <h3>이 장이 만든 것, 그리고 남긴 것</h3>
+  <h3>이 장의 결과와 미뤄 둔 문제</h3>
 
   <div class="table-wrap">
     <table>
-      <tr><th style="width:4rem">갚을 곳</th><th>미룬 것</th></tr>
+      <tr><th style="width:4rem">다루는 장</th><th>미룬 것</th></tr>
       <tr><td><b>6장</b></td><td>할인·배송비 계산이 응용 서비스 안에 있습니다. 어느
         엔티티에도 넣기 애매한 이 규칙을 도메인 서비스로 뽑아냅니다</td></tr>
       <tr><td><b>7장</b></td><td>재고 할당이 <code>place_order</code>와 <b>같은
@@ -740,9 +749,9 @@ class ShippingPolicy(Protocol):
 </section>
 
 <!-- ─────────────────────────────────────────── 페이지 12 -->
-<section class="screen" data-title="취소하기와 표현 계층">
+<section class="screen" data-title="취소 유스케이스와 표현 계층 연결">
   <p class="kicker">5장 · 페이지 12</p>
-  <h2>취소하기, 그리고 표현 계층에서 부르기</h2>
+  <h2>취소 유스케이스와 표현 계층 연결</h2>
 
   <p><code>cancel_order()</code>는 <code>place_order()</code>보다 짧습니다 — 두
   애그리게이트를 <b>새로 만들지</b> 않고, 이미 있는 것을 되돌리기만 하면 됩니다.</p>
@@ -771,7 +780,7 @@ class ShippingPolicy(Protocol):
   </ol>
 
   <div class="box note">
-    <p class="box-t">7장을 미리 보면 — 지금은 왜 이벤트가 필요 없나</p>
+    <p class="box-t">지금 이벤트가 필요 없는 이유</p>
     <p>4장 페이지 11은 "재고가 '주문이 취소됐다'는 사실을 알아야 <code>release()</code>를
     부를 수 있고, 그 전달 장치가 도메인 이벤트"라고 남겼습니다. 그런데 위 코드는 이벤트
     없이도 동작합니다 — <code>OrderingService</code>가 <code>uow</code> 하나로 두
@@ -846,16 +855,15 @@ class ShippingPolicy(Protocol):
       <li data-why="맞습니다. '누구를 몇 번째로 부르고 결과를 어떻게 모을지'는 업무 규칙이 아니라 조립 순서입니다. 응용 계층의 일입니다.">
         <code>get_many</code>로 재고를 한 번에 조회하고, SKU별 <code>allocate()</code>
         결과를 <code>dict</code>에 모으는 코드</li>
-      <li data-why="유통기한이 임박한 배치를 먼저 빼는 FEFO는 3장에서 이미 InventoryItem 안으로 들어간 업무 규칙입니다. 응용 서비스가 다시 판단하면 안 됩니다.">
+      <li data-why="유통기한 여유 규칙(3일 미만 남은 배치 제외)도 업무 규칙입니다. 3장 페이지 9가 미뤄 두었고, 7장에서 재고 애그리게이트가 정책으로 받아 적용합니다. 응용 서비스가 판단할 일이 아닙니다.">
         유통기한이 3일 미만 남은 배치는 할당에서 제외하는 판단</li>
     </ol>
     <div class="explain">
       <p><b class="lbl">해설</b> 판별 질문은 페이지 11과 같습니다 — "업무 담당자가 바꿀
       수 있는 규칙인가, 아니면 개발자만 아는 조립 순서인가?" 3번만 후자입니다.</p>
-      <p>흥미로운 점은, 이 넷 다 <b>지금 실제로 어딘가에 있다</b>는 것입니다. 1·2번은
-      지금 <code>place_order()</code> 안에 있고(페이지 11에서 문제로 짚었습니다), 4번은
-      이미 3장에서 <code>InventoryItem</code> 안에 있습니다. 코드가 도는 것과 코드가
-      제자리에 있는 것은 다른 문제입니다.</p>
+      <p>1·2번은 지금 <code>place_order()</code> 안에 있고(페이지 11에서 문제로
+      짚었습니다), 4번은 아직 어디에도 없지만 7장에서 <code>InventoryItem</code> 쪽에
+      자리를 잡습니다. 코드가 도는 것과 코드가 제자리에 있는 것은 다른 문제입니다.</p>
     </div>
   </div>
 
@@ -931,10 +939,10 @@ class ShippingPolicy(Protocol):
     def get_order_summary(self, order_number: OrderNumber) -&gt; OrderSummary:
         with self._uow as uow:                          # 1
             order = uow.orders.get(order_number)         # 2
-        return to_summary(order)
+            return to_summary(order)                     # 3
 </code></pre>
       <ol class="notes">
-        <li><span class="ln">4~5행</span> <b>트랜잭션 경계가 필요해서
+        <li><span class="ln">4행</span> <b>트랜잭션 경계가 필요해서
         <code>with self._uow:</code>로 감싼 것이 아닙니다.</b> 이 메서드는 아무것도
         바꾸지 않는 <b>읽기 전용</b> 조회입니다 — 트랜잭션 경계는 "변경을 한 단위로
         묶기" 위한 것이지 읽기에는 필요 없습니다. 그런데도 <code>with</code>가 필요한
@@ -947,6 +955,10 @@ class ShippingPolicy(Protocol):
         <code>uow.orders.get()</code>이 4장에서 만든 <code>OrderNotFound</code>를
         던집니다. 이 메서드가 별도로 처리할 필요가 없습니다 — 표현 계층의
         <code>except DomainError</code>가 이미 잡습니다(페이지 12).</li>
+
+        <li><span class="ln">6행</span> <code>to_summary(order)</code>도 <b>블록 안에서</b>
+        부릅니다. 블록을 나가면 <code>rollback()</code>이 객체의 값을 비우고 세션이
+        닫히므로, DTO로 옮기는 일은 블록 안에서 끝냅니다.</li>
       </ol>
     </div>
   </details>
