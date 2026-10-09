@@ -19,19 +19,19 @@
   낱말을 <code>OrderStatus</code>의 세 값으로 정확히 맞춰봤는데도, 그렇다고 세 사람이
   <b>같은 것에 관심을 갖게 되지는 않았습니다.</b> 도현은 여전히 실물을, 은수는 여전히
   판매 가능 여부를 봅니다. 그리고 3장 페이지 13은 <code>InventoryItem</code> 하나가
-  세 팀의 관심사를 프로퍼티 세 개로 <b>봉합</b>하고 있다고 짚어 뒀습니다. 이 장은
+  세 팀의 관심사를 프로퍼티 세 개로 <b>임시로 묶어 두고</b> 있다고 짚어 뒀습니다. 이 장은
   용어를 더 맞추는 대신, <b>모델 자체를 쪼갭니다.</b></p>
 
   <div class="box note">
     <p class="box-t">이 장의 지도</p>
     <ul>
       <li><b>페이지 2~4 · 문제.</b> 요구사항 두 개가 "상품 1개 = SKU 1개" 가정을
-      깨고, 억지로 구겨 넣어 봅니다. 그리고 이게 낯선 병이 아니라는 것도 확인합니다.</li>
-      <li><b>페이지 5 · 이름 붙이기.</b> 바운디드 컨텍스트가 무엇인가.</li>
-      <li><b>페이지 6~7 · 카탈로그 쪼개기.</b> <code>Product</code>를 나누고, 컨텍스트를
+      깨고, 억지로 코드에 맞춰 봅니다. 그리고 이 문제가 이 책에서 처음이 아니라는 것도 확인합니다.</li>
+      <li><b>페이지 5 · 바운디드 컨텍스트.</b> 바운디드 컨텍스트가 무엇인가.</li>
+      <li><b>페이지 6~7 · 카탈로그 나누기.</b> <code>Product</code>를 나누고, 컨텍스트를
       잇는 통로를 만듭니다.</li>
-      <li><b>페이지 8~9 · 재고 쪼개기(?)</b> 3장이 봉합했다던 것을 실제로 열어 보고,
-      진짜 갈라야 할 것이 무엇인지 확인합니다.</li>
+      <li><b>페이지 8~9 · 재고와 창고.</b> 3장이 임시로 묶어 뒀던 것을 나눌 수 있는지 확인하고,
+      진짜 분리해야 할 것이 무엇인지 찾습니다.</li>
       <li><b>페이지 10~11 · 경계를 긋고 잇는 법.</b> 언제 나누고, 나눈 뒤엔 어떻게 잇는가.</li>
       <li><b>페이지 12 · 한계와 반대의견.</b> 모든 프로젝트에 필요한 것은 아닙니다.</li>
       <li><b>페이지 13 · 마무리.</b> 요약, 퀴즈, 과제.</li>
@@ -41,15 +41,15 @@
   <p>미리 말해 둘 것이 하나 있습니다. 이 장을 다 읽고 나면 <code>Order</code>와
   <code>InventoryItem</code>의 코드는 <b>거의 그대로</b>일 것입니다. 3~7장에서
   "애그리게이트는 ID로만 참조한다", "카탈로그 값은 스냅샷으로 복사한다"는 규칙을
-  지켜 온 대가가 바로 이 장에서 나옵니다 — 가정이 깨져도 <b>규칙을 지킨 코드는
+  지켜 온 효과가 바로 이 장에서 나옵니다 — 가정이 깨져도 <b>규칙을 지킨 코드는
   거의 손댈 필요가 없습니다.</b> 반대로 손대야 하는 곳은 애초에 그 규칙이 없던
   자리, <code>Product</code>입니다.</p>
 </section>
 
 <!-- ─────────────────────────────────────────── 페이지 2 -->
-<section class="screen" data-title="요구사항 둘, 같은 날 도착하다">
+<section class="screen" data-title="같은 날 들어온 요구사항 두 개">
   <p class="kicker">9장 · 페이지 2</p>
-  <h2>요구사항 둘, 같은 날 도착하다</h2>
+  <h2>같은 날 들어온 요구사항 두 개</h2>
 
   <p>3장 페이지 7이 미리 경고했던 그날이 왔습니다. 은수가 슬랙에 요구사항을
   두 개 올립니다.</p>
@@ -90,7 +90,7 @@
   </div>
 
   <p>둘 다 3장 페이지 7의 경고가 가리키던 바로 그 순간입니다.
-  <span class="later">9장에서 다시 볼 문제</span>였던 "상품 1개 = SKU 1개" 가정이
+  앞장에서 9장으로 미뤄 둔 문제였던 "상품 1개 = SKU 1개" 가정이
   두 방향에서 동시에 깨졌습니다.</p>
 </section>
 
@@ -101,7 +101,7 @@
 
   <p>지금 코드를 최대한 안 건드리고 풀 수 있을까요? <code>OrderLine.sku</code>를
   콤마로 묶은 문자열로 만들어 보는 사람이 꼭 나옵니다. 왜 안 되는지 직접 겪어야
-  다음 페이지의 해법이 설득력을 갖습니다.</p>
+  페이지 6의 해법이 설득력을 갖습니다.</p>
 
 <pre><span class="cap"># 이렇게 하면 안 된다 — 문자열로 여러 SKU를 욱여넣기</span><code>class OrderItemInput:
     sku: str          # "SET-JEONGSEONG-3"? 아니면 "SHAMPOO,RINSE,BODYWASH"?
@@ -109,13 +109,13 @@
 </code></pre>
 
   <div class="box bad">
-    <p class="box-t">세 가지가 한꺼번에 무너집니다</p>
+    <p class="box-t">문자열 방식의 세 가지 문제</p>
     <ul>
       <li><b>재고 코드가 카탈로그 규칙을 알아야 합니다.</b>
       <code>InventoryRepository.get_many(skus)</code>가 <code>"SET-JEONGSEONG-3"</code>이라는
       문자열을 받으면, 이걸 세 개의 진짜 SKU로 <b>풀어내는 로직</b>이 재고 컨텍스트
       어딘가에 있어야 합니다. 재고팀 코드가 "이 세트는 무엇으로 구성되는가"라는
-      <b>카탈로그의 지식</b>을 떠안게 됩니다.</li>
+      <b>카탈로그의 지식</b>을 맡게 됩니다.</li>
       <li><b>낱개/박스는 반대로 안 풀립니다.</b> "SHAMPOO,RINSE,BODYWASH"처럼 여러
       SKU를 한 문자열에 담는 방식은 애초에 "SKU 하나를 배수로 파는" 경우(신라면
       낱개/박스)에는 <b>맞지도 않습니다.</b> 한 방향의 임시방편이 반대 방향은
@@ -132,11 +132,11 @@
 </section>
 
 <!-- ─────────────────────────────────────────── 페이지 4 -->
-<section class="screen" data-title="낱말 하나, 여러 세계">
+<section class="screen" data-title="같은 낱말, 다른 개념">
   <p class="kicker">9장 · 페이지 4</p>
-  <h2>낱말 하나, 여러 세계</h2>
+  <h2>같은 낱말, 다른 개념</h2>
 
-  <p>사실 이 책은 이미 같은 모양의 문제를 두 번 더 겪었습니다. 나란히 놓아 보겠습니다.</p>
+  <p>사실 이 책은 같은 모양의 문제를 이미 세 번 겪었습니다. 나란히 놓아 보겠습니다.</p>
 
   <div class="table-wrap">
     <table>
@@ -177,20 +177,21 @@
   "재고"와 "상품"은 왜 같은 방법으로 안 풀릴까요?</p>
 
   <div class="box warn">
-    <p class="box-t">용어집으로는 못 푸는 것이 있다</p>
-    <p>주소·출고 문제는 <b>한 클래스, 한 팀 안에서</b> 이름만 정확히 나누면
-    끝났습니다. 그런데 "상품"과 "SKU"는 애초에 <b>다른 팀이 서로 다른 이유로
+    <p class="box-t">용어집으로 풀리지 않는 문제</p>
+    <p>출고 문제는 <code>Order</code> 한 클래스 안에서 이름만 정확히 나누면
+    끝났습니다. 주소는 주문 쪽과 회원 쪽이 처음부터 다른 클래스여서 서로를
+    고칠 일이 없었습니다. 그런데 "상품"과 "SKU"는 애초에 <b>다른 팀이 서로 다른 이유로
     관리하는 서로 다른 개념</b>입니다 — 은수는 "무엇을 얼마에 파는가"를 관리하고
     도현은 "몇 개가 있는가"를 관리합니다. 이건 이름의 문제가 아니라
     <b>누가 무엇의 주인인가</b>의 문제입니다. 그리고 지금 코드에는 그 경계가
-    <code>Product</code>라는 클래스 하나로 뭉개져 있습니다.</p>
+    <code>Product</code>라는 클래스 하나에 섞여 있습니다.</p>
   </div>
 </section>
 
 <!-- ─────────────────────────────────────────── 페이지 5 -->
-<section class="screen" data-title="이름 붙이기 — 바운디드 컨텍스트">
+<section class="screen" data-title="바운디드 컨텍스트">
   <p class="kicker">9장 · 페이지 5</p>
-  <h2>이름 붙이기 — <span class="term" data-term="boundedcontext">바운디드 컨텍스트</span></h2>
+  <h2><span class="term" data-term="boundedcontext">바운디드 컨텍스트</span></h2>
 
   <p><b>바운디드 컨텍스트(Bounded Context)</b>는 하나의 모델과 그 모델이 쓰는
   낱말들이 <b>유효한 범위</b>입니다. "유효하다"는 것은 그 안에서는 낱말 하나가
@@ -200,7 +201,7 @@
   일하고 있었기 때문입니다.</p>
 
   <div class="box note">
-    <p class="box-t">경계 안에서 정확한 것과, 경계를 나누는 것은 다른 일이다</p>
+    <p class="box-t">이름 정리와 경계 나누기의 차이</p>
     <p>8장까지는 "출고"라는 한 낱말이 가리키는 <b>세 시점을 한 애그리게이트
     (<code>Order</code>) 안에서</b> 정확히 구분했습니다 — 이건 경계를 나눈 게
     아니라 <b>한 모델 안에서 이름을 정리한 것</b>입니다. 이 장에서 하는 일은
@@ -244,13 +245,13 @@
         <path d="M456 105 H482"/>
       </g>
     </svg>
-    <figcaption>세 상자는 서로 다른 이유로 바뀌는 서로 다른 모델입니다. 넘나드는 화살표에
-    적힌 것은 객체가 아니라 문자열 하나(SKU)뿐입니다 — 3장 페이지 7의 "ID로만 참조" 규칙이
+    <figcaption>세 상자는 서로 다른 이유로 바뀌는 서로 다른 모델입니다. 상자 사이를 잇는
+    선은 객체가 아니라 SKU 문자열 하나만 오간다는 뜻입니다 — 3장 페이지 7의 "ID로만 참조" 규칙이
     애그리게이트 사이에 이어 컨텍스트 사이에도 그대로 적용됩니다.</figcaption>
   </figure>
 
   <div class="box good">
-    <p class="box-t">중요: 컨텍스트는 지금 셋으로 "새로 생기는" 게 아니다</p>
+    <p class="box-t">원래 있던 컨텍스트의 경계</p>
     <p>한빛몰은 처음부터 일곱 개 컨텍스트(카탈로그·주문·재고·창고·배송·결제·회원)를
     갖고 있었습니다. 1~8장은 그중 <b>주문과 재고</b>에만 집중했고, 나머지는 존재는
     했지만 코드로 드러나지 않았을 뿐입니다. 이 장이 하는 일은 컨텍스트를 발명하는
@@ -260,9 +261,9 @@
 </section>
 
 <!-- ─────────────────────────────────────────── 페이지 6 -->
-<section class="screen" data-title="카탈로그 쪼개기 — Product를 셋으로">
+<section class="screen" data-title="Product를 세 클래스로 나누기">
   <p class="kicker">9장 · 페이지 6</p>
-  <h2>카탈로그 쪼개기 — <code>Product</code>를 셋으로</h2>
+  <h2><code>Product</code>를 세 클래스로 나누기</h2>
 
   <p>지금까지 <code>Product</code>는 온전한 클래스로 코드에 등장한 적이 없습니다
   (2장 페이지 11에서 "엔티티다"라고만 판정했습니다). 정확히 그게 신호였습니다 —
@@ -281,6 +282,8 @@
 class ProductSku:
     sku: str
     quantity_per_product: int    # 이 상품 1개를 팔 때 이 SKU가 몇 개 빠지는가
+    unit_price: Money            # 이 상품 안에서 SKU 1개를 얼마로 치는가
+                                 # (수량 × 단가의 합 = Product.price)
 </code></pre>
 
 <pre><span class="cap"># inventory/sku.py — 재고 컨텍스트: "몇 개 팔 수 있는가"</span><code>class Sku:                       # 재고 컨텍스트가 아는 "품목". 판매가를 모른다
@@ -307,24 +310,24 @@ class StoredItem:
       <tr><th style="width:11rem">요구사항</th><th><code>composition</code></th></tr>
       <tr>
         <td>정성 3종 세트</td>
-        <td><code>[ProductSku("shampoo-01", 1), ProductSku("rinse-01", 1),
-        ProductSku("bodywash-01", 1)]</code> — <b>서로 다른 SKU 셋</b>, 배수는
-        모두 1.</td>
+        <td><code>[ProductSku("shampoo-01", 1, 15000원), ProductSku("rinse-01", 1, 11000원),
+        ProductSku("bodywash-01", 1, 13000원)]</code> — <b>서로 다른 SKU 셋</b>, 배수는
+        모두 1. 단가의 합이 세트 판매가 39,000원입니다.</td>
       </tr>
       <tr>
         <td>신라면 낱개</td>
-        <td><code>[ProductSku("ramen-shin", 1)]</code></td>
+        <td><code>[ProductSku("ramen-shin", 1, 900원)]</code></td>
       </tr>
       <tr>
         <td>신라면 1박스(30입)</td>
-        <td><code>[ProductSku("ramen-shin", 30)]</code> — <b>같은 SKU</b>,
-        배수만 30.</td>
+        <td><code>[ProductSku("ramen-shin", 30, 800원)]</code> — <b>같은 SKU</b>,
+        배수만 30. 판매가는 800 × 30 = 24,000원입니다.</td>
       </tr>
     </table>
   </div>
 
   <div class="box good">
-    <p class="box-t">방향이 정반대인 두 요구사항이 한 구조로 풀렸다</p>
+    <p class="box-t">두 요구사항을 푸는 하나의 구조</p>
     <p>페이지 2의 표에서 "1:3"과 "2:1"은 서로 반대 방향처럼 보였습니다. 그런데
     <code>composition</code>은 "이 상품을 만드는 데 어떤 SKU가 몇 개씩
     필요한가"라는 <b>한 가지 질문</b>일 뿐이고, 그 답이 세트에서는 여러 줄,
@@ -335,9 +338,9 @@ class StoredItem:
 </section>
 
 <!-- ─────────────────────────────────────────── 페이지 7 -->
-<section class="screen" data-title="컨텍스트를 잇는 통로 — CatalogPort">
+<section class="screen" data-title="컨텍스트를 잇는 CatalogPort">
   <p class="kicker">9장 · 페이지 7</p>
-  <h2>컨텍스트를 잇는 통로 — <code>CatalogPort</code></h2>
+  <h2>컨텍스트를 잇는 <code>CatalogPort</code></h2>
 
   <p>5장이 만든 <code>CatalogPort.snapshot()</code>을 기억하나요? 그때는 구현을
   보여주지 않았습니다. 지금이 그 구현을 볼 차례입니다.</p>
@@ -357,36 +360,49 @@ class StoredItem:
         ]
 </code></pre>
     </div>
-    <div class="tab" data-label="9장 — composition을 펼친다">
+    <div class="tab" data-label="9장: composition 펼치기">
 <pre><code>class SqlCatalogPort:
     def snapshot(self, items):
-        result = []
-        for item in items:
-            product = self._load_product(item.sku)   # item.sku = product_id
-            for comp in product.composition:
-                result.append(OrderItemSnapshot(
-                    sku=comp.sku,                      # 진짜 재고 SKU
-                    product_name=product.name,
-                    unit_price=product.price,
-                    quantity=Quantity(
-                        item.quantity * comp.quantity_per_product)))
-        return result
+        # item.sku = product_id. 상품을 한 번에 조회한다
+        products = self._load_products([i.sku for i in items])
+        return [
+            OrderItemSnapshot(
+                sku=comp.sku,                    # 진짜 재고 SKU
+                product_name=product.name,
+                unit_price=comp.unit_price,      # SKU별 단가
+                quantity=Quantity(
+                    item.quantity * comp.quantity_per_product))
+            for item, product in zip(items, products)
+            for comp in product.composition
+        ]
 </code></pre>
     </div>
   </div>
 
-  <p>세 곳이 바뀝니다. <b>①</b> <code>item.sku</code>의 뜻이 바뀝니다 —
+  <p>네 곳이 바뀝니다. <b>①</b> <code>item.sku</code>의 뜻이 바뀝니다 —
   1~8장에서는 진짜 SKU였는데, 9장부터는 "고객이 장바구니에 담은 카탈로그
   항목의 식별자"(=<code>product_id</code>)입니다. 단일 SKU 상품이라면 지금까지와
   똑같이 SKU와 값이 같아 보이지만, 세트 상품이라면 다릅니다. <b>②</b> 결과가
   <code>items</code>와 <b>1:1이 아닐 수 있습니다</b> — 세트 하나가 SKU 셋으로
-  펼쳐집니다. <b>③</b> 수량 계산에 <code>quantity_per_product</code>가 곱해집니다.</p>
+  펼쳐집니다. <b>③</b> 수량 계산에 <code>quantity_per_product</code>가 곱해집니다.
+  <b>④</b> 단가는 <code>product.price</code>가 아니라 SKU마다 카탈로그가 정해 둔
+  <code>comp.unit_price</code>를 씁니다.</p>
+
+  <p>④가 필요한 이유는 주문 라인의 소계가 <code>unit_price × quantity</code>이기
+  때문입니다. 세트의 <code>product.price</code>를 라인마다 그대로 쓰면 정성 3종 세트
+  1개가 39,000 × 3 = 117,000원이 되고, 신라면 1박스(24,000원)는 24,000 × 30 =
+  720,000원이 됩니다. 그래서 카탈로그가 상품 1개에 들어가는 SKU 단가의 합이
+  판매가와 같도록 미리 나눠 둡니다 — 세트는 15,000 + 11,000 + 13,000 = 39,000원,
+  박스는 800 × 30 = 24,000원입니다. 주문 수량이 몇 개든 소계의 합은
+  <code>product.price</code> × 주문 수량과 같습니다. 25,000원짜리 30입 박스처럼 SKU
+  단가가 정수 원으로 나누어떨어지지 않는 가격은 이 구조로 표현할 수 없으므로, 카탈로그에
+  등록할 때 가격이나 구성을 조정해야 합니다.</p>
 
   <div class="box warn">
-    <p class="box-t"><code>OrderItemInput.sku</code>라는 이름은 바꾸지 않는다</p>
+    <p class="box-t">그대로 둔 <code>OrderItemInput.sku</code> 이름</p>
     <p>5장에서 정한 필드 이름을 그대로 둡니다 — 시그니처를 바꿀 이유가 없다면
     바꾸지 않습니다. 대신 그 문자열에 <b>담기는 값의 뜻</b>이
-    조용히 넓어졌습니다. 이것도 하나의 교훈입니다 — <b>문자열 타입 필드는
+    조용히 넓어졌습니다. <b>문자열 타입 필드는
     이름이 바뀌지 않아도 의미가 바뀔 수 있고, 그 변화는 타입 검사로 걸리지
     않습니다.</b> 2장이 원시값 집착을 경고했던 이유가 여기서도 나타납니다.</p>
   </div>
@@ -395,12 +411,12 @@ class StoredItem:
   <code>InventoryRepository.get_many()</code>는 어떻게 바뀔까요?</p>
 
   <div class="box good">
-    <p class="box-t">한 줄도 안 바뀐다</p>
+    <p class="box-t">바뀌지 않는 세 함수</p>
     <p>세 곳 다 <code>OrderItemSnapshot.sku</code>나 <code>OrderLine.sku</code>를
     <b>이미 있는 그대로의 문자열로만</b> 다뤘습니다 — "이 값이 <code>Product.id</code>와
     같다"는 가정을 코드로 심어 둔 곳은 어디에도 없었습니다(4장 페이지 11의 표,
     5장 페이지 11의 표가 그 가정을 <b>주석으로만</b> 남겨 뒀던 이유가 이겁니다).
-    3장이 정한 "ID로만 참조"와 6장의 스냅샷 규칙을 지킨 대가가 이것입니다 —
+    3장이 정한 "ID로만 참조"와 6장의 스냅샷 규칙을 지킨 효과가 이것입니다 —
     <b>가정이 깨져도 그 가정에 기대지 않은 코드는 흔들리지 않습니다.</b>
     <code>InventoryItem.sku</code>도 마찬가지입니다 — 이 필드는 언제나 그냥
     <code>str</code>이었을 뿐, <code>Product</code>를 참조한 적이 없습니다.
@@ -410,13 +426,13 @@ class StoredItem:
 </section>
 
 <!-- ─────────────────────────────────────────── 페이지 8 -->
-<section class="screen" data-title="재고 컨텍스트는 그대로 둔다">
+<section class="screen" data-title="그대로 두는 재고 컨텍스트">
   <p class="kicker">9장 · 페이지 8</p>
-  <h2>재고 컨텍스트는 그대로 둔다</h2>
+  <h2>그대로 두는 재고 컨텍스트</h2>
 
-  <p>이제 3장 페이지 13이 남긴 빚을 갚을 차례입니다. 그 페이지는 이렇게
-  약속했습니다 — "지금은 프로퍼티 세 개로 봉합했다. 9장에서 이 봉합을 뜯고
-  창고 컨텍스트와 재고 컨텍스트로 나눈다." 그 페이지의 코드를 다시 가져오겠습니다.</p>
+  <p>이제 3장 페이지 13이 미뤄 둔 문제를 다룰 차례입니다. 그 페이지는 프로퍼티
+  세 개로 임시로 묶어 두었다고 하면서, 9장에서 창고 컨텍스트와 재고 컨텍스트로
+  나누겠다고 예고했습니다. 그 페이지의 코드를 다시 가져오겠습니다.</p>
 
 <pre><span class="cap"># domain/inventory.py — 3장 페이지 13, 그대로</span><code>    @property
     def on_hand_quantity(self) -&gt; int:      # 실물재고
@@ -433,7 +449,7 @@ class StoredItem:
         return sum(b.available for b in self._batches)
 </code></pre>
 
-  <p>봉합을 뜯어 보겠습니다 — 실제로 뜯어 보면, <b>뜯을 것이 없습니다.</b>
+  <p>3장의 예고대로 세 프로퍼티를 나눌 수 있는지 확인해 보면, <b>나눌 것이 없습니다.</b>
   3장 페이지 13의 표를 다시 보세요.</p>
 
   <div class="table-wrap">
@@ -443,7 +459,7 @@ class StoredItem:
         <td>실물재고</td>
         <td>창고팀(도현), 재고 실사</td>
         <td><code>_batches</code>의 <code>quantity</code> 합입니다. 실사와
-        비교하는 <b>기준값</b>은 재고 컨텍스트가 쥐고 있어야 실사 차이를
+        비교하는 <b>기준값</b>은 재고 컨텍스트가 관리해야 실사 차이를
         계산할 수 있습니다.</td>
       </tr>
       <tr>
@@ -463,7 +479,7 @@ class StoredItem:
   </div>
 
   <div class="box note">
-    <p class="box-t">"누가 쓰는가"와 "누가 계산하는가"는 다른 질문이다</p>
+    <p class="box-t">값을 쓰는 사람과 계산의 주인</p>
     <p>세 프로퍼티는 전부 <b>같은 재료</b>(배치의 <code>quantity</code>와
     <code>reserved</code>)에서 나옵니다. 쓰는 사람이 창고 쪽(도현, 피킹 담당)이든
     주문 쪽(은수)이든, <b>계산 자체의 주인은 하나</b>여야 값이 어긋나지
@@ -474,14 +490,14 @@ class StoredItem:
   </div>
 
   <p>그러면 3장 페이지 13은 틀린 예고를 한 걸까요? 방향은 맞았는데
-  <b>무엇을 뜯어야 하는지</b>를 그 시점에는 정확히 몰랐던 것에 가깝습니다.
+  <b>무엇을 나눠야 하는지</b>를 그 시점에는 정확히 몰랐던 것에 가깝습니다.
   다음 페이지에서 실제로 없던 것이 무엇인지 봅니다.</p>
 </section>
 
 <!-- ─────────────────────────────────────────── 페이지 9 -->
-<section class="screen" data-title="창고 컨텍스트를 새로 만든다">
+<section class="screen" data-title="새로 만드는 창고 컨텍스트">
   <p class="kicker">9장 · 페이지 9</p>
-  <h2>창고 컨텍스트를 새로 만든다</h2>
+  <h2>새로 만드는 창고 컨텍스트</h2>
 
   <p>도현이 실제로 하는 일을 떠올려 보세요 — 피킹 지시서를 들고 <b>어느 랙으로
   가야 하는지</b>를 압니다. <code>on_hand_quantity</code>는 이 질문에 답하지
@@ -500,8 +516,7 @@ class StoredItem:
 </code></pre>
 
   <div class="box warn">
-    <p class="box-t"><code>StoredItem.quantity</code>는 <code>on_hand_quantity</code>에서
-    잘라 온 값이 아니다</p>
+    <p class="box-t"><code>StoredItem.quantity</code>와 <code>on_hand_quantity</code>의 차이</p>
     <p>둘은 <b>서로 다른 방법으로 구해지는, 서로 다른 숫자</b>입니다.
     <code>on_hand_quantity</code>는 재고 컨텍스트가 입고 처리(<code>receive()</code>·
     <code>arrive()</code>)를 반영해 계산하는 <b>장부상의 합</b>입니다.
@@ -510,8 +525,9 @@ class StoredItem:
     <code>StoredItem.quantity</code>를 더한 값이 그 SKU의
     <code>on_hand_quantity</code>와 같아야 하지만, <b>코드가 그 일치를 강제하지
     않습니다.</b> 도난·파손·전산 누락이 생기면 어긋나고, 그 어긋남을 맞추는
-    것 자체가 실사(재고 조정)의 일입니다 — 두 컨텍스트가 항상 정확히 같은
-    숫자를 보장하지 않는다는 것을 <b>결과적 일관성</b>이라고 부릅니다
+    것 자체가 실사(재고 조정)의 일입니다 — 이렇게 변경 직후에는 두 숫자가 어긋날 수
+    있어도 합의한 시간 안에는 일치하게 되는 것을 허용하는 방식이, 3장과 7장에서 본
+    <span class="term" data-term="eventualconsistency">결과적 일관성</span>입니다
     (12장에서 더 다룹니다).</p>
   </div>
 
@@ -524,7 +540,7 @@ class StoredItem:
     <code>Order.status</code>가 <code>출고됨</code>으로 바뀌는 것과, 창고에서
     실제로 특정 로케이션의 <code>StoredItem.quantity</code>가 줄어드는 것은
     <b>같은 사건의 두 표현</b>이지 하나가 다른 하나의 원인은 아닙니다. 용어를
-    맞추고 나서도 남았던 <span class="later">9장에서 다시 볼 문제</span>가
+    맞추고 나서도 남았던, 앞장에서 9장으로 미뤄 둔 문제가
     바로 이것이었습니다 — 도현과 은수는 낱말을 맞춘 뒤에도 <b>서로 다른
     컨텍스트에서, 서로 다른 이유로 바뀌는 서로 다른 모델</b>을 보고 있었고,
     이제 그 모델이 코드로 각각 존재합니다.</p>
@@ -547,10 +563,11 @@ class StoredItem:
       "출고" — 같은 말을 서로 다른 팀이 서로 다른 뜻으로 쓰고 있다면
       후보입니다. 다만 정의가 다르다고 <b>항상</b> 나눠야 하는 건 아닙니다
       (8장처럼 한 애그리게이트 안에서 이름만 정리해도 되는 경우와 구분해야
-      합니다 — 페이지 5의 note 상자).</li>
+      합니다 — 페이지 5의 "이름 정리와 경계 나누기의 차이" 상자).</li>
       <li><b>누가 이 규칙을 책임지는가?</b> 3장 페이지 6이 애그리게이트 경계에
       썼던 질문("규칙의 주인이 누구인가")을 컨텍스트 단위로 다시 던집니다.
-      SKU 구성을 결정하는 것은 재고팀이 아니라 상품 기획입니다.</li>
+      SKU 구성을 결정하는 것은 재고팀이 아니라 상품 기획입니다. 0장의 한빛몰 흐름도에서
+      단계마다 맡은 사람과 시스템이 달랐던 것도 이 질문에서 출발합니다.</li>
     </ol>
   </div>
 
@@ -568,16 +585,16 @@ class StoredItem:
   </div>
 
   <div class="box note">
-    <p class="box-t">이 경계는 파이썬이 강제하지 않는다</p>
+    <p class="box-t">파이썬이 강제하지 않는 경계</p>
     <p><code>catalog/</code>·<code>inventory/</code>·<code>warehouse/</code>라는
     폴더 구분은 <b>관례입니다.</b> <code>inventory/</code> 코드가
     <code>from catalog.product import Product</code>를 그대로 써도 파이썬은
     막지 않습니다. 지금 규모에서는 폴더 구조와 코드 리뷰로 충분하다고
     보지만, 팀이 커지면 <code>import-linter</code> 같은 도구를 CI에 넣어
     "이 방향의 참조는 안 된다"는 규칙을 <b>빌드 실패로 강제</b>하기도
-    합니다. C++이나 자바처럼 컴파일러가 강제하는 언어를 써 봤다면 그 감각과
-    비교해 보세요 — 몰라도 상관없습니다, 파이썬은 이를 스스로 강제하지
-    않는다는 점만 기억해 두세요.</p>
+    합니다. 자바의 package-private 이나 모듈(<code>module-info</code>)의
+    <code>exports</code> 처럼 언어가 공개 범위를 강제하는 경우도 있습니다. 파이썬에는
+    그런 장치가 없다는 점만 기억해 두세요.</p>
   </div>
 </section>
 
@@ -594,7 +611,7 @@ class StoredItem:
     <table>
       <tr><th style="width:11rem">3장의 애그리게이트 규칙</th><th>9장의 컨텍스트 규칙</th></tr>
       <tr>
-        <td>다른 애그리게이트는 <b>ID로만</b> 참조한다(페이지 7)</td>
+        <td>다른 애그리게이트는 <b>ID로만</b> 참조한다(3장 페이지 7)</td>
         <td>다른 컨텍스트는 <b>SKU 문자열 같은 식별자로만</b> 참조한다.
         <code>InventoryItem</code>은 <code>Product</code>를 몰라도 됩니다.</td>
       </tr>
@@ -609,10 +626,10 @@ class StoredItem:
 
   <p>무엇을 스냅샷할지 결정하는 기준도 6장과 같습니다 — <b>"과거의 사실인가,
   지금의 상태인가?"</b> 주문 라인의 <code>product_name</code>·
-  <code>unit_price</code>는 과거의 사실이라 스냅샷입니다. 반대로
-  <code>InventoryItem</code>이 재고를 확인할 때 쓰는 <code>Sku.manages_expiry</code>는
-  <b>매번 다시 물어봐도 되는 지금의 상태</b>라 스냅샷하지 않고 그때그때
-  조회합니다.</p>
+  <code>unit_price</code>는 과거의 사실이라 스냅샷입니다. 반대로 주문 화면이
+  보여 주는 판매가능수량(재고 컨텍스트의 <code>sellable_quantity</code>)은
+  <b>매번 다시 물어봐야 하는 지금의 상태</b>라 스냅샷하지 않고 그때그때
+  묻습니다.</p>
 
   <div class="box good">
     <p class="box-t">10장 예고</p>
@@ -631,7 +648,7 @@ class StoredItem:
   <h2>한계와 반대의견</h2>
 
   <div class="box warn">
-    <p class="box-t">1. 경계를 잘못 그으면 신호가 보인다</p>
+    <p class="box-t">1. 경계를 잘못 그었다는 신호</p>
     <p>3장 페이지 14가 이 신호를 미리 알려 줬습니다 — <b>"다른 컨텍스트의 정책이
     바뀌었는데 내 코드를 고쳐야 한다"면 경계가 잘못된 것입니다.</b> 배송
     리드타임을 예로 들어 이미 이 원칙을 지켰습니다 — <code>ShippingPolicy.lead_time</code>을
@@ -644,16 +661,16 @@ class StoredItem:
   </div>
 
   <div class="box warn">
-    <p class="box-t">2. 경계는 한 번에 완벽하게 그어지지 않는다</p>
-    <p>3장 페이지 13은 "여기서 뜯는다"고 예고했지만, 실제로 뜯어 보니(페이지 8)
-    뜯을 것은 예고했던 것과 달랐습니다. <b>이건 실패가 아니라 정상입니다.</b>
+    <p class="box-t">2. 한 번에 정해지지 않는 경계</p>
+    <p>3장 페이지 13은 세 프로퍼티를 나눈다고 예고했지만, 실제로 확인해 보니(페이지 8)
+    나눌 것은 예고했던 것과 달랐습니다. <b>이건 실패가 아니라 정상입니다.</b>
     코드를 실제로 나눠 보기 전에는 어디가 진짜 이음매인지 알기 어렵습니다.
     처음 그은 경계가 며칠 안에 다시 움직이는 것은 흔한 일이고, 페이지 10의
     세 질문으로 다시 확인하는 습관이 그은 경계보다 중요합니다.</p>
   </div>
 
   <div class="box warn">
-    <p class="box-t">3. 작은 프로젝트에는 과하다</p>
+    <p class="box-t">3. 작은 프로젝트에서의 비용</p>
     <p>상품 종류가 몇 개 안 되고 창고도 하나뿐인 쇼핑몰이라면, 오늘 만든
     세 폴더는 <b>불필요한 간접 참조</b>가 됩니다. <code>Product</code> 하나에
     <code>sku</code> 필드를 그냥 두는 편이 코드를 읽기에도, 유지하기에도
@@ -711,7 +728,7 @@ class StoredItem:
         <code>Sku</code>로 대체했다</li>
     </ol>
     <div class="explain">
-      <p><b class="lbl">해설</b> 3장의 예고는 방향은 맞았지만 무엇을 뜯어야
+      <p><b class="lbl">해설</b> 3장의 예고는 방향은 맞았지만 무엇을 나눠야
       하는지는 정확히 짚지 못했습니다(페이지 12의 반대의견 2). 실제로 확인해
       보니 진짜 빠져 있던 것은 계산식의 소유권이 아니라 <b>창고가 필요로
       하는, 이전에 없던 데이터</b>였습니다.</p>
@@ -737,7 +754,7 @@ class StoredItem:
     <div class="explain">
       <p><b class="lbl">해설</b> 페이지 7의 good 상자가 이 논지입니다.
       "ID로만 참조"·"스냅샷"은 단순히 좋은 습관이 아니라, <b>나중에 가정이
-      깨질 때 얼마나 많은 코드를 다시 써야 하는지를 결정하는 보험</b>이었습니다.</p>
+      깨질 때 얼마나 많은 코드를 다시 써야 하는지를 결정하는 요인</b>이었습니다.</p>
     </div>
   </div>
 
@@ -751,7 +768,7 @@ class StoredItem:
       <li data-why="페이지 4·10에서 다룬, 적절한 근거입니다.">
         여러 팀이 같은 낱말을 서로 다른 뜻으로 쓰고 있어서
         의사소통 오류가 반복된다</li>
-      <li data-why="페이지 10의 note 상자에서 다룬, 적절한 근거입니다. 규칙의 주인이 다르면 경계를 나눌 이유가 됩니다.">
+      <li data-why="페이지 10의 세 번째 질문에서 다룬, 적절한 근거입니다. 규칙의 주인이 다르면 경계를 나눌 이유가 됩니다.">
         상품 구성을 결정하는 책임이 재고팀이 아니라
         상품기획팀에 있다</li>
       <li data-why="맞습니다. 마이크로서비스로 나누고 싶다는 것은 배포·인프라의 결정이지, 모델이 유효한 범위를 나누는 이유가 아닙니다. 페이지 10의 warn 상자가 정확히 이 오해를 지적합니다.">
@@ -786,10 +803,11 @@ class StoredItem:
         있는지(어느 물류센터인지)와 그 창고 안 어느 랙인지는 <b>서로 다른
         결정입니다.</b> 새 창고를 여는 것과 기존 창고 안에서 랙을
         재배치하는 것은 다른 팀, 다른 시점의 일입니다.</li>
-        <li><b>"같은 낱말인데 정의가 다른가?"</b> — 안 B처럼 문자열에
-        정보를 욱여넣으면, <code>"SEOUL-A동-03-B-12"</code>를 파싱해서
-        창고를 가려내는 코드가 <b>어딘가에 반드시 생깁니다.</b> 이건
-        페이지 3에서 이미 겪은 실수(문자열에 여러 개념 욱여넣기)의 재발입니다.</li>
+        <li><b>"같은 낱말인데 정의가 다른가?"</b> — 안 B에서는
+        <code>Location.code</code> 하나가 "창고 구분"과 "랙 위치"라는 두 뜻을
+        갖습니다. <code>"SEOUL-A동-03-B-12"</code>를 파싱해서 창고를 가려내는
+        코드가 <b>어딘가에 반드시 생기고,</b> 이건 페이지 3에서 이미 겪은 실수(문자열에
+        여러 개념 욱여넣기)의 재발입니다. 안 A는 두 뜻에 각각 이름 있는 필드를 줍니다.</li>
         <li><b>"누가 이 규칙을 책임지는가?"</b> — "어느 창고에서 출고할지
         정하는 규칙"(가까운 창고 우선? 재고 있는 곳 우선?)은 <b>랙 배치
         규칙과 다른 사람이 정합니다.</b> 필드로 분리해 둬야 이 규칙을
@@ -797,7 +815,7 @@ class StoredItem:
       </ul>
       <p>안 B가 매력적으로 보이는 이유는 "지금 당장 코드를 안 고쳐도
       되기 때문"인데, 이건 페이지 3의 "억지로 욱여넣기"와 같은 함정입니다.
-      값 하나에 개념 두 개를 담으면 <b>지금은 편하고 나중에 비쌉니다.</b></p>
+      값 하나에 개념 두 개를 담으면 <b>지금은 편하지만 나중에 고치는 비용이 커집니다.</b></p>
     </div>
   </details>
 
